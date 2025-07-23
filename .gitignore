@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pdb
+*.egg-info/
+
+# SQLite
+*.sqlite3
+*.db
+*.sqlite
+
+# VSCode
+.vscode/
+
+# PyCharm
+.idea/
+*.iml
+
+# 환경설정/가상환경
+.env
+.venv/
+venv/
+ENV/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 기타
+*.log
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
