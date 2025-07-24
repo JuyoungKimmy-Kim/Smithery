@@ -36,3 +36,16 @@ Thumbs.db
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Node/React/Next.js (frontend)
+node_modules/
+.next/
+out/
+build/
+dist/
+
+# 기타 프론트엔드 빌드 산출물
+coverage/
+
+# Zone.Identifier (Windows 보안 정보)
+*.Zone.Identifier
