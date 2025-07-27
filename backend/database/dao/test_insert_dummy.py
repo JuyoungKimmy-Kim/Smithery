@@ -13,7 +13,7 @@ dummy1 = MCPServer(
     transport=TransportType.sse,
     category="review system",
     tags=["github", "code"],
-    status="active"
+    status="active",
 )
 dummy2 = MCPServer(
     id="2",
@@ -23,7 +23,7 @@ dummy2 = MCPServer(
     transport=TransportType.sse,
     category="issue",
     tags=["jira", "issue"],
-    status="active"
+    status="active",
 )
 dummy3 = MCPServer(
     id="3",
@@ -33,7 +33,7 @@ dummy3 = MCPServer(
     transport=TransportType.streamable_http,
     category="test",
     tags=["test", "issue"],
-    status="active"
+    status="active",
 )
 dummy4 = MCPServer(
     id="4",
@@ -43,7 +43,7 @@ dummy4 = MCPServer(
     transport=TransportType.sse,
     category="search",
     tags=["search", "issue"],
-    status="active"
+    status="active",
 )
 dummy5 = MCPServer(
     id="5",
@@ -53,7 +53,7 @@ dummy5 = MCPServer(
     transport=TransportType.sse,
     category="test",
     tags=["perforce", "code"],
-    status="active"
+    status="active",
 )
 
 dao.create_mcp(dummy1)
