@@ -6,11 +6,10 @@ from fastapi.staticfiles import StaticFiles
 from backend.database.dao.mcp_server_dao import MCPServerDAO
 
 app = FastAPI()
-# 정적 파일(css, js, assets) 서빙
+# Serve static files (css, js, assets)
 app.mount("/css", StaticFiles(directory="frontend/css"), name="css")
 app.mount("/js", StaticFiles(directory="frontend/js"), name="js")
 app.mount("/assets", StaticFiles(directory="frontend/assets"), name="assets")
-# index.html은 frontend/에서, detail.html 등은 frontend/templates/에서 렌더링
 index_templates = Jinja2Templates(directory="frontend")
 
 @app.get("/", response_class=HTMLResponse)
@@ -29,7 +28,7 @@ def mcp_detail(request: Request, mcp_id: str):
     dao.create_table()
     mcp = dao.get_mcp(mcp_id)
     dao.close()
-    return detail_templates.TemplateResponse("detail.html", {"request": request, "mcp": mcp})
+    return index_templates.TemplateResponse("detail.html", {"request": request, "mcp": mcp})
 
 @app.get("/api/mcps")
 def api_mcps():
