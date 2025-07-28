@@ -2,3 +2,7 @@ fastapi
 uvicorn
 httpx
 pydantic
+jinja2
+python-multipart
+requests
+beautifulsoup4
