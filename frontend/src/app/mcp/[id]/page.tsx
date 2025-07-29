@@ -141,55 +141,74 @@ export default function MCPServerDetail() {
           )}
         </div>
 
-        {/* Tools Section */}
-        {mcp.tools && mcp.tools.length > 0 && (
-          <Card className="mb-8">
-            <CardBody className="p-8">
-              <div className="flex items-center gap-2 mb-6">
-                <WrenchScrewdriverIcon className="h-6 w-6 text-blue-500" />
-                <Typography variant="h4" color="blue-gray">
-                  Tools ({mcp.tools.length})
-                </Typography>
-              </div>
-              
-              <div className="grid gap-4 md:grid-cols-2">
-                {mcp.tools.map((tool, index) => (
-                  <Card key={index} className="border border-gray-200">
-                    <CardBody className="p-4">
-                      <Typography variant="h6" color="blue-gray" className="mb-2">
-                        {tool.name}
-                      </Typography>
-                      <Typography variant="small" color="gray" className="mb-3">
-                        {tool.description}
-                      </Typography>
-                      
-                      {tool.input_properties && tool.input_properties.length > 0 && (
-                        <div>
-                          <Typography variant="small" color="blue-gray" className="font-medium mb-2">
-                            Input Properties:
+        {/* Tools & Config Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+          {/* Tools (Left) */}
+          <div>
+            {mcp.tools && mcp.tools.length > 0 && (
+              <Card>
+                <CardBody className="p-8">
+                  <div className="flex items-center gap-2 mb-6">
+                    <WrenchScrewdriverIcon className="h-6 w-6 text-blue-500" />
+                    <Typography variant="h4" color="blue-gray">
+                      Tools ({mcp.tools.length})
+                    </Typography>
+                  </div>
+                  <div className="grid gap-4">
+                    {mcp.tools.map((tool, index) => (
+                      <Card key={index} className="border border-gray-200">
+                        <CardBody className="p-4">
+                          <Typography variant="h6" color="blue-gray" className="mb-2">
+                            {tool.name}
                           </Typography>
-                          <div className="space-y-1">
-                            {tool.input_properties.map((prop, propIndex) => (
-                              <div key={propIndex} className="flex items-center gap-2 text-xs">
-                                <span className="font-medium">{prop.name}</span>
-                                {prop.required && (
-                                  <Badge color="red" size="sm">Required</Badge>
-                                )}
-                                {prop.description && (
-                                  <span className="text-gray-600">- {prop.description}</span>
-                                )}
+                          <Typography variant="small" color="gray" className="mb-3">
+                            {tool.description}
+                          </Typography>
+                          {tool.input_properties && tool.input_properties.length > 0 && (
+                            <div>
+                              <Typography variant="small" color="blue-gray" className="font-medium mb-2">
+                                Input Properties:
+                              </Typography>
+                              <div className="space-y-1">
+                                {tool.input_properties.map((prop, propIndex) => (
+                                  <div key={propIndex} className="flex items-center gap-2 text-xs">
+                                    <span className="font-medium">{prop.name}</span>
+                                    {prop.required && (
+                                      <Badge color="red" size="sm">Required</Badge>
+                                    )}
+                                    {prop.description && (
+                                      <span className="text-gray-600">- {prop.description}</span>
+                                    )}
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </CardBody>
-                  </Card>
-                ))}
-              </div>
-            </CardBody>
-          </Card>
-        )}
+                            </div>
+                          )}
+                        </CardBody>
+                      </Card>
+                    ))}
+                  </div>
+                </CardBody>
+              </Card>
+            )}
+          </div>
+          {/* Config (Right) */}
+          <div>
+            <Card>
+              <CardBody className="p-8">
+                <div className="flex items-center gap-2 mb-6">
+                  <WrenchScrewdriverIcon className="h-6 w-6 text-blue-500" />
+                  <Typography variant="h4" color="blue-gray">
+                    Server Config
+                  </Typography>
+                </div>
+                <pre className="bg-gray-100 rounded p-4 text-xs overflow-x-auto">
+                  {JSON.stringify(mcp.config, null, 2)}
+                </pre>
+              </CardBody>
+            </Card>
+          </div>
+        </div>
 
         {/* Resources Section */}
         {mcp.resources && mcp.resources.length > 0 && (
