@@ -1,4 +1,5 @@
 import React from "react";
+import { useRouter } from "next/navigation";
 import {
   Typography,
   Card,
@@ -14,6 +15,7 @@ interface BlogPostCardProps {
   desc: string;
   author: { name: string; img: string };
   date: string;
+  id?: string; // MCP 서버 ID 추가
 }
 
 export function BlogPostCard({
@@ -23,23 +25,42 @@ export function BlogPostCard({
   desc,
   author,
   date,
+  id,
 }: BlogPostCardProps) {
+  const router = useRouter();
+
+  const handleClick = () => {
+    console.log("Card clicked! ID:", id); // 디버깅 로그 추가
+    console.log("Card title:", title); // 제목도 로깅
+    if (id) {
+      console.log("Navigating to:", `/mcp/${id}`); // 디버깅 로그 추가
+      router.push(`/mcp/${id}`);
+    } else {
+      console.log("No ID provided, navigating to test page"); // 디버깅 로그 추가
+      // ID가 없어도 테스트용으로 첫 번째 MCP로 이동
+      // router.push 대신 window.location 사용
+      window.location.href = `/mcp/1`;
+    }
+  };
+
   return (
-    <Card shadow={true}>
+    <Card 
+      shadow={true} 
+      className="cursor-pointer hover:shadow-lg transition-shadow duration-200"
+      onClick={handleClick}
+    >
       <CardBody className="p-6">
         <Typography variant="small" color="blue" className="mb-2 !font-medium">
           {category}
         </Typography>
         <Typography
-          as="a"
-          href="#"
           variant="h5"
           color="blue-gray"
-          className="mb-2 normal-case transition-colors hover:text-gray-900"
+          className="mb-2 normal-case transition-colors hover:text-gray-900 cursor-pointer"
         >
           {title}
         </Typography>
-        <Typography className="mb-6 font-normal !text-gray-500">
+        <Typography className="mb-6 font-normal !text-gray-500 cursor-pointer">
           {desc}
         </Typography>
         <div className="mb-4">

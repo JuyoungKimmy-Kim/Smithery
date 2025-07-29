@@ -9,6 +9,8 @@ export async function GET() {
       throw new Error(`Backend API error: ${response.status}`);
     }
     const posts = await response.json();
+    console.log('Backend posts data:', posts); // 디버깅 로그 추가
+    console.log('First post ID:', posts[0]?.id); // 첫 번째 포스트의 ID 확인
     return NextResponse.json(posts);
   } catch (error) {
     console.error('API error:', error);
