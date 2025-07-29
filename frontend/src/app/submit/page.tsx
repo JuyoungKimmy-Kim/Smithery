@@ -12,19 +12,22 @@ export default function SubmitMCPPage() {
         </Typography>
         <form className="space-y-6">
           <div>
-            <Input label="Server Name" required fullWidth />
+            <Input label="Server Name" required />
           </div>
           <div>
-            <Input label="Category" required fullWidth />
+            <Input label="Category" required />
           </div>
           <div>
-            <Input label="GitHub Link" fullWidth />
+            <Input label="GitHub Link" />
           </div>
           <div>
-            <Textarea label="Description" required fullWidth rows={4} />
+            <Textarea label="Description" required rows={4} />
           </div>
           <div>
-            <Input label="Tags (comma separated)" fullWidth />
+            <Textarea label="Server Config (JSON)" required rows={6} />
+          </div>
+          <div>
+            <Input label="Tags (comma separated)" />
           </div>
           <div className="flex justify-end">
             <Button color="blue" type="submit">

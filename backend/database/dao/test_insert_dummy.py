@@ -32,6 +32,21 @@ def convert_dict_to_mcp_tools(tools_dict_list):
         mcp_tools.append(tool)
     return mcp_tools
 
+# 예시 config JSON
+example_config = {
+    "mcpServers": {
+        "weather": {
+            "command": "uv",
+            "args": [
+                "--directory",
+                "C:\\ABSOLUTE\\PATH\\TO\\PARENT\\FOLDER\\weather",
+                "run",
+                "weather.py"
+            ]
+        }
+    }
+}
+
 dummy1 = MCPServer(
     id="1",
     github_link="https://github.com/modelcontextprotocol/server-filesystem",
@@ -41,6 +56,7 @@ dummy1 = MCPServer(
     category="review system",
     tags=["github", "code"],
     status="active",
+    config=example_config
 )
 dummy2 = MCPServer(
     id="2",
@@ -51,6 +67,7 @@ dummy2 = MCPServer(
     category="issue",
     tags=["jira", "issue"],
     status="active",
+    config=example_config
 )
 dummy3 = MCPServer(
     id="3",
@@ -61,6 +78,7 @@ dummy3 = MCPServer(
     category="test",
     tags=["test", "issue"],
     status="active",
+    config=example_config
 )
 dummy4 = MCPServer(
     id="4",
@@ -71,6 +89,7 @@ dummy4 = MCPServer(
     category="search",
     tags=["search", "issue"],
     status="active",
+    config=example_config
 )
 dummy5 = MCPServer(
     id="5",
@@ -81,6 +100,7 @@ dummy5 = MCPServer(
     category="test",
     tags=["perforce", "code"],
     status="active",
+    config=example_config
 )
 
 # MCP 서버들을 DB에 저장하고 tools 정보도 함께 저장
