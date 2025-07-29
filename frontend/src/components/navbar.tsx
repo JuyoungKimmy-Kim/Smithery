@@ -13,6 +13,7 @@ import {
   XMarkIcon,
   Bars3Icon,
 } from "@heroicons/react/24/solid";
+import { useRouter } from "next/navigation";
 
 const NAV_MENU = [
   {
@@ -54,8 +55,13 @@ function NavItem({ children, href }: NavItemProps) {
 
 export function Navbar() {
   const [open, setOpen] = React.useState(false);
+  const router = useRouter();
 
   const handleOpen = () => setOpen((cur) => !cur);
+  const handleDeployClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    router.push("/submit");
+  };
 
   React.useEffect(() => {
     window.addEventListener(
@@ -86,9 +92,7 @@ export function Navbar() {
         </ul>
         <div className="hidden items-center gap-2 lg:flex">
           <Button variant="text">Sign In</Button>
-          <a href="https://www.material-tailwind.com/blocks" target="_blank">
-            <Button color="gray">Deploy Server</Button>
-          </a>
+          <Button color="gray" onClick={handleDeployClick}>Deploy Server</Button>
         </div>
         <IconButton
           variant="text"
@@ -115,9 +119,7 @@ export function Navbar() {
           </ul>
           <div className="mt-6 mb-4 flex items-center gap-2">
             <Button variant="text">Sign In</Button>
-            <a href="https://www.material-tailwind.com/blocks" target="_blank">
-              <Button color="gray">Deploy Server</Button>
-            </a>
+            <Button color="gray" onClick={handleDeployClick}>Deploy Server</Button>
           </div>
         </div>
       </Collapse>

@@ -10,6 +10,7 @@ import {
 } from "@material-tailwind/react";
 import { ArrowSmallDownIcon } from "@heroicons/react/24/solid";
 import BlogPostCard from "@/components/blog-post-card";
+import { MCPServer } from "@/types/mcp";
 
 interface Post {
   category: string;
@@ -21,6 +22,7 @@ interface Post {
     img: string;
     name: string;
   };
+  id?: string;
 }
 
 export function Posts() {
@@ -33,6 +35,8 @@ export function Posts() {
         const response = await fetch('/api/posts');
         if (response.ok) {
           const data = await response.json();
+          console.log('Frontend received posts:', data); // 디버깅 로그 추가
+          console.log('First post ID:', data[0]?.id); // 첫 번째 포스트의 ID 확인
           setPosts(data);
         } else {
           console.error('Failed to fetch posts');
@@ -46,6 +50,7 @@ export function Posts() {
 
     fetchPosts();
   }, []);
+
   return (
     <section className="grid min-h-screen place-items-center p-8">
       <Tabs value="trends" className="mx-auto max-w-7xl w-full mb-8">
@@ -71,7 +76,7 @@ export function Posts() {
         </div>
       ) : (
         <div className="container my-auto grid grid-cols-1 gap-x-8 gap-y-16 items-start lg:grid-cols-3">
-          {posts.map(({ category, tags, title, desc, date, author }) => (
+          {posts.map(({ category, tags, title, desc, date, author, id }) => (
             <BlogPostCard
               key={title}
               category={category}
@@ -83,6 +88,7 @@ export function Posts() {
                 img: author.img,
                 name: author.name,
               }}
+              id={id}
             />
           ))}
         </div>

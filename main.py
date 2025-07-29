@@ -99,6 +99,7 @@ def get_posts():
         posts = []
         for i, mcp in enumerate(mcps):
             post = {
+                "id": mcp.id,  # MCP 서버 ID 추가
                 "category": mcp.category or "Unknown",
                 "tags": str(mcp.tags) if mcp.tags else "[]",
                 "title": mcp.name,
