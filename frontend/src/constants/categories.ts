@@ -1,7 +1,7 @@
 export const MCP_CATEGORIES = [
   "Code Tools",
   "Documentation", 
-  "Data & Search",
+  "Data",
   "Automation",
   "DevOps",
   "Miscellaneous"
