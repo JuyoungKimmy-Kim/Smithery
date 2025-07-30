@@ -12,13 +12,13 @@ class MCPServerDAO(Database):
             github_link TEXT NOT NULL,
             name TEXT NOT NULL,
             description TEXT NOT NULL,
-            transport TEXT NOT NULL,
-            category TEXT,
+            transport,
+            category TEXT NOT NULL,
             tags TEXT,
             status TEXT,
             tools TEXT,
             resources TEXT,
-            config TEXT NOT NULL,
+            config TEXT,
             created_at TEXT,
             updated_at TEXT
         );

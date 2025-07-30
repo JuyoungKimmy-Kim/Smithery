@@ -33,6 +33,7 @@ export interface MCPServer {
   status?: string;
   tools: MCPServerTool[];
   resources: MCPServerResource[];
+  config?: any;
   created_at?: string;
   updated_at?: string;
 }
