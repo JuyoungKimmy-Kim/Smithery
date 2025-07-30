@@ -11,9 +11,9 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: "NextJS Tailwind Blog Posts Page",
+  title: "MCP Server Hub",
   description:
-    "Download Tailwind Blog Post Page, a free webpage template developed by Creative Tim. Based on Tailwind CSS and Material Tailwind, see the live demo on our site and elevate your blogging experience!",
+  ""
 };
 
 export default function RootLayout({

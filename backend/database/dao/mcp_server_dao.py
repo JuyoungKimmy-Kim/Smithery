@@ -12,12 +12,13 @@ class MCPServerDAO(Database):
             github_link TEXT NOT NULL,
             name TEXT NOT NULL,
             description TEXT NOT NULL,
-            transport TEXT NOT NULL,
-            category TEXT,
+            transport,
+            category TEXT NOT NULL,
             tags TEXT,
             status TEXT,
             tools TEXT,
             resources TEXT,
+            config TEXT,
             created_at TEXT,
             updated_at TEXT
         );
@@ -100,8 +101,8 @@ class MCPServerDAO(Database):
 
     def create_mcp(self, mcp: MCPServer):
         query = """
-        INSERT INTO mcp_server (id, github_link, name, description, transport, category, tags, status, tools, resources, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO mcp_server (id, github_link, name, description, transport, category, tags, status, tools, resources, config, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         self.conn.execute(
             query,
@@ -116,6 +117,7 @@ class MCPServerDAO(Database):
                 mcp.status,
                 self._serialize_tools(mcp.tools),
                 self._serialize_resources(mcp.resources),
+                json.dumps(mcp.config) if hasattr(mcp, "config") and mcp.config is not None else None,
                 mcp.created_at,
                 mcp.updated_at,
             ),
@@ -131,6 +133,7 @@ class MCPServerDAO(Database):
             data["tags"] = json.loads(data["tags"]) if data["tags"] else []
             data["tools"] = self._deserialize_tools(data["tools"])
             data["resources"] = self._deserialize_resources(data["resources"])
+            data["config"] = json.loads(data["config"]) if data.get("config") else None
             # transport를 enum으로 변환
             if data["transport"]:
                 data["transport"] = TransportType(data["transport"])
@@ -147,6 +150,7 @@ class MCPServerDAO(Database):
             data["tags"] = json.loads(data["tags"]) if data["tags"] else []
             data["tools"] = self._deserialize_tools(data["tools"])
             data["resources"] = self._deserialize_resources(data["resources"])
+            data["config"] = json.loads(data["config"]) if data.get("config") else None
             # transport를 enum으로 변환
             if data["transport"]:
                 data["transport"] = TransportType(data["transport"])
@@ -160,6 +164,8 @@ class MCPServerDAO(Database):
             kwargs["tools"] = self._serialize_tools(kwargs["tools"])
         if "resources" in kwargs:
             kwargs["resources"] = self._serialize_resources(kwargs["resources"])
+        if "config" in kwargs:
+            kwargs["config"] = json.dumps(kwargs["config"])
         if "transport" in kwargs:
             transport = kwargs["transport"]
             kwargs["transport"] = transport.value if isinstance(transport, TransportType) else transport

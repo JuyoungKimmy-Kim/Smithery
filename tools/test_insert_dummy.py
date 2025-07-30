@@ -32,15 +32,31 @@ def convert_dict_to_mcp_tools(tools_dict_list):
         mcp_tools.append(tool)
     return mcp_tools
 
+# 예시 config JSON
+example_config = {
+    "mcpServers": {
+        "weather": {
+            "command": "uv",
+            "args": [
+                "--directory",
+                "C:\\ABSOLUTE\\PATH\\TO\\PARENT\\FOLDER\\weather",
+                "run",
+                "weather.py"
+            ]
+        }
+    }
+}
+
 dummy1 = MCPServer(
     id="1",
     github_link="https://github.com/modelcontextprotocol/server-filesystem",
     name="github mcp",
     description="This tools provide various github features using github API",
     transport=TransportType.sse,
-    category="review system",
+    category="Code Tools",
     tags=["github", "code"],
     status="active",
+    config=example_config
 )
 dummy2 = MCPServer(
     id="2",
@@ -48,9 +64,10 @@ dummy2 = MCPServer(
     name="Jirahub",
     description="This toolkit allows AI to access the JIRA",
     transport=TransportType.sse,
-    category="issue",
+    category="Documentation",
     tags=["jira", "issue"],
     status="active",
+    config=example_config
 )
 dummy3 = MCPServer(
     id="3",
@@ -58,9 +75,10 @@ dummy3 = MCPServer(
     name="Test Vitlas",
     description="One system for all our projects' test results.",
     transport=TransportType.streamable_http,
-    category="test",
+    category="DevOps",
     tags=["test", "issue"],
     status="active",
+    config=example_config
 )
 dummy4 = MCPServer(
     id="4",
@@ -68,9 +86,10 @@ dummy4 = MCPServer(
     name="Knowhub",
     description="This toolkit helps AI search for knowledge, tables, and images stored in the database.",
     transport=TransportType.sse,
-    category="search",
+    category="Data",
     tags=["search", "issue"],
     status="active",
+    config=example_config
 )
 dummy5 = MCPServer(
     id="5",
@@ -78,48 +97,39 @@ dummy5 = MCPServer(
     name="Perforce",
     description="This toolkit enables AI to interact Perforce P4 and its review system Swarm",
     transport=TransportType.sse,
-    category="test",
+    category="Code Tools",
     tags=["perforce", "code"],
     status="active",
+    config=example_config
 )
 
 # MCP 서버들을 DB에 저장하고 tools 정보도 함께 저장
 print("=== Starting MCP server data insertion ===")
 
-# dummy1 - Filesystem MCP Server
-print("1. Processing Filesystem MCP Server...")
 tools1_dict = mcp_service.read_mcp_server_tool_list(dummy1.github_link)
 tools1 = convert_dict_to_mcp_tools(tools1_dict)
 dummy1.tools = tools1
 dao.create_mcp(dummy1)
 print(f"   - Saved {len(tools1)} tools")
 
-# dummy2 - Git MCP Server
-print("2. Processing Git MCP Server...")
 tools2_dict = mcp_service.read_mcp_server_tool_list(dummy2.github_link)
 tools2 = convert_dict_to_mcp_tools(tools2_dict)
 dummy2.tools = tools2
 dao.create_mcp(dummy2)
 print(f"   - Saved {len(tools2)} tools")
 
-# dummy3 - HTTP MCP Server
-print("3. Processing HTTP MCP Server...")
 tools3_dict = mcp_service.read_mcp_server_tool_list(dummy3.github_link)
 tools3 = convert_dict_to_mcp_tools(tools3_dict)
 dummy3.tools = tools3
 dao.create_mcp(dummy3)
 print(f"   - Saved {len(tools3)} tools")
 
-# dummy4 - Ollama MCP Server
-print("4. Processing Ollama MCP Server...")
 tools4_dict = mcp_service.read_mcp_server_tool_list(dummy4.github_link)
 tools4 = convert_dict_to_mcp_tools(tools4_dict)
 dummy4.tools = tools4
 dao.create_mcp(dummy4)
 print(f"   - Saved {len(tools4)} tools")
 
-# dummy5 - Ollama MCP Server (duplicate but with different name)
-print("5. Processing Ollama MCP Server (2)...")
 tools5_dict = mcp_service.read_mcp_server_tool_list(dummy5.github_link)
 tools5 = convert_dict_to_mcp_tools(tools5_dict)
 dummy5.tools = tools5

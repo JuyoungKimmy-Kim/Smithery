@@ -38,5 +38,6 @@ class MCPServer(BaseModel):
     status: Optional[str] = None
     tools: List[MCPServerTool] = Field(default_factory=list)
     resources: List[MCPServerResource] = Field(default_factory=list)
+    config: dict = Field(default_factory=dict)
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
