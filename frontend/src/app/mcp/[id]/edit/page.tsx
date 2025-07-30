@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { MCPServer, TransportType } from "../../../../types/mcp";
+import { MCP_CATEGORIES } from "@/constants/categories";
 
 export default function EditMCPServerPage() {
   const params = useParams();
@@ -178,9 +179,9 @@ export default function EditMCPServerPage() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed"
             />
           </div>
-
-        {/* GitHub Link - 읽기 전용 */}
-                    <div>
+          
+          {/* GitHub Link - 읽기 전용 */}
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               GitHub Link
             </label>
@@ -192,8 +193,8 @@ export default function EditMCPServerPage() {
             />
           </div>
           
-        {/* Description - 필수 */}
-                    <div>
+          {/* Description - 필수 */}
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Description *
             </label>
@@ -211,27 +212,32 @@ export default function EditMCPServerPage() {
               <p className="mt-1 text-sm text-red-600">{validationErrors.description}</p>
             )}
           </div>
-
-          {/* Category - 필수 */}
-          <div>
+          
+           {/* Category - 필수 (드롭다운) */}
+           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Category *
             </label>
-            <input
-              type="text"
+            <select
               required
               value={formData.category}
               onChange={(e) => handleInputChange('category', e.target.value)}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 validationErrors.category ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder="e.g., review system, issue, test, search"
-            />
+            >
+              <option value="">카테고리를 선택하세요</option>
+              {MCP_CATEGORIES.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
             {validationErrors.category && (
               <p className="mt-1 text-sm text-red-600">{validationErrors.category}</p>
             )}
           </div>
-         
+
           {/* Tags - 선택적 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">

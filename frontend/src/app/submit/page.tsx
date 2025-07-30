@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { MCPServer, TransportType } from "../../types/mcp";
+import { MCP_CATEGORIES } from "@/constants/categories";
 
 export default function SubmitMCPPage() {
   const router = useRouter();
@@ -146,9 +147,9 @@ export default function SubmitMCPPage() {
               <p className="mt-1 text-sm text-red-600">{validationErrors.name}</p>
             )}
           </div>
-
+          
           {/* GitHub Link - 필수 */}
-                    <div>
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               GitHub Link *
             </label>
@@ -186,27 +187,32 @@ export default function SubmitMCPPage() {
               <p className="mt-1 text-sm text-red-600">{validationErrors.description}</p>
             )}
           </div>
-
-          {/* Category - 필수 */}
-                    <div>
+          
+          {/* Category - 필수 (드롭다운) */}
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Category *
             </label>
-            <input
-              type="text"
+            <select
               required
               value={formData.category}
               onChange={(e) => handleInputChange('category', e.target.value)}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 validationErrors.category ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder="e.g., review system, issue, test, search"
-            />
+            >
+              <option value="">카테고리를 선택하세요</option>
+              {MCP_CATEGORIES.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
             {validationErrors.category && (
               <p className="mt-1 text-sm text-red-600">{validationErrors.category}</p>
             )}
           </div>
-          
+
           {/* Tags - 선택적 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
