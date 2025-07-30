@@ -1,15 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
-import {
-  Typography,
-  Card,
-  CardBody,
-  Button,
-  Badge,
-  Chip,
-} from "@material-tailwind/react";
+import { useParams, useRouter } from "next/navigation";
 import {
   CodeBracketIcon,
   GlobeAltIcon,
@@ -17,14 +9,18 @@ import {
   CalendarIcon,
   WrenchScrewdriverIcon,
   BookOpenIcon,
+  PencilIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 import { MCPServer } from "@/types/mcp";
 
 export default function MCPServerDetail() {
   const params = useParams();
+  const router = useRouter();
   const [mcp, setMcp] = useState<MCPServer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const fetchMCP = async () => {
@@ -48,12 +44,48 @@ export default function MCPServerDetail() {
     }
   }, [params.id]);
 
+  const handleModify = () => {
+    // 수정 페이지로 이동
+    if (mcp) {
+      router.push(`/mcp/${mcp.id}/edit`);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!mcp) return;
+    
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${mcp.name}"? This action cannot be undone.`
+    );
+    
+    if (!confirmed) return;
+    
+    setIsDeleting(true);
+    
+    try {
+      const response = await fetch(`/api/mcps/${mcp.id}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        alert("MCP server deleted successfully!");
+        router.push('/'); // 홈페이지로 이동
+      } else {
+        throw new Error('Failed to delete MCP server');
+      }
+    } catch (error) {
+      alert('Failed to delete MCP server. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Typography variant="h6" color="gray">
+        <h2 className="text-xl text-gray-600">
           Loading MCP server...
-        </Typography>
+        </h2>
       </div>
     );
   }
@@ -61,9 +93,9 @@ export default function MCPServerDetail() {
   if (error || !mcp) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Typography variant="h6" color="red">
+        <h2 className="text-xl text-red-600">
           {error || "MCP server not found"}
-        </Typography>
+        </h2>
       </div>
     );
   }
@@ -76,24 +108,25 @@ export default function MCPServerDetail() {
           <div className="flex items-start justify-between mb-6">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-4">
-                <Badge color="blue" className="text-xs">
+                <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
                   {mcp.category || "Uncategorized"}
-                </Badge>
-                <Badge 
-                  color={mcp.status === "active" ? "green" : "gray"} 
-                  className="text-xs"
-                >
+                </span>
+                <span className={`px-2 py-1 text-xs rounded-full ${
+                  mcp.status === "active" 
+                    ? "bg-green-100 text-green-800" 
+                    : "bg-gray-100 text-gray-800"
+                }`}>
                   {mcp.status || "Unknown"}
-                </Badge>
+                </span>
               </div>
               
-              <Typography variant="h2" color="blue-gray" className="mb-4">
+              <h1 className="text-3xl font-bold text-gray-900 mb-4">
                 {mcp.name}
-              </Typography>
+              </h1>
               
-              <Typography variant="lead" color="gray" className="mb-6">
+              <p className="text-lg text-gray-600 mb-6">
                 {mcp.description}
-              </Typography>
+              </p>
 
               <div className="flex items-center gap-6 text-sm text-gray-600">
                 <div className="flex items-center gap-2">
@@ -110,15 +143,30 @@ export default function MCPServerDetail() {
             </div>
 
             <div className="flex gap-3">
-              <Button 
-                variant="outlined" 
-                color="blue"
-                className="flex items-center gap-2"
+              <button 
+                className="px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 transition-colors flex items-center gap-2"
                 onClick={() => window.open(mcp.github_link, '_blank')}
               >
                 <CodeBracketIcon className="h-4 w-4" />
                 View on GitHub
-              </Button>
+              </button>
+              
+              <button 
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
+                onClick={handleModify}
+              >
+                <PencilIcon className="h-4 w-4" />
+                Edit
+              </button>
+              
+              <button 
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                onClick={handleDelete}
+                disabled={isDeleting}
+              >
+                <TrashIcon className="h-4 w-4" />
+                {isDeleting ? "Deleting..." : "Delete"}
+              </button>
             </div>
           </div>
 
@@ -128,13 +176,12 @@ export default function MCPServerDetail() {
               <TagIcon className="h-4 w-4 text-gray-600" />
               <div className="flex flex-wrap gap-2">
                 {mcp.tags.map((tag, index) => (
-                  <Chip
+                  <span
                     key={index}
-                    value={tag}
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs"
-                  />
+                    className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full"
+                  >
+                    {tag}
+                  </span>
                 ))}
               </div>
             </div>
@@ -146,184 +193,168 @@ export default function MCPServerDetail() {
           {/* Tools (Left) */}
           <div>
             {mcp.tools && mcp.tools.length > 0 && (
-              <Card>
-                <CardBody className="p-8">
-                  <div className="flex items-center gap-2 mb-6">
-                    <WrenchScrewdriverIcon className="h-6 w-6 text-blue-500" />
-                    <Typography variant="h4" color="blue-gray">
-                      Tools ({mcp.tools.length})
-                    </Typography>
-                  </div>
-                  <div className="grid gap-4">
-                    {mcp.tools.map((tool, index) => (
-                      <Card key={index} className="border border-gray-200">
-                        <CardBody className="p-4">
-                          <Typography variant="h6" color="blue-gray" className="mb-2">
-                            {tool.name}
-                          </Typography>
-                          <Typography variant="small" color="gray" className="mb-3">
-                            {tool.description}
-                          </Typography>
-                          {tool.input_properties && tool.input_properties.length > 0 && (
-                            <div>
-                              <Typography variant="small" color="blue-gray" className="font-medium mb-2">
-                                Input Properties:
-                              </Typography>
-                              <div className="space-y-1">
-                                {tool.input_properties.map((prop, propIndex) => (
-                                  <div key={propIndex} className="flex items-center gap-2 text-xs">
-                                    <span className="font-medium">{prop.name}</span>
-                                    {prop.required && (
-                                      <Badge color="red" size="sm">Required</Badge>
-                                    )}
-                                    {prop.description && (
-                                      <span className="text-gray-600">- {prop.description}</span>
-                                    )}
-                                  </div>
-                                ))}
+              <div className="bg-white rounded-lg shadow-sm p-8">
+                <div className="flex items-center gap-2 mb-6">
+                  <WrenchScrewdriverIcon className="h-6 w-6 text-blue-500" />
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Tools ({mcp.tools.length})
+                  </h2>
+                </div>
+                <div className="grid gap-4">
+                  {mcp.tools.map((tool, index) => (
+                    <div key={index} className="border border-gray-200 rounded-lg p-4">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        {tool.name}
+                      </h3>
+                      <p className="text-sm text-gray-600 mb-3">
+                        {tool.description}
+                      </p>
+                      {tool.input_properties && tool.input_properties.length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-900 mb-2">
+                            Input Properties:
+                          </p>
+                          <div className="space-y-1">
+                            {tool.input_properties.map((prop, propIndex) => (
+                              <div key={propIndex} className="flex items-center gap-2 text-xs">
+                                <span className="font-medium">{prop.name}</span>
+                                {prop.required && (
+                                  <span className="px-1 py-0.5 bg-red-100 text-red-800 text-xs rounded">Required</span>
+                                )}
+                                {prop.description && (
+                                  <span className="text-gray-600">- {prop.description}</span>
+                                )}
                               </div>
-                            </div>
-                          )}
-                        </CardBody>
-                      </Card>
-                    ))}
-                  </div>
-                </CardBody>
-              </Card>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
           {/* Config (Right) */}
           <div>
-            <Card>
-              <CardBody className="p-8">
-                <div className="flex items-center gap-2 mb-6">
-                  <WrenchScrewdriverIcon className="h-6 w-6 text-blue-500" />
-                  <Typography variant="h4" color="blue-gray">
-                    Server Config
-                  </Typography>
-                </div>
-                <pre className="bg-gray-100 rounded p-4 text-xs overflow-x-auto">
-                  {JSON.stringify(mcp.config, null, 2)}
-                </pre>
-              </CardBody>
-            </Card>
+            <div className="bg-white rounded-lg shadow-sm p-8">
+              <div className="flex items-center gap-2 mb-6">
+                <WrenchScrewdriverIcon className="h-6 w-6 text-blue-500" />
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Server Config
+                </h2>
+              </div>
+              <pre className="bg-gray-100 rounded p-4 text-xs overflow-x-auto">
+                {JSON.stringify(mcp.config, null, 2)}
+              </pre>
+            </div>
           </div>
         </div>
 
         {/* Resources Section */}
         {mcp.resources && mcp.resources.length > 0 && (
-          <Card className="mb-8">
-            <CardBody className="p-8">
-              <div className="flex items-center gap-2 mb-6">
-                <BookOpenIcon className="h-6 w-6 text-blue-500" />
-                <Typography variant="h4" color="blue-gray">
-                  Resources ({mcp.resources.length})
-                </Typography>
-              </div>
-              
-              <div className="grid gap-4">
-                {mcp.resources.map((resource, index) => (
-                  <Card key={index} className="border border-gray-200">
-                    <CardBody className="p-4">
-                      <Typography variant="h6" color="blue-gray" className="mb-2">
-                        {resource.name}
-                      </Typography>
-                      <Typography variant="small" color="gray" className="mb-3">
-                        {resource.description}
-                      </Typography>
-                      <Button
-                        variant="text"
-                        color="blue"
-                        size="sm"
-                        className="p-0 h-auto"
-                        onClick={() => window.open(resource.url, '_blank')}
-                      >
-                        {resource.url}
-                      </Button>
-                    </CardBody>
-                  </Card>
-                ))}
-              </div>
-            </CardBody>
-          </Card>
+          <div className="bg-white rounded-lg shadow-sm p-8 mb-8">
+            <div className="flex items-center gap-2 mb-6">
+              <BookOpenIcon className="h-6 w-6 text-blue-500" />
+              <h2 className="text-2xl font-bold text-gray-900">
+                Resources ({mcp.resources.length})
+              </h2>
+            </div>
+            
+            <div className="grid gap-4">
+              {mcp.resources.map((resource, index) => (
+                <div key={index} className="border border-gray-200 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    {resource.name}
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-3">
+                    {resource.description}
+                  </p>
+                  <button
+                    className="text-blue-600 hover:text-blue-800 text-sm hover:underline"
+                    onClick={() => window.open(resource.url, '_blank')}
+                  >
+                    {resource.url}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* Metadata Section */}
-        <Card>
-          <CardBody className="p-8">
-            <Typography variant="h4" color="blue-gray" className="mb-6">
-              Metadata
-            </Typography>
-            
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <Typography variant="small" color="gray" className="font-medium">
-                  ID
-                </Typography>
-                <Typography variant="paragraph" color="blue-gray">
-                  {mcp.id}
-                </Typography>
-              </div>
-              
-              <div>
-                <Typography variant="small" color="gray" className="font-medium">
-                  GitHub Link
-                </Typography>
-                <Typography 
-                  variant="paragraph" 
-                  color="blue"
-                  className="cursor-pointer hover:underline"
-                  onClick={() => window.open(mcp.github_link, '_blank')}
-                >
-                  {mcp.github_link}
-                </Typography>
-              </div>
-              
-              <div>
-                <Typography variant="small" color="gray" className="font-medium">
-                  Transport
-                </Typography>
-                <Typography variant="paragraph" color="blue-gray">
-                  {mcp.transport}
-                </Typography>
-              </div>
-              
-              <div>
-                <Typography variant="small" color="gray" className="font-medium">
-                  Status
-                </Typography>
-                <Badge 
-                  color={mcp.status === "active" ? "green" : "gray"}
-                  className="w-fit"
-                >
-                  {mcp.status || "Unknown"}
-                </Badge>
-              </div>
-              
-              {mcp.created_at && (
-                <div>
-                  <Typography variant="small" color="gray" className="font-medium">
-                    Created At
-                  </Typography>
-                  <Typography variant="paragraph" color="blue-gray">
-                    {new Date(mcp.created_at).toLocaleString()}
-                  </Typography>
-                </div>
-              )}
-              
-              {mcp.updated_at && (
-                <div>
-                  <Typography variant="small" color="gray" className="font-medium">
-                    Updated At
-                  </Typography>
-                  <Typography variant="paragraph" color="blue-gray">
-                    {new Date(mcp.updated_at).toLocaleString()}
-                  </Typography>
-                </div>
-              )}
+        <div className="bg-white rounded-lg shadow-sm p-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">
+            Metadata
+          </h2>
+          
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <p className="text-sm font-medium text-gray-600">
+                ID
+              </p>
+              <p className="text-gray-900">
+                {mcp.id}
+              </p>
             </div>
-          </CardBody>
-        </Card>
+            
+            <div>
+              <p className="text-sm font-medium text-gray-600">
+                GitHub Link
+              </p>
+              <button 
+                className="text-blue-600 hover:text-blue-800 hover:underline"
+                onClick={() => window.open(mcp.github_link, '_blank')}
+              >
+                {mcp.github_link}
+              </button>
+            </div>
+            
+            <div>
+              <p className="text-sm font-medium text-gray-600">
+                Transport
+              </p>
+              <p className="text-gray-900">
+                {mcp.transport}
+              </p>
+            </div>
+            
+            <div>
+              <p className="text-sm font-medium text-gray-600">
+                Status
+              </p>
+              <span className={`px-2 py-1 text-xs rounded-full ${
+                mcp.status === "active" 
+                  ? "bg-green-100 text-green-800" 
+                  : "bg-gray-100 text-gray-800"
+              }`}>
+                {mcp.status || "Unknown"}
+              </span>
+            </div>
+            
+            {mcp.created_at && (
+              <div>
+                <p className="text-sm font-medium text-gray-600">
+                  Created At
+                </p>
+                <p className="text-gray-900">
+                  {new Date(mcp.created_at).toLocaleString()}
+                </p>
+              </div>
+            )}
+            
+            {mcp.updated_at && (
+              <div>
+                <p className="text-sm font-medium text-gray-600">
+                  Updated At
+                </p>
+                <p className="text-gray-900">
+                  {new Date(mcp.updated_at).toLocaleString()}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
