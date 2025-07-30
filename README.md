@@ -6,22 +6,12 @@
 
 ```
 ds-smithery/
-├── backend/          # 백엔드 로직 (DAO, 모델)
-│   ├── database/
-│   │   ├── dao/mcp_server_dao.py    # MCP 서버 데이터 접근 로직
-│   │   └── model/mcp_server.py      # 데이터 모델 정의
-│   └── ...
+├── backend/          # 백엔드 로직 (DAO, 모델, 서비스)
 ├── frontend/         # Next.js + Tailwind CSS 프론트엔드
-│   ├── src/
-│   │   ├── app/api/                 # Next.js API Routes (백엔드 API 호출)
-│   │   │   ├── mcps/                # MCP 서버 API 프록시
-│   │   │   └── posts/               # 블로그 포스트 API 프록시
-│   │   └── types/mcp.ts             # TypeScript 타입 정의
-│   └── ...
+├── tools/            # 개발 도구 및 스크립트
 ├── test/             # 테스트 파일들
 ├── main.py           # FastAPI 백엔드 서버
-├── requirements.txt  # Python 의존성 (백엔드용)
-└── mcp_market.db     # SQLite 데이터베이스
+└── requirements.txt  # Python 의존성
 ```
 
 ## 아키텍처 설명
@@ -191,7 +181,22 @@ python -c "from database.dao.mcp_server_dao import MCPServerDAO; dao = MCPServer
 
 ## 데이터베이스
 
-프로젝트는 SQLite 데이터베이스 (`mcp_market.db`)를 사용합니다. 데이터베이스 접근은 백엔드의 DAO 로직을 통해 이루어집니다.
+### 개발용 더미 데이터 생성
+
+개발 및 테스트를 위해 더미 데이터를 생성할 수 있습니다:
+
+```bash
+# 가상환경 활성화
+source .venv/bin/activate
+
+# 더미 데이터 삽입 스크립트 실행
+PYTHONPATH=. python tools/test_insert_dummy.py
+```
+
+이 스크립트는 다음과 같은 더미 데이터를 생성합니다:
+- 5개의 MCP 서버 정보
+- 각 서버마다 2-3개의 도구(tools)
+- 다양한 카테고리와 태그 정보
 
 ### 데이터베이스 스키마
 ```sql
