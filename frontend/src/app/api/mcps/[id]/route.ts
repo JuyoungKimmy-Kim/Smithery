@@ -4,10 +4,11 @@ const BACKEND_URL = 'http://localhost:8080';
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/mcps/${params.id}`);
+    const { id } = await params;
+    const response = await fetch(`${BACKEND_URL}/api/mcps/${id}`);
     if (!response.ok) {
       if (response.status === 404) {
         return NextResponse.json({ error: 'MCP server not found' }, { status: 404 });
@@ -24,11 +25,12 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const body = await request.json();
-    const response = await fetch(`${BACKEND_URL}/api/mcps/${params.id}`, {
+    const response = await fetch(`${BACKEND_URL}/api/mcps/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -53,10 +55,11 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/mcps/${params.id}`, {
+    const { id } = await params;
+    const response = await fetch(`${BACKEND_URL}/api/mcps/${id}`, {
       method: 'DELETE',
     });
     
