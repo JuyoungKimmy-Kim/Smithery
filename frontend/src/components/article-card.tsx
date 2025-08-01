@@ -1,10 +1,4 @@
 import Image from "next/image";
-import {
-  Typography,
-  Card,
-  CardBody,
-} from "@material-tailwind/react";
-
 
 interface ArticleCardProps {
     img: string;
@@ -14,10 +8,7 @@ interface ArticleCardProps {
   
   export function ArticleCard({ img, title, desc }: ArticleCardProps) {
     return (
-      <Card
-        className="relative grid min-h-[30rem] items-end overflow-hidden rounded-xl"
-        color="transparent"
-      >
+      <div className="relative grid min-h-[30rem] items-end overflow-hidden rounded-xl bg-transparent">
         <Image
           width={768}
           height={768}
@@ -26,19 +17,15 @@ interface ArticleCardProps {
           className="absolute inset-0 h-full w-full object-cover object-center"
         />
         <div className="absolute inset-0 bg-black/60" />
-        <CardBody className="relative flex flex-col justify-end">
-          <Typography variant="h4" color="white">
+        <div className="relative flex flex-col justify-end p-6">
+          <h2 className="text-2xl font-bold text-white">
             {title}
-          </Typography>
-          <Typography
-            variant="paragraph"
-            color="white"
-            className="my-2 font-normal"
-          >
+          </h2>
+          <p className="text-white my-2 font-normal">
             {desc}
-          </Typography>
-        </CardBody>
-      </Card>
+          </p>
+        </div>
+      </div>
     );
   }
 
