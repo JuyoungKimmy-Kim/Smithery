@@ -1,11 +1,5 @@
 import React from "react";
 import { useRouter } from "next/navigation";
-import {
-  Typography,
-  Card,
-  CardBody,
-  Avatar,
-} from "@material-tailwind/react";
 import TagList from "./tag-list";
 
 interface BlogPostCardProps {
@@ -44,54 +38,40 @@ export function BlogPostCard({
   };
 
   return (
-    <Card 
-      shadow={true} 
-      className="cursor-pointer hover:shadow-lg transition-shadow duration-200"
+    <div 
+      className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 cursor-pointer"
       onClick={handleClick}
     >
-      <CardBody className="p-6">
-        <Typography variant="small" color="blue" className="mb-2 !font-medium">
+      <div className="p-6">
+        <span className="text-sm font-medium text-blue-600 mb-2 block">
           {category}
-        </Typography>
-        <Typography
-          variant="h5"
-          color="blue-gray"
-          className="mb-2 normal-case transition-colors hover:text-gray-900 cursor-pointer"
-        >
+        </span>
+        <h3 className="text-xl font-semibold text-gray-900 mb-2 normal-case transition-colors hover:text-gray-700 cursor-pointer">
           {title}
-        </Typography>
-        <Typography className="mb-6 font-normal !text-gray-500 cursor-pointer">
+        </h3>
+        <p className="text-gray-600 mb-6 cursor-pointer">
           {desc}
-        </Typography>
+        </p>
         <div className="mb-4">
           <TagList tags={tags} maxTags={4} />
         </div>
         <div className="flex items-center gap-4">
-          <Avatar
-            size="sm"
-            variant="circular"
+          <img
             src={author.img}
             alt={author.name}
+            className="w-8 h-8 rounded-full"
           />
           <div>
-            <Typography
-              variant="small"
-              color="blue-gray"
-              className="mb-0.5 !font-medium"
-            >
+            <p className="text-sm font-medium text-gray-900 mb-0.5">
               {author.name}
-            </Typography>
-            <Typography
-              variant="small"
-              color="gray"
-              className="text-xs !text-gray-500 font-normal"
-            >
+            </p>
+            <p className="text-xs text-gray-500">
               {date}
-            </Typography>
+            </p>
           </div>
         </div>
-      </CardBody>
-    </Card>
+      </div>
+    </div>
   );
 }
 

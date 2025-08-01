@@ -1,12 +1,5 @@
 import React from "react";
 import {
-  Navbar as MTNavbar,
-  Collapse,
-  Button,
-  IconButton,
-  Typography,
-} from "@material-tailwind/react";
-import {
   RectangleStackIcon,
   UserCircleIcon,
   CommandLineIcon,
@@ -39,16 +32,13 @@ interface NavItemProps {
 function NavItem({ children, href }: NavItemProps) {
   return (
     <li>
-      <Typography
-        as="a"
+      <a
         href={href || "#"}
         target={href ? "_blank" : "_self"}
-        variant="paragraph"
-        color="gray"
         className="flex items-center gap-2 font-medium text-gray-900"
       >
         {children}
-      </Typography>
+      </a>
     </li>
   );
 }
@@ -71,16 +61,14 @@ export function Navbar() {
   }, []);
 
   return (
-    <MTNavbar shadow={false} fullWidth className="border-0 sticky top-0 z-50">
-      <div className="container mx-auto flex items-center justify-between">
-        <Typography
-          as="a"
+    <nav className="border-0 sticky top-0 z-50 bg-white shadow-sm">
+      <div className="container mx-auto flex items-center justify-between px-4 py-3">
+        <a
           href="/"
-          color="blue-gray"
-          className="text-lg font-bold"
+          className="text-lg font-bold text-blue-gray-900"
         >
           MCP Server Hub
-        </Typography>
+        </a>
         <ul className="ml-10 hidden items-center gap-8 lg:flex">
           {NAV_MENU.map(({ name, icon: Icon, href }) => (
             <NavItem key={name} href={href}>
@@ -90,39 +78,53 @@ export function Navbar() {
           ))}
         </ul>
         <div className="hidden items-center gap-2 lg:flex">
-          <Button variant="text">Sign In</Button>
-          <Button color="gray" onClick={handleDeployClick}>Deploy Server</Button>
+          <button className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors">
+            Sign In
+          </button>
+          <button 
+            className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+            onClick={handleDeployClick}
+          >
+            Deploy Server
+          </button>
         </div>
-        <IconButton
-          variant="text"
-          color="gray"
+        <button
           onClick={handleOpen}
-          className="ml-auto inline-block lg:hidden"
+          className="ml-auto inline-block lg:hidden p-2 text-gray-700 hover:text-gray-900"
         >
           {open ? (
-            <XMarkIcon strokeWidth={2} className="h-6 w-6" />
+            <XMarkIcon className="h-6 w-6" />
           ) : (
-            <Bars3Icon strokeWidth={2} className="h-6 w-6" />
+            <Bars3Icon className="h-6 w-6" />
           )}
-        </IconButton>
+        </button>
       </div>
-      <Collapse open={open}>
-        <div className="container mx-auto mt-3 border-t border-gray-200 px-2 pt-4">
-          <ul className="flex flex-col gap-4">
-            {NAV_MENU.map(({ name, icon: Icon }) => (
-              <NavItem key={name}>
-                <Icon className="h-5 w-5" />
-                {name}
-              </NavItem>
-            ))}
-          </ul>
-          <div className="mt-6 mb-4 flex items-center gap-2">
-            <Button variant="text">Sign In</Button>
-            <Button color="gray" onClick={handleDeployClick}>Deploy Server</Button>
+      {open && (
+        <div className="lg:hidden border-t border-gray-200 bg-white">
+          <div className="container mx-auto px-4 py-4">
+            <ul className="space-y-4">
+              {NAV_MENU.map(({ name, icon: Icon, href }) => (
+                <NavItem key={name} href={href}>
+                  <Icon className="h-5 w-5" />
+                  {name}
+                </NavItem>
+              ))}
+            </ul>
+            <div className="mt-4 space-y-2">
+              <button className="w-full px-4 py-2 text-left text-gray-700 hover:text-gray-900 transition-colors">
+                Sign In
+              </button>
+              <button 
+                className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                onClick={handleDeployClick}
+              >
+                Deploy Server
+              </button>
+            </div>
           </div>
         </div>
-      </Collapse>
-    </MTNavbar>
+      )}
+    </nav>
   );
 }
 
