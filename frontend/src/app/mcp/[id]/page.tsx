@@ -28,6 +28,8 @@ export default function MCPServerDetail() {
         const response = await fetch(`/api/mcps/${params.id}`);
         if (response.ok) {
           const data = await response.json();
+          console.log('MCP Server Data:', data); // 디버깅용 로그
+          console.log('Tools:', data.tools); // tools 데이터 확인
           setMcp(data);
         } else {
           setError("MCP server not found");

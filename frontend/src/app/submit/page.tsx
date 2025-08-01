@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { MCPServer, TransportType } from "../../types/mcp";
 import { MCP_CATEGORIES } from "@/constants/categories";
@@ -18,6 +18,9 @@ export default function SubmitMCPPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
+  const [previewTools, setPreviewTools] = useState<any[]>([]);
+  const [previewResources, setPreviewResources] = useState<any[]>([]);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -31,6 +34,49 @@ export default function SubmitMCPPage() {
         ...prev,
         [field]: ""
       }));
+    }
+
+    // GitHub 링크가 변경되면 tools 미리보기 업데이트
+    if (field === 'github_link' && value.trim()) {
+      handleGitHubLinkChange(value);
+    }
+  };
+
+  const handleGitHubLinkChange = async (githubLink: string) => {
+    if (!githubLink.startsWith('https://github.com/')) {
+      setPreviewTools([]);
+      setPreviewResources([]);
+      return;
+    }
+
+    setIsLoadingPreview(true);
+    try {
+      // 백엔드 API를 통해 tools 정보 미리보기 요청
+      const response = await fetch('/api/mcps/preview', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ github_link: githubLink }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Preview API Response:', data); // 디버깅용 로그
+        setPreviewTools(data.tools || []);
+        setPreviewResources(data.resources || []);
+        console.log('Set Preview Tools:', data.tools || []); // 설정된 tools 확인
+      } else {
+        console.log('Preview API failed:', response.status); // 실패 로그
+        setPreviewTools([]);
+        setPreviewResources([]);
+      }
+    } catch (error) {
+      console.error('Tools 미리보기 로드 실패:', error);
+      setPreviewTools([]);
+      setPreviewResources([]);
+    } finally {
+      setIsLoadingPreview(false);
     }
   };
 
@@ -82,10 +128,14 @@ export default function SubmitMCPPage() {
         transport: TransportType.SSE, // 기본값으로 SSE 사용
         tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
         status: "active",
-        tools: [], // 기본 빈 배열
-        resources: [], // 기본 빈 배열
+        tools: previewTools, // 미리보기에서 가져온 tools 사용
+        resources: previewResources, // 미리보기에서 가져온 resources 사용
         config: formData.config ? JSON.parse(formData.config) : {}
       };
+
+      console.log('Submitting MCP Server:', mcpServer); // 디버깅용 로그
+      console.log('Preview Tools:', previewTools); // tools 데이터 확인
+      console.log('Preview Tools length:', previewTools.length); // tools 개수 확인
 
       const response = await fetch('/api/mcps', {
         method: 'POST',
@@ -243,6 +293,63 @@ export default function SubmitMCPPage() {
               JSON 형식으로 서버 설정을 입력하세요. 비워두면 기본 설정이 사용됩니다.
             </p>
           </div>
+
+          {/* Tools & Resources 미리보기 */}
+          {(previewTools.length > 0 || previewResources.length > 0 || isLoadingPreview) && (
+            <div className="border border-gray-200 rounded-lg p-6 bg-gray-50">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Detected Tools & Resources
+              </h3>
+              
+              {isLoadingPreview && (
+                <div className="flex items-center justify-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <span className="ml-2 text-gray-600">Analyzing repository...</span>
+                </div>
+              )}
+
+              {!isLoadingPreview && previewTools.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-md font-medium text-gray-800 mb-3">
+                    Tools ({previewTools.length})
+                  </h4>
+                  <div className="space-y-2">
+                    {previewTools.map((tool, index) => (
+                      <div key={index} className="bg-white rounded border p-3">
+                        <div className="font-medium text-gray-900">{tool.name}</div>
+                        <div className="text-sm text-gray-600">{tool.description}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!isLoadingPreview && previewResources.length > 0 && (
+                <div>
+                  <h4 className="text-md font-medium text-gray-800 mb-3">
+                    Resources ({previewResources.length})
+                  </h4>
+                  <div className="space-y-2">
+                    {previewResources.map((resource, index) => (
+                      <div key={index} className="bg-white rounded border p-3">
+                        <div className="font-medium text-gray-900">{resource.name}</div>
+                        <div className="text-sm text-gray-600">{resource.description}</div>
+                        {resource.url && (
+                          <div className="text-xs text-blue-600 mt-1">{resource.url}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!isLoadingPreview && previewTools.length === 0 && previewResources.length === 0 && (
+                <div className="text-gray-500 text-sm">
+                  No tools or resources detected in this repository.
+                </div>
+              )}
+            </div>
+          )}
           
           <div className="flex justify-end">
             <button
