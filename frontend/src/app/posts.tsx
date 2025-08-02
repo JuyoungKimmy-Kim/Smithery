@@ -29,16 +29,23 @@ export function Posts() {
   useEffect(() => {
     const fetchPosts = async () => {
       try {
+        console.log('Fetching posts from /api/posts...');
         const response = await fetch('/api/posts');
+        console.log('Response status:', response.status);
+        console.log('Response ok:', response.ok);
+        
         if (response.ok) {
           const data = await response.json();
           console.log('Fetched posts data:', data); // 전체 데이터 확인
+          console.log('Number of posts:', data.length); // 포스트 개수 확인
           console.log('First post structure:', data[0]); // 첫 번째 포스트 구조 확인
           
           setAllPosts(data);
           setPosts(data);
         } else {
-          console.error('Failed to fetch posts');
+          console.error('Failed to fetch posts, status:', response.status);
+          const errorText = await response.text();
+          console.error('Error response:', errorText);
         }
       } catch (error) {
         console.error('Error fetching posts:', error);
