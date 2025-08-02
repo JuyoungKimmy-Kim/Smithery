@@ -1,5 +1,11 @@
 from backend.database.database import Database
-from backend.database.model.mcp_server import MCPServer, MCPServerTool, MCPServerResource, MCPServerProperty, TransportType
+from backend.database.model.mcp_server import (
+    MCPServer,
+    MCPServerTool,
+    MCPServerResource,
+    MCPServerProperty,
+    TransportType,
+)
 from typing import List, Optional
 import json
 
@@ -39,10 +45,10 @@ class MCPServerDAO(Database):
                     {
                         "name": prop.name,
                         "description": prop.description,
-                        "required": prop.required
+                        "required": prop.required,
                     }
                     for prop in tool.input_properties
-                ]
+                ],
             }
             tools_data.append(tool_data)
         return json.dumps(tools_data)
@@ -58,14 +64,14 @@ class MCPServerDAO(Database):
                 MCPServerProperty(
                     name=prop["name"],
                     description=prop.get("description"),
-                    required=prop["required"]
+                    required=prop["required"],
                 )
                 for prop in tool_data["input_properties"]
             ]
             tool = MCPServerTool(
                 name=tool_data["name"],
                 description=tool_data["description"],
-                input_properties=input_properties
+                input_properties=input_properties,
             )
             tools.append(tool)
         return tools
@@ -78,7 +84,7 @@ class MCPServerDAO(Database):
             {
                 "name": resource.name,
                 "description": resource.description,
-                "url": resource.url
+                "url": resource.url,
             }
             for resource in resources
         ]
@@ -94,7 +100,7 @@ class MCPServerDAO(Database):
             resource = MCPServerResource(
                 name=resource_data["name"],
                 description=resource_data["description"],
-                url=resource_data["url"]
+                url=resource_data["url"],
             )
             resources.append(resource)
         return resources
@@ -111,13 +117,21 @@ class MCPServerDAO(Database):
                 mcp.github_link,
                 mcp.name,
                 mcp.description,
-                mcp.transport.value if isinstance(mcp.transport, TransportType) else mcp.transport,
+                (
+                    mcp.transport.value
+                    if isinstance(mcp.transport, TransportType)
+                    else mcp.transport
+                ),
                 mcp.category,
                 json.dumps(mcp.tags) if mcp.tags else None,
                 mcp.status,
                 self._serialize_tools(mcp.tools),
                 self._serialize_resources(mcp.resources),
-                json.dumps(mcp.config) if hasattr(mcp, "config") and mcp.config is not None else None,
+                (
+                    json.dumps(mcp.config)
+                    if hasattr(mcp, "config") and mcp.config is not None
+                    else None
+                ),
                 mcp.created_at,
                 mcp.updated_at,
             ),
@@ -168,7 +182,9 @@ class MCPServerDAO(Database):
             kwargs["config"] = json.dumps(kwargs["config"])
         if "transport" in kwargs:
             transport = kwargs["transport"]
-            kwargs["transport"] = transport.value if isinstance(transport, TransportType) else transport
+            kwargs["transport"] = (
+                transport.value if isinstance(transport, TransportType) else transport
+            )
         fields = ", ".join([f"{k} = ?" for k in kwargs])
         values = list(kwargs.values())
         values.append(mcp_id)
