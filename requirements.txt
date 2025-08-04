@@ -8,3 +8,10 @@ requests
 beautifulsoup4
 pytest
 bs4
+# 인증 관련
+PyJWT==2.8.0
+bcrypt==4.1.2
+# 이메일 검증
+email-validator==2.1.0
+# 환경변수 관리
+python-dotenv==1.0.0

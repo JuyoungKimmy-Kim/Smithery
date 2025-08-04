@@ -11,6 +11,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "18": "^0.0.0",
     "@heroicons/react": "2.0.18",
     "@material-tailwind/react": "2.1.2",
     "@types/sqlite3": "^5.1.0",
