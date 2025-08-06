@@ -1,9 +1,27 @@
 "use client";
 
 import Image from "next/image";
+import { useState } from "react";
 
+interface HeroProps {
+  onSearch?: (searchTerm: string) => void;
+}
 
-function Hero() {
+function Hero({ onSearch }: HeroProps) {
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const handleSearch = () => {
+    if (onSearch && searchTerm.trim()) {
+      onSearch(searchTerm.trim());
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
+
   return (
     <header className="mt-5 bg-black py-16">
       <div className="container mx-auto flex flex-col justify-center items-center min-h-[320px] text-center">
@@ -23,10 +41,16 @@ function Hero() {
               <input 
                 type="text" 
                 placeholder="find your mcp server" 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyPress={handleKeyPress}
                 className="w-full px-3 py-2 bg-gray-800 text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
               />
             </div>
-            <button className="px-6 py-2 bg-white text-black font-medium rounded-lg hover:bg-gray-100 transition-colors lg:w-max shrink-0 w-full">
+            <button 
+              onClick={handleSearch}
+              className="px-6 py-2 bg-white text-black font-medium rounded-lg hover:bg-gray-100 transition-colors lg:w-max shrink-0 w-full"
+            >
               Search
             </button>
           </div>

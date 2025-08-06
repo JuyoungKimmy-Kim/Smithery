@@ -5,27 +5,6 @@ export function Footer() {
   return (
     <footer className="pb-5 p-10 md:pt-10">
       <div className="container flex flex-col mx-auto">
-        <div className="flex !w-full py-10 mb-5 md:mb-20 flex-col justify-center !items-center bg-gray-900 container max-w-6xl mx-auto rounded-2xl p-5 ">
-          <h2 className="text-2xl md:text-3xl text-center font-bold text-white">
-            Join our community!
-          </h2>
-          <p className="md:w-7/12 text-center my-3 text-base text-white">
-            Get news in your inbox every week! We hate spam too, so no worries
-            about this.
-          </p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-4 md:flex-row">
-            <div className="w-80">
-              <input 
-                type="email" 
-                placeholder="Email" 
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <button className="px-6 py-2 bg-white text-gray-900 font-medium rounded-lg hover:bg-gray-100 transition-colors lg:w-32 w-full">
-              subscribe
-            </button>
-          </div>
-        </div>
         <div className="flex flex-col md:flex-row items-center !justify-between">
           <a
             href="https://www.material-tailwind.com"

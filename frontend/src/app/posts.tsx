@@ -5,6 +5,7 @@ import { ArrowSmallDownIcon } from "@heroicons/react/24/solid";
 import BlogPostCard from "@/components/blog-post-card";
 import { MCPServer } from "@/types/mcp";
 import { MCP_CATEGORIES } from "@/constants/categories";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Post {
   category: string;
@@ -19,12 +20,26 @@ interface Post {
   id?: string;
 }
 
-export function Posts() {
+interface PostsProps {
+  searchTerm?: string;
+}
+
+export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
+  const { isAuthenticated } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
   const [allPosts, setAllPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("All");
   const [visibleCount, setVisibleCount] = useState(6); // 초기 6개 카드만 보이도록
+  const [refreshKey, setRefreshKey] = useState(0); // 즐겨찾기 상태 변경 시 리프레시용
+  const [searchTerm, setSearchTerm] = useState(initialSearchTerm); // 검색어 상태 추가
+
+  // 외부에서 전달된 검색어가 변경될 때 처리
+  useEffect(() => {
+    if (initialSearchTerm !== searchTerm) {
+      handleSearch(initialSearchTerm);
+    }
+  }, [initialSearchTerm]);
 
   useEffect(() => {
     const fetchPosts = async () => {
@@ -55,7 +70,31 @@ export function Posts() {
     };
 
     fetchPosts();
-  }, []);
+  }, [refreshKey]); // refreshKey가 변경될 때마다 다시 가져오기
+
+  // 검색 기능 추가
+  const handleSearch = (searchTerm: string) => {
+    setSearchTerm(searchTerm);
+    setActiveTab("All"); // 검색 시 All 탭으로 리셋
+    setVisibleCount(6); // 검색 시 초기 6개로 리셋
+    
+    if (!searchTerm.trim()) {
+      setPosts(allPosts);
+      return;
+    }
+
+    const filteredPosts = allPosts.filter(post => {
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        post.title.toLowerCase().includes(searchLower) ||
+        post.desc.toLowerCase().includes(searchLower) ||
+        post.tags.toLowerCase().includes(searchLower) ||
+        post.category.toLowerCase().includes(searchLower)
+      );
+    });
+    
+    setPosts(filteredPosts);
+  };
 
   // 탭 변경 시 필터링
   const handleTabChange = (category: string) => {
@@ -63,9 +102,37 @@ export function Posts() {
     setVisibleCount(6); // 탭 변경 시 초기 6개로 리셋
     
     if (category === "All") {
-      setPosts(allPosts);
+      // 검색어가 있으면 검색 결과를 유지, 없으면 전체 표시
+      if (searchTerm.trim()) {
+        const filteredPosts = allPosts.filter(post => {
+          const searchLower = searchTerm.toLowerCase();
+          return (
+            post.title.toLowerCase().includes(searchLower) ||
+            post.desc.toLowerCase().includes(searchLower) ||
+            post.tags.toLowerCase().includes(searchLower) ||
+            post.category.toLowerCase().includes(searchLower)
+          );
+        });
+        setPosts(filteredPosts);
+      } else {
+        setPosts(allPosts);
+      }
     } else {
-      const filteredPosts = allPosts.filter(post => post.category === category);
+      // 카테고리 필터링 + 검색어 필터링
+      let filteredPosts = allPosts.filter(post => post.category === category);
+      
+      if (searchTerm.trim()) {
+        filteredPosts = filteredPosts.filter(post => {
+          const searchLower = searchTerm.toLowerCase();
+          return (
+            post.title.toLowerCase().includes(searchLower) ||
+            post.desc.toLowerCase().includes(searchLower) ||
+            post.tags.toLowerCase().includes(searchLower) ||
+            post.category.toLowerCase().includes(searchLower)
+          );
+        });
+      }
+      
       setPosts(filteredPosts);
     }
   };
@@ -75,6 +142,11 @@ export function Posts() {
     setVisibleCount(prev => prev + 6); // 6개씩 추가
   };
 
+  // 즐겨찾기 상태 변경 시 리프레시
+  const handleFavoriteChange = () => {
+    setRefreshKey(prev => prev + 1);
+  };
+
   // 현재 보여줄 카드들
   const visiblePosts = posts.slice(0, visibleCount);
   const hasMorePosts = visibleCount < posts.length;
@@ -82,6 +154,15 @@ export function Posts() {
   return (
     <section className="min-h-screen p-8">
       <div className="mx-auto max-w-7xl w-full">
+        {/* 검색 결과 표시 */}
+        {searchTerm && (
+          <div className="mb-6 text-center">
+            <p className="text-gray-600">
+              검색 결과: "{searchTerm}" ({posts.length}개 서버)
+            </p>
+          </div>
+        )}
+
         {/* 카테고리 탭 영역 */}
         <div className="w-full flex mb-8 flex-col items-center">
           <div className="h-10 w-full md:w-[50rem] border border-gray-300 rounded-lg bg-white bg-opacity-90 flex">
@@ -121,7 +202,10 @@ export function Posts() {
         ) : posts.length === 0 ? (
           <div className="flex items-center justify-center h-[500px]">
             <h3 className="text-lg text-gray-600">
-              No MCP servers found in {activeTab} category.
+              {searchTerm 
+                ? `"${searchTerm}"에 대한 검색 결과가 없습니다.`
+                : `No MCP servers found in ${activeTab} category.`
+              }
             </h3>
           </div>
         ) : (
@@ -129,7 +213,7 @@ export function Posts() {
             <div className="grid grid-cols-1 gap-x-8 gap-y-16 items-start lg:grid-cols-3">
               {visiblePosts.map(({ category, tags, title, desc, date, author, id }) => (
                 <BlogPostCard
-                  key={id || title} // id가 있으면 id 사용, 없으면 title 사용
+                  key={`${id || title}-${refreshKey}`} // refreshKey를 포함하여 리렌더링 보장
                   category={category}
                   tags={tags}
                   title={title}
@@ -140,6 +224,7 @@ export function Posts() {
                     name: author?.name || 'Unknown Author', // 기본 작성자명
                   }}
                   id={id}
+                  onFavoriteChange={handleFavoriteChange}
                 />
               ))}
             </div>

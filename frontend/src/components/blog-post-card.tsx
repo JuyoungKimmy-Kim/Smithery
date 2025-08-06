@@ -1,6 +1,9 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { StarIcon } from "@heroicons/react/24/outline";
+import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import TagList from "./tag-list";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface BlogPostCardProps {
   category: string;
@@ -10,6 +13,7 @@ interface BlogPostCardProps {
   author: { name: string; img: string };
   date: string;
   id?: string; // MCP 서버 ID 추가
+  onFavoriteChange?: () => void; // 즐겨찾기 상태 변경 콜백
 }
 
 export function BlogPostCard({
@@ -20,8 +24,79 @@ export function BlogPostCard({
   author,
   date,
   id,
+  onFavoriteChange,
 }: BlogPostCardProps) {
   const router = useRouter();
+  const { isAuthenticated } = useAuth();
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // 즐겨찾기 상태 확인
+  useEffect(() => {
+    if (isAuthenticated && id) {
+      checkFavoriteStatus();
+    }
+  }, [isAuthenticated, id]);
+
+  const checkFavoriteStatus = async () => {
+    try {
+      const response = await fetch(`/api/mcp-servers/user/favorites`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        const favorites = await response.json();
+        const isFav = favorites.some((fav: any) => fav.id === id);
+        setIsFavorite(isFav);
+      }
+    } catch (error) {
+      console.error('Error checking favorite status:', error);
+    }
+  };
+
+  const handleFavoriteClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!isAuthenticated) {
+      alert('로그인이 필요합니다.');
+      router.push('/login');
+      return;
+    }
+
+    if (!id) return;
+
+    setIsLoading(true);
+    try {
+      const url = `/api/mcp-servers/${id}/favorite`;
+      const method = isFavorite ? 'DELETE' : 'POST';
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Favorite toggle response:', data);
+        setIsFavorite(!isFavorite);
+        // 부모 컴포넌트에 즐겨찾기 상태 변경 알림
+        if (onFavoriteChange) {
+          onFavoriteChange();
+        }
+      } else {
+        const errorText = await response.text();
+        console.error('Failed to toggle favorite:', response.status, errorText);
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleClick = () => {
     console.log("Card clicked! ID:", id); // 디버깅 로그 추가
@@ -37,11 +112,37 @@ export function BlogPostCard({
     }
   };
 
+  const handleAuthorClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // 카드 클릭 이벤트 방지
+    if (author?.name && author.name !== 'Unknown') {
+      router.push(`/user/${author.name}`);
+    }
+  };
+
   return (
     <div 
-      className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 cursor-pointer"
+      className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 cursor-pointer relative"
       onClick={handleClick}
     >
+      {/* 즐겨찾기 버튼 */}
+      <div className="absolute top-4 right-4 z-10">
+        <button
+          onClick={handleFavoriteClick}
+          disabled={isLoading}
+          className={`p-2 rounded-full transition-all duration-200 ${
+            isFavorite 
+              ? 'text-yellow-500 hover:text-yellow-600' 
+              : 'text-gray-400 hover:text-yellow-500'
+          } ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110'}`}
+        >
+          {isFavorite ? (
+            <StarIconSolid className="h-5 w-5" />
+          ) : (
+            <StarIcon className="h-5 w-5" />
+          )}
+        </button>
+      </div>
+
       <div className="p-6">
         <span className="text-sm font-medium text-blue-600 mb-2 block">
           {category}
@@ -55,15 +156,18 @@ export function BlogPostCard({
         <div className="mb-4">
           <TagList tags={tags} maxTags={4} />
         </div>
-        <div className="flex items-center gap-4">
+        <div 
+          className="flex items-center gap-4 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+          onClick={handleAuthorClick}
+        >
           <img
-            src={author.img}
-            alt={author.name}
+            src={author?.img || '/image/avatar1.jpg'}
+            alt={author?.name || 'Unknown'}
             className="w-8 h-8 rounded-full"
           />
           <div>
-            <p className="text-sm font-medium text-gray-900 mb-0.5">
-              {author.name}
+            <p className="text-sm font-medium text-gray-900 mb-0.5 hover:text-blue-600 transition-colors">
+              {author?.name || 'Unknown'}
             </p>
             <p className="text-xs text-gray-500">
               {date}

@@ -4,10 +4,12 @@ import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { MCPServer, TransportType } from "../../../../types/mcp";
 import { MCP_CATEGORIES } from "@/constants/categories";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function EditMCPServerPage() {
   const params = useParams();
   const router = useRouter();
+  const { token, isAuthenticated } = useAuth();
   const [mcp, setMcp] = useState<MCPServer | null>(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -21,6 +23,28 @@ export default function EditMCPServerPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
+
+  // tags를 문자열로 변환하는 함수
+  const formatTagsToString = (tags: any): string => {
+    if (!tags) return "";
+    if (typeof tags === 'string') return tags;
+    if (Array.isArray(tags)) {
+      return tags.map((tag: any) => {
+        if (typeof tag === 'string') return tag;
+        if (tag && typeof tag === 'object' && tag.name) return tag.name;
+        return 'Unknown Tag';
+      }).join(', ');
+    }
+    return "";
+  };
+
+  // 인증 상태 확인
+  useEffect(() => {
+    if (!isAuthenticated) {
+      alert('Sign in required.');
+      router.push('/login');
+    }
+  }, [isAuthenticated, router]);
 
   // 기존 MCP 서버 데이터 로드
   useEffect(() => {
@@ -37,7 +61,7 @@ export default function EditMCPServerPage() {
             category: data.category || "",
             github_link: data.github_link || "",
             description: data.description || "",
-            tags: data.tags ? data.tags.join(', ') : "",
+            tags: formatTagsToString(data.tags),
             config: data.config ? JSON.stringify(data.config, null, 2) : ""
           });
         } else {
@@ -100,9 +124,9 @@ export default function EditMCPServerPage() {
     try {
       // 폼 데이터를 MCPServer 형식으로 변환
       const updateData = {
-        category: formData.category.trim(),
         description: formData.description.trim(),
-        tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
+        category: formData.category.trim(),
+        tags: formData.tags.trim(), // 콤마로 구분된 문자열로 전송
         config: formData.config ? JSON.parse(formData.config) : {}
       };
 
@@ -110,6 +134,7 @@ export default function EditMCPServerPage() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify(updateData),
       });
@@ -121,7 +146,12 @@ export default function EditMCPServerPage() {
 
       const result = await response.json();
       alert('MCP Server가 성공적으로 수정되었습니다!');
-      router.push(`/mcp/${params.id}`); // 상세 페이지로 이동
+      
+      // 상세 페이지로 이동하기 전에 잠시 대기
+      setTimeout(() => {
+        router.push(`/mcp/${params.id}`);
+      }, 100);
+
     } catch (err) {
       if (err instanceof Error && err.message.includes('JSON')) {
         setError('Server Config JSON 형식이 올바르지 않습니다.');
