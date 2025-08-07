@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER:  ${POSTGRES_USER:-mcp_hub_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mcp_hub_password}
+      POSTGRES_DB: ${POSTGRES_DB:-mcp_hub_db}
+    ports:
+      - 10003:5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    container_name: mcp-hub-backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - .env
+    environment:
+      - HTTP_PROXY=xxx
+      - HTTPS_PROXY=xxx
+      - NO_PROXY=xxx
+      - POSTGRES_USER=${POSTGRES_USER:-mcp_hub_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mcp_hub_password}
+      - POSTGRES_DB=${POSTGRES_DB:-mcp_hub_db}
+      - POSTGRES_PORT=5432
+      - POSTGRES_HOST=${POSTGRES_HOST:-db}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+    ports:
+      - 10001:10001
+    depends_on:
+      - db
+
+  frontend:
+    container_name: mcp-hub-frontend
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    env_file:
+      - .env
+    environment:
+      - HTTP_PROXY=xxx
+      - HTTPS_PROXY=xxx
+      - NO_PROXY=xxx
+    ports:
+      - 10002:3000
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

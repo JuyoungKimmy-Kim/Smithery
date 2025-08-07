@@ -5,52 +5,47 @@ import {
   CommandLineIcon,
   XMarkIcon,
   Bars3Icon,
+  ChevronDownIcon,
 } from "@heroicons/react/24/solid";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 
-const NAV_MENU = [
-  {
-    name: "Page",
-    icon: RectangleStackIcon,
-  },
-  {
-    name: "Account",
-    icon: UserCircleIcon,
-  },
-  {
-    name: "Docs",
-    icon: CommandLineIcon,
-    href: "https://www.material-tailwind.com/docs/react/installation",
-  },
-];
 
-interface NavItemProps {
-  children: React.ReactNode;
-  href?: string;
-}
 
-function NavItem({ children, href }: NavItemProps) {
-  return (
-    <li>
-      <a
-        href={href || "#"}
-        target={href ? "_blank" : "_self"}
-        className="flex items-center gap-2 font-medium text-gray-900"
-      >
-        {children}
-      </a>
-    </li>
-  );
-}
+
 
 export function Navbar() {
   const [open, setOpen] = React.useState(false);
+  const [userMenuOpen, setUserMenuOpen] = React.useState(false);
   const router = useRouter();
+  const { user, isAuthenticated, logout } = useAuth();
 
   const handleOpen = () => setOpen((cur) => !cur);
+  const handleUserMenuToggle = () => setUserMenuOpen((cur) => !cur);
+  
   const handleDeployClick = (e: React.MouseEvent) => {
     e.preventDefault();
+    if (!isAuthenticated) {
+      alert('Sign in required.');
+      router.push('/login');
+      return;
+    }
     router.push("/submit");
+  };
+
+  const handleLoginClick = () => {
+    router.push('/login');
+  };
+
+  const handleLogoutClick = () => {
+    logout();
+    router.push('/');
+    setUserMenuOpen(false);
+  };
+
+  const handleMyPageClick = () => {
+    router.push('/mypage');
+    setUserMenuOpen(false);
   };
 
   React.useEffect(() => {
@@ -59,6 +54,19 @@ export function Navbar() {
       () => window.innerWidth >= 960 && setOpen(false)
     );
   }, []);
+
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuOpen && !(event.target as Element).closest('.user-menu')) {
+        setUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [userMenuOpen]);
 
   return (
     <nav className="border-0 sticky top-0 z-50 bg-white shadow-sm">
@@ -69,24 +77,53 @@ export function Navbar() {
         >
           MCP Server Hub
         </a>
-        <ul className="ml-10 hidden items-center gap-8 lg:flex">
-          {NAV_MENU.map(({ name, icon: Icon, href }) => (
-            <NavItem key={name} href={href}>
-              <Icon className="h-5 w-5" />
-              {name}
-            </NavItem>
-          ))}
-        </ul>
-        <div className="hidden items-center gap-2 lg:flex">
-          <button className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors">
-            Sign In
-          </button>
+
+        <div className="hidden items-center gap-4 lg:flex">
           <button 
-            className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             onClick={handleDeployClick}
           >
             Deploy Server
           </button>
+          
+          {isAuthenticated ? (
+            <div className="relative user-menu">
+              <button
+                onClick={handleUserMenuToggle}
+                className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:text-gray-900 transition-colors rounded-lg hover:bg-gray-100"
+              >
+                <UserCircleIcon className="h-5 w-5" />
+                <span className="text-sm font-medium">{user?.username}</span>
+                <ChevronDownIcon className="h-4 w-4" />
+              </button>
+              
+              {userMenuOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                  <button
+                    onClick={handleMyPageClick}
+                    className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-2"
+                  >
+                    <UserCircleIcon className="h-4 w-4" />
+                    My Page
+                  </button>
+                  <hr className="my-1" />
+                  <button
+                    onClick={handleLogoutClick}
+                    className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <button 
+              onClick={handleLoginClick}
+              className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors"
+            >
+              Sign In
+            </button>
+          )}
         </div>
         <button
           onClick={handleOpen}
@@ -102,24 +139,38 @@ export function Navbar() {
       {open && (
         <div className="lg:hidden border-t border-gray-200 bg-white">
           <div className="container mx-auto px-4 py-4">
-            <ul className="space-y-4">
-              {NAV_MENU.map(({ name, icon: Icon, href }) => (
-                <NavItem key={name} href={href}>
-                  <Icon className="h-5 w-5" />
-                  {name}
-                </NavItem>
-              ))}
-            </ul>
             <div className="mt-4 space-y-2">
-              <button className="w-full px-4 py-2 text-left text-gray-700 hover:text-gray-900 transition-colors">
-                Sign In
-              </button>
               <button 
-                className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 onClick={handleDeployClick}
               >
                 Deploy Server
               </button>
+              
+              {isAuthenticated ? (
+                <>
+                  <button
+                    onClick={handleMyPageClick}
+                    className="w-full px-4 py-2 text-left text-gray-700 hover:text-gray-900 transition-colors flex items-center gap-2"
+                  >
+                    <UserCircleIcon className="h-4 w-4" />
+                    My Page
+                  </button>
+                  <button 
+                    onClick={handleLogoutClick}
+                    className="w-full px-4 py-2 text-left text-gray-700 hover:text-gray-900 transition-colors"
+                  >
+                    Sign Out
+                  </button>
+                </>
+              ) : (
+                <button 
+                  onClick={handleLoginClick}
+                  className="w-full px-4 py-2 text-left text-gray-700 hover:text-gray-900 transition-colors"
+                >
+                  Sign In
+                </button>
+              )}
             </div>
           </div>
         </div>

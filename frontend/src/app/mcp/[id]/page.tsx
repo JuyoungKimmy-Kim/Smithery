@@ -13,10 +13,12 @@ import {
   TrashIcon,
 } from "@heroicons/react/24/outline";
 import { MCPServer } from "@/types/mcp";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function MCPServerDetail() {
   const params = useParams();
   const router = useRouter();
+  const { user, isAuthenticated, isAdmin, token } = useAuth();
   const [mcp, setMcp] = useState<MCPServer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +27,9 @@ export default function MCPServerDetail() {
   useEffect(() => {
     const fetchMCP = async () => {
       try {
-        const response = await fetch(`/api/mcps/${params.id}`);
+        // 캐시를 무시하고 새로운 데이터를 가져오기 위해 timestamp 추가
+        const timestamp = new Date().getTime();
+        const response = await fetch(`/api/mcps/${params.id}?t=${timestamp}`);
         if (response.ok) {
           const data = await response.json();
           console.log('MCP Server Data:', data); // 디버깅용 로그
@@ -45,6 +49,15 @@ export default function MCPServerDetail() {
       fetchMCP();
     }
   }, [params.id]);
+
+  // 현재 사용자가 이 MCP 서버의 소유자인지 확인
+  const isOwner = mcp && user && (mcp as any).owner_id === user.id;
+  
+  // Edit 권한: 소유자 또는 관리자
+  const canEdit = isOwner || isAdmin;
+  
+  // Delete 권한: 관리자만
+  const canDelete = isAdmin;
 
   const handleModify = () => {
     // 수정 페이지로 이동
@@ -67,15 +80,20 @@ export default function MCPServerDetail() {
     try {
       const response = await fetch(`/api/mcps/${mcp.id}`, {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       });
       
       if (response.ok) {
         alert("MCP server deleted successfully!");
         router.push('/'); // 홈페이지로 이동
       } else {
-        throw new Error('Failed to delete MCP server');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete MCP server');
       }
     } catch (error) {
+      console.error('Delete error:', error);
       alert('Failed to delete MCP server. Please try again.');
     } finally {
       setIsDeleting(false);
@@ -141,6 +159,14 @@ export default function MCPServerDetail() {
                     <span>Created: {new Date(mcp.created_at).toLocaleDateString()}</span>
                   </div>
                 )}
+                {/* 권한 정보 표시 */}
+                {isAuthenticated && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs px-2 py-1 rounded-full bg-gray-100">
+                      {isOwner ? "Owner" : isAdmin ? "Admin" : "Viewer"}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -153,22 +179,26 @@ export default function MCPServerDetail() {
                 View on GitHub
               </button>
               
-              <button 
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
-                onClick={handleModify}
-              >
-                <PencilIcon className="h-4 w-4" />
-                Edit
-              </button>
+              {canEdit && (
+                <button 
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  onClick={handleModify}
+                >
+                  <PencilIcon className="h-4 w-4" />
+                  Edit
+                </button>
+              )}
               
-              <button 
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center gap-2 disabled:opacity-50"
-                onClick={handleDelete}
-                disabled={isDeleting}
-              >
-                <TrashIcon className="h-4 w-4" />
-                {isDeleting ? "Deleting..." : "Delete"}
-              </button>
+              {canDelete && (
+                <button 
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                >
+                  <TrashIcon className="h-4 w-4" />
+                  {isDeleting ? "Deleting..." : "Delete"}
+                </button>
+              )}
             </div>
           </div>
 
@@ -177,14 +207,25 @@ export default function MCPServerDetail() {
             <div className="flex items-center gap-2 mb-4">
               <TagIcon className="h-4 w-4 text-gray-600" />
               <div className="flex flex-wrap gap-2">
-                {mcp.tags.map((tag, index) => (
-                  <span
-                    key={index}
-                    className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full"
-                  >
-                    {tag}
-                  </span>
-                ))}
+                {mcp.tags.map((tag: any, index) => {
+                  let tagName = '';
+                  if (typeof tag === 'string') {
+                    tagName = tag;
+                  } else if (tag && typeof tag === 'object' && tag.name) {
+                    tagName = tag.name;
+                  } else {
+                    tagName = 'Unknown Tag';
+                  }
+                  
+                  return (
+                    <span
+                      key={index}
+                      className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full"
+                    >
+                      {tagName}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           )}

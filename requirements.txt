@@ -8,3 +8,8 @@ requests
 beautifulsoup4
 pytest
 bs4
+sqlalchemy
+psycopg2-binary
+alembic
+passlib[bcrypt]
+PyJWT

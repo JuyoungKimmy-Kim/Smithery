@@ -1,43 +1,50 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
-from enum import Enum
+from sqlalchemy import Column, Integer, String, DateTime, JSON, Text, ForeignKey
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+from .base import Base
+from .tag import mcp_server_tags
 
+class MCPServer(Base):
+    __tablename__ = 'mcp_servers'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False)
+    github_link = Column(String(500), nullable=False)
+    description = Column(Text, nullable=False)
+    category = Column(String(100), nullable=False)
+    status = Column(String(20), default='pending')  # 'pending', 'approved', 'rejected'
+    config = Column(JSON, nullable=True)
+    owner_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # 관계
+    owner = relationship("User", back_populates="mcp_servers")
+    tools = relationship("MCPServerTool", back_populates="mcp_server", cascade="all, delete-orphan")
+    tags = relationship("Tag", secondary=mcp_server_tags, backref="mcp_servers")
+    favorites = relationship("UserFavorite", back_populates="mcp_server")
 
-class TransportType(str, Enum):
-    sse = "sse"
-    streamable_http = "streamable-http"
-    stdio = "stdio"
+class MCPServerTool(Base):
+    __tablename__ = 'mcp_server_tools'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    mcp_server_id = Column(Integer, ForeignKey('mcp_servers.id'), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # 관계
+    mcp_server = relationship("MCPServer", back_populates="tools")
+    parameters = relationship("MCPServerProperty", back_populates="tool", cascade="all, delete-orphan")
 
-
-class MCPServerProperty(BaseModel):
-    name: str
-    description: Optional[str] = None
-    required: bool
-
-
-class MCPServerTool(BaseModel):
-    name: str
-    description: str
-    input_properties: List[MCPServerProperty]
-
-
-class MCPServerResource(BaseModel):
-    name: str
-    description: str
-    url: str
-
-
-class MCPServer(BaseModel):
-    id: str
-    github_link: str
-    name: str
-    description: str
-    transport: TransportType
-    category: Optional[str] = None
-    tags: Optional[List[str]] = None
-    status: Optional[str] = None
-    tools: List[MCPServerTool] = Field(default_factory=list)
-    resources: List[MCPServerResource] = Field(default_factory=list)
-    config: dict = Field(default_factory=dict)
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+class MCPServerProperty(Base):
+    __tablename__ = 'mcp_server_properties'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    tool_id = Column(Integer, ForeignKey('mcp_server_tools.id'), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # 관계
+    tool = relationship("MCPServerTool", back_populates="parameters")

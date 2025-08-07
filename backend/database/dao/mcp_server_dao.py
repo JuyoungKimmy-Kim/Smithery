@@ -1,198 +1,216 @@
-from backend.database.database import Database
-from backend.database.model.mcp_server import (
-    MCPServer,
-    MCPServerTool,
-    MCPServerResource,
-    MCPServerProperty,
-    TransportType,
-)
-from typing import List, Optional
-import json
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import or_, and_
+from typing import Optional, List, Dict, Any
+from backend.database.model import MCPServer, MCPServerTool, MCPServerProperty, Tag, User, UserFavorite
 
-
-class MCPServerDAO(Database):
-    def create_table(self):
-        query = """
-        CREATE TABLE IF NOT EXISTS mcp_server (
-            id TEXT PRIMARY KEY,
-            github_link TEXT NOT NULL,
-            name TEXT NOT NULL,
-            description TEXT NOT NULL,
-            transport,
-            category TEXT NOT NULL,
-            tags TEXT,
-            status TEXT,
-            tools TEXT,
-            resources TEXT,
-            config TEXT,
-            created_at TEXT,
-            updated_at TEXT
-        );
-        """
-        self.conn.execute(query)
-        self.conn.commit()
-
-    def _serialize_tools(self, tools: List[MCPServerTool]) -> str:
-        """MCPServerTool 리스트를 JSON 문자열로 직렬화"""
-        if not tools:
-            return None
-        tools_data = []
-        for tool in tools:
-            tool_data = {
-                "name": tool.name,
-                "description": tool.description,
-                "input_properties": [
-                    {
-                        "name": prop.name,
-                        "description": prop.description,
-                        "required": prop.required,
-                    }
-                    for prop in tool.input_properties
-                ],
-            }
-            tools_data.append(tool_data)
-        return json.dumps(tools_data)
-
-    def _deserialize_tools(self, tools_json: str) -> List[MCPServerTool]:
-        """JSON 문자열을 MCPServerTool 리스트로 역직렬화"""
-        if not tools_json:
-            return []
-        tools_data = json.loads(tools_json)
-        tools = []
-        for tool_data in tools_data:
-            input_properties = [
-                MCPServerProperty(
-                    name=prop["name"],
-                    description=prop.get("description"),
-                    required=prop["required"],
-                )
-                for prop in tool_data["input_properties"]
-            ]
-            tool = MCPServerTool(
-                name=tool_data["name"],
-                description=tool_data["description"],
-                input_properties=input_properties,
-            )
-            tools.append(tool)
-        return tools
-
-    def _serialize_resources(self, resources: List[MCPServerResource]) -> str:
-        """MCPServerResource 리스트를 JSON 문자열로 직렬화"""
-        if not resources:
-            return None
-        resources_data = [
-            {
-                "name": resource.name,
-                "description": resource.description,
-                "url": resource.url,
-            }
-            for resource in resources
-        ]
-        return json.dumps(resources_data)
-
-    def _deserialize_resources(self, resources_json: str) -> List[MCPServerResource]:
-        """JSON 문자열을 MCPServerResource 리스트로 역직렬화"""
-        if not resources_json:
-            return []
-        resources_data = json.loads(resources_json)
-        resources = []
-        for resource_data in resources_data:
-            resource = MCPServerResource(
-                name=resource_data["name"],
-                description=resource_data["description"],
-                url=resource_data["url"],
-            )
-            resources.append(resource)
-        return resources
-
-    def create_mcp(self, mcp: MCPServer):
-        query = """
-        INSERT INTO mcp_server (id, github_link, name, description, transport, category, tags, status, tools, resources, config, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """
-        self.conn.execute(
-            query,
-            (
-                mcp.id,
-                mcp.github_link,
-                mcp.name,
-                mcp.description,
-                (
-                    mcp.transport.value
-                    if isinstance(mcp.transport, TransportType)
-                    else mcp.transport
-                ),
-                mcp.category,
-                json.dumps(mcp.tags) if mcp.tags else None,
-                mcp.status,
-                self._serialize_tools(mcp.tools),
-                self._serialize_resources(mcp.resources),
-                (
-                    json.dumps(mcp.config)
-                    if hasattr(mcp, "config") and mcp.config is not None
-                    else None
-                ),
-                mcp.created_at,
-                mcp.updated_at,
-            ),
+class MCPServerDAO:
+    def __init__(self, db: Session):
+        self.db = db
+    
+    def create_mcp_server(self, mcp_server_data: Dict[str, Any], owner_id: int, tags: List[str] = None) -> MCPServer:
+        """새 MCP 서버를 생성합니다."""
+        # 태그 처리
+        tag_objects = []
+        if tags:
+            for tag_name in tags:
+                tag = self.db.query(Tag).filter(Tag.name == tag_name).first()
+                if not tag:
+                    tag = Tag(name=tag_name)
+                    self.db.add(tag)
+                    self.db.flush()
+                tag_objects.append(tag)
+        
+        mcp_server = MCPServer(
+            name=mcp_server_data['name'],
+            github_link=mcp_server_data['github_link'],
+            description=mcp_server_data['description'],
+            category=mcp_server_data['category'],
+            status='pending',  # 승인 대기 상태로 생성
+            config=mcp_server_data.get('config'),
+            owner_id=owner_id,
+            tags=tag_objects
         )
-        self.conn.commit()
-
-    def get_mcp(self, mcp_id: str) -> Optional[MCPServer]:
-        query = "SELECT * FROM mcp_server WHERE id = ?"
-        cur = self.conn.execute(query, (mcp_id,))
-        row = cur.fetchone()
-        if row:
-            data = dict(row)
-            data["tags"] = json.loads(data["tags"]) if data["tags"] else []
-            data["tools"] = self._deserialize_tools(data["tools"])
-            data["resources"] = self._deserialize_resources(data["resources"])
-            data["config"] = json.loads(data["config"]) if data.get("config") else None
-            # transport를 enum으로 변환
-            if data["transport"]:
-                data["transport"] = TransportType(data["transport"])
-            return MCPServer(**data)
-        return None
-
-    def get_all_mcps(self) -> List[MCPServer]:
-        query = "SELECT * FROM mcp_server"
-        cur = self.conn.execute(query)
-        rows = cur.fetchall()
-        result = []
-        for row in rows:
-            data = dict(row)
-            data["tags"] = json.loads(data["tags"]) if data["tags"] else []
-            data["tools"] = self._deserialize_tools(data["tools"])
-            data["resources"] = self._deserialize_resources(data["resources"])
-            data["config"] = json.loads(data["config"]) if data.get("config") else None
-            # transport를 enum으로 변환
-            if data["transport"]:
-                data["transport"] = TransportType(data["transport"])
-            result.append(MCPServer(**data))
-        return result
-
-    def update_mcp(self, mcp_id: str, **kwargs):
-        if "tags" in kwargs:
-            kwargs["tags"] = json.dumps(kwargs["tags"])
-        if "tools" in kwargs:
-            kwargs["tools"] = self._serialize_tools(kwargs["tools"])
-        if "resources" in kwargs:
-            kwargs["resources"] = self._serialize_resources(kwargs["resources"])
-        if "config" in kwargs:
-            kwargs["config"] = json.dumps(kwargs["config"])
-        if "transport" in kwargs:
-            transport = kwargs["transport"]
-            kwargs["transport"] = (
-                transport.value if isinstance(transport, TransportType) else transport
+        
+        self.db.add(mcp_server)
+        self.db.commit()
+        self.db.refresh(mcp_server)
+        return mcp_server
+    
+    def get_mcp_server_by_id(self, mcp_server_id: int) -> Optional[MCPServer]:
+        """ID로 MCP 서버를 조회합니다."""
+        return self.db.query(MCPServer).filter(MCPServer.id == mcp_server_id).first()
+    
+    def get_approved_mcp_servers(self, limit: int = None, offset: int = 0) -> List[MCPServer]:
+        """승인된 MCP 서버 목록을 조회합니다."""
+        query = self.db.query(MCPServer).options(
+            joinedload(MCPServer.owner)
+        ).filter(MCPServer.status == 'approved')
+        if limit:
+            query = query.limit(limit).offset(offset)
+        return query.all()
+    
+    def get_pending_mcp_servers(self) -> List[MCPServer]:
+        """승인 대기 중인 MCP 서버 목록을 조회합니다."""
+        return self.db.query(MCPServer).options(
+            joinedload(MCPServer.owner)
+        ).filter(MCPServer.status == 'pending').all()
+    
+    def search_mcp_servers(self, keyword: str, status: str = 'approved') -> List[MCPServer]:
+        """키워드로 MCP 서버를 검색합니다."""
+        return self.db.query(MCPServer).options(
+            joinedload(MCPServer.owner)
+        ).filter(
+            and_(
+                MCPServer.status == status,
+                or_(
+                    MCPServer.name.ilike(f'%{keyword}%'),
+                    MCPServer.description.ilike(f'%{keyword}%'),
+                    MCPServer.category.ilike(f'%{keyword}%'),
+                    MCPServer.tags.any(Tag.name.ilike(f'%{keyword}%'))
+                )
             )
-        fields = ", ".join([f"{k} = ?" for k in kwargs])
-        values = list(kwargs.values())
-        values.append(mcp_id)
-        query = f"UPDATE mcp_server SET {fields} WHERE id = ?"
-        self.conn.execute(query, values)
-        self.conn.commit()
-
-    def delete_mcp(self, mcp_id: str):
-        query = "DELETE FROM mcp_server WHERE id = ?"
-        self.conn.execute(query, (mcp_id,))
-        self.conn.commit()
+        ).all()
+    
+    def get_mcp_servers_by_category(self, category: str, status: str = 'approved') -> List[MCPServer]:
+        """카테고리별 MCP 서버 목록을 조회합니다."""
+        return self.db.query(MCPServer).options(
+            joinedload(MCPServer.owner)
+        ).filter(
+            and_(MCPServer.category == category, MCPServer.status == status)
+        ).all()
+    
+    def update_mcp_server_status(self, mcp_server_id: int, status: str) -> Optional[MCPServer]:
+        """MCP 서버 상태를 업데이트합니다."""
+        mcp_server = self.get_mcp_server_by_id(mcp_server_id)
+        if mcp_server:
+            mcp_server.status = status
+            self.db.commit()
+            self.db.refresh(mcp_server)
+        return mcp_server
+    
+    def approve_all_pending_servers(self) -> dict:
+        """모든 승인 대기중인 MCP 서버를 일괄 승인합니다."""
+        result = self.db.query(MCPServer).filter(MCPServer.status == 'pending').update(
+            {MCPServer.status: 'approved'}
+        )
+        self.db.commit()
+        return {"approved_count": result}
+    
+    def delete_mcp_server(self, mcp_server_id: int) -> bool:
+        """MCP 서버를 삭제합니다."""
+        mcp_server = self.get_mcp_server_by_id(mcp_server_id)
+        if mcp_server:
+            # 먼저 관련된 즐겨찾기 데이터 삭제
+            self.db.query(UserFavorite).filter(UserFavorite.mcp_server_id == mcp_server_id).delete()
+            
+            # MCP 서버 삭제
+            self.db.delete(mcp_server)
+            self.db.commit()
+            return True
+        return False
+    
+    def add_tools_to_mcp_server(self, mcp_server_id: int, tools_data: List[Dict[str, Any]]) -> bool:
+        """MCP 서버에 도구들을 추가합니다."""
+        mcp_server = self.get_mcp_server_by_id(mcp_server_id)
+        if not mcp_server:
+            return False
+        
+        for tool_data in tools_data:
+            tool = MCPServerTool(
+                name=tool_data['name'],
+                description=tool_data.get('description'),
+                mcp_server_id=mcp_server_id
+            )
+            self.db.add(tool)
+            self.db.flush()
+            
+            # 파라미터 추가
+            for param_data in tool_data.get('parameters', []):
+                param = MCPServerProperty(
+                    name=param_data['name'],
+                    description=param_data.get('description'),
+                    tool_id=tool.id
+                )
+                self.db.add(param)
+        
+        self.db.commit()
+        return True
+    
+    def get_mcp_server_with_tools(self, mcp_server_id: int) -> Optional[MCPServer]:
+        """도구 정보와 함께 MCP 서버를 조회합니다."""
+        return self.db.query(MCPServer).filter(MCPServer.id == mcp_server_id).first()
+    
+    def get_mcp_servers_by_owner(self, owner_id: int) -> List[MCPServer]:
+        """소유자별 MCP 서버 목록을 조회합니다."""
+        return self.db.query(MCPServer).filter(MCPServer.owner_id == owner_id).all()
+    
+    def get_popular_tags(self, limit: int = 10) -> List[Tag]:
+        """인기 태그 목록을 조회합니다."""
+        return self.db.query(Tag).join(MCPServer.tags).filter(MCPServer.status == 'approved').limit(limit).all()
+    
+    def get_categories(self) -> List[str]:
+        """모든 카테고리 목록을 조회합니다."""
+        categories = self.db.query(MCPServer.category).distinct().all()
+        return [category[0] for category in categories if category[0]]
+    
+    def update_mcp_server(self, mcp_server_id: int, update_data: Dict[str, Any]) -> Optional[MCPServer]:
+        """MCP 서버를 수정합니다."""
+        print(f"DAO: Updating MCP server {mcp_server_id} with data: {update_data}")  # 디버깅 로그
+        
+        # Pydantic 모델을 딕셔너리로 변환
+        if hasattr(update_data, 'dict'):
+            update_data = update_data.dict(exclude_unset=True)
+        elif hasattr(update_data, 'model_dump'):
+            update_data = update_data.model_dump(exclude_unset=True)
+        
+        mcp_server = self.get_mcp_server_by_id(mcp_server_id)
+        if not mcp_server:
+            print(f"DAO: MCP server {mcp_server_id} not found")  # 디버깅 로그
+            return None
+        
+        print(f"DAO: Before update - name: '{mcp_server.name}', description: '{mcp_server.description}', category: '{mcp_server.category}'")  # 디버깅 로그
+        
+        # 업데이트 가능한 필드들
+        updatable_fields = ['name', 'description', 'category', 'config']
+        
+        print(f"DAO: Checking updatable fields: {updatable_fields}")  # 디버깅 로그
+        print(f"DAO: Update data keys: {list(update_data.keys())}")  # 디버깅 로그
+        
+        for field in updatable_fields:
+            print(f"DAO: Checking field '{field}'")  # 디버깅 로그
+            if field in update_data:
+                print(f"DAO: Field '{field}' found in update_data")  # 디버깅 로그
+                if update_data[field] is not None:
+                    old_value = getattr(mcp_server, field)
+                    new_value = update_data[field]
+                    print(f"DAO: Updating field '{field}' from '{old_value}' to '{new_value}'")  # 디버깅 로그
+                    setattr(mcp_server, field, new_value)
+                else:
+                    print(f"DAO: Skipping field '{field}' because value is None")  # 디버깅 로그
+            else:
+                print(f"DAO: Field '{field}' not found in update_data")  # 디버깅 로그
+        
+        # 태그 업데이트
+        if 'tags' in update_data:
+            print(f"DAO: Updating tags from '{mcp_server.tags}' to '{update_data['tags']}'")  # 디버깅 로그
+            tags = update_data['tags']
+            if isinstance(tags, str):
+                tags = [tag.strip() for tag in tags.split(',') if tag.strip()]
+            
+            tag_objects = []
+            for tag_name in tags:
+                tag = self.db.query(Tag).filter(Tag.name == tag_name).first()
+                if not tag:
+                    tag = Tag(name=tag_name)
+                    self.db.add(tag)
+                    self.db.flush()
+                tag_objects.append(tag)
+            
+            mcp_server.tags = tag_objects
+        
+        print(f"DAO: After update - name: '{mcp_server.name}', description: '{mcp_server.description}', category: '{mcp_server.category}'")  # 디버깅 로그
+        print(f"DAO: Committing changes to database...")  # 디버깅 로그
+        self.db.commit()
+        self.db.refresh(mcp_server)
+        print(f"DAO: Update completed successfully")  # 디버깅 로그
+        return mcp_server

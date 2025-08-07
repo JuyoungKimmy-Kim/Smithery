@@ -4,9 +4,11 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { MCPServer, TransportType } from "../../types/mcp";
 import { MCP_CATEGORIES } from "@/constants/categories";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function SubmitMCPPage() {
   const router = useRouter();
+  const { token, isAuthenticated } = useAuth();
   const [formData, setFormData] = useState({
     name: "",
     category: "",
@@ -21,6 +23,14 @@ export default function SubmitMCPPage() {
   const [previewTools, setPreviewTools] = useState<any[]>([]);
   const [previewResources, setPreviewResources] = useState<any[]>([]);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+
+  // 인증 상태 확인
+  useEffect(() => {
+    if (!isAuthenticated) {
+      alert('Sign in required.');
+      router.push('/login');
+    }
+  }, [isAuthenticated, router]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -52,10 +62,11 @@ export default function SubmitMCPPage() {
     setIsLoadingPreview(true);
     try {
       // 백엔드 API를 통해 tools 정보 미리보기 요청
-      const response = await fetch('/api/mcps/preview', {
+      const response = await fetch('/api/mcps', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({ github_link: githubLink }),
       });
@@ -110,6 +121,12 @@ export default function SubmitMCPPage() {
     e.preventDefault();
     setError("");
     
+    // 인증 확인
+    if (!isAuthenticated) {
+      setError("Sign in required.");
+      return;
+    }
+    
     // 폼 검증
     if (!validateForm()) {
       return;
@@ -118,31 +135,25 @@ export default function SubmitMCPPage() {
     setIsSubmitting(true);
 
     try {
-      // 폼 데이터를 MCPServer 형식으로 변환
-      const mcpServer: Partial<MCPServer> = {
-        id: Date.now().toString(), // 임시 ID 생성
+      // 백엔드 스키마에 맞는 데이터 형식으로 변환
+      const mcpServerData = {
         name: formData.name.trim(),
         category: formData.category.trim(),
         github_link: formData.github_link.trim(),
         description: formData.description.trim(),
-        transport: TransportType.SSE, // 기본값으로 SSE 사용
-        tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
-        status: "active",
-        tools: previewTools, // 미리보기에서 가져온 tools 사용
-        resources: previewResources, // 미리보기에서 가져온 resources 사용
+        tags: formData.tags.trim(), // 콤마로 구분된 문자열
         config: formData.config ? JSON.parse(formData.config) : {}
       };
 
-      console.log('Submitting MCP Server:', mcpServer); // 디버깅용 로그
-      console.log('Preview Tools:', previewTools); // tools 데이터 확인
-      console.log('Preview Tools length:', previewTools.length); // tools 개수 확인
+      console.log('Submitting MCP Server:', mcpServerData); // 디버깅용 로그
 
       const response = await fetch('/api/mcps', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(mcpServer),
+        body: JSON.stringify(mcpServerData),
       });
 
       if (!response.ok) {
@@ -163,6 +174,18 @@ export default function SubmitMCPPage() {
       setIsSubmitting(false);
     }
   };
+
+  // 로그인하지 않은 경우 로딩 표시
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center py-12">
@@ -198,6 +221,31 @@ export default function SubmitMCPPage() {
             )}
           </div>
           
+          {/* Category - 필수 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Category *
+            </label>
+            <select
+              required
+              value={formData.category}
+              onChange={(e) => handleInputChange('category', e.target.value)}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                validationErrors.category ? 'border-red-500' : 'border-gray-300'
+              }`}
+            >
+              <option value="">Select a category</option>
+              {MCP_CATEGORIES.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+            {validationErrors.category && (
+              <p className="mt-1 text-sm text-red-600">{validationErrors.category}</p>
+            )}
+          </div>
+
           {/* GitHub Link - 필수 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -217,7 +265,7 @@ export default function SubmitMCPPage() {
               <p className="mt-1 text-sm text-red-600">{validationErrors.github_link}</p>
             )}
           </div>
-          
+
           {/* Description - 필수 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -225,141 +273,80 @@ export default function SubmitMCPPage() {
             </label>
             <textarea
               required
-              rows={4}
               value={formData.description}
               onChange={(e) => handleInputChange('description', e.target.value)}
+              rows={4}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 validationErrors.description ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder="MCP 서버에 대한 상세한 설명을 입력하세요"
+              placeholder="Describe your MCP server..."
             />
             {validationErrors.description && (
               <p className="mt-1 text-sm text-red-600">{validationErrors.description}</p>
             )}
           </div>
-          
-          {/* Category - 필수 (드롭다운) */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Category *
-            </label>
-            <select
-              required
-              value={formData.category}
-              onChange={(e) => handleInputChange('category', e.target.value)}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                validationErrors.category ? 'border-red-500' : 'border-gray-300'
-              }`}
-            >
-              <option value="">카테고리를 선택하세요</option>
-              {MCP_CATEGORIES.map((category) => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
-            </select>
-            {validationErrors.category && (
-              <p className="mt-1 text-sm text-red-600">{validationErrors.category}</p>
-            )}
-          </div>
 
-          {/* Tags - 선택적 */}
+          {/* Tags */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Tags (comma separated)
+              Tags (comma-separated)
             </label>
             <input
               type="text"
               value={formData.tags}
               onChange={(e) => handleInputChange('tags', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="github, code, api, test"
+              placeholder="python, mcp, automation"
             />
           </div>
-          
-          {/* Server Config - 선택적 */}
+
+          {/* Server Config */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Server Config (JSON)
             </label>
             <textarea
-              rows={6}
               value={formData.config}
               onChange={(e) => handleInputChange('config', e.target.value)}
-              placeholder='{"mcpServers": {"example": {"command": "python", "args": ["server.py"]}}}'
+              rows={4}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder='{"key": "value"}'
             />
-            <p className="mt-1 text-sm text-gray-500">
-              JSON 형식으로 서버 설정을 입력하세요. 비워두면 기본 설정이 사용됩니다.
-            </p>
           </div>
 
-          {/* Tools & Resources 미리보기 */}
-          {(previewTools.length > 0 || previewResources.length > 0 || isLoadingPreview) && (
-            <div className="border border-gray-200 rounded-lg p-6 bg-gray-50">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Detected Tools & Resources
-              </h3>
-              
-              {isLoadingPreview && (
-                <div className="flex items-center justify-center py-4">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                  <span className="ml-2 text-gray-600">Analyzing repository...</span>
-                </div>
-              )}
-
-              {!isLoadingPreview && previewTools.length > 0 && (
-                <div className="mb-6">
-                  <h4 className="text-md font-medium text-gray-800 mb-3">
-                    Tools ({previewTools.length})
-                  </h4>
-                  <div className="space-y-2">
-                    {previewTools.map((tool, index) => (
-                      <div key={index} className="bg-white rounded border p-3">
-                        <div className="font-medium text-gray-900">{tool.name}</div>
-                        <div className="text-sm text-gray-600">{tool.description}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {!isLoadingPreview && previewResources.length > 0 && (
-                <div>
-                  <h4 className="text-md font-medium text-gray-800 mb-3">
-                    Resources ({previewResources.length})
-                  </h4>
-                  <div className="space-y-2">
-                    {previewResources.map((resource, index) => (
-                      <div key={index} className="bg-white rounded border p-3">
-                        <div className="font-medium text-gray-900">{resource.name}</div>
-                        <div className="text-sm text-gray-600">{resource.description}</div>
-                        {resource.url && (
-                          <div className="text-xs text-blue-600 mt-1">{resource.url}</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {!isLoadingPreview && previewTools.length === 0 && previewResources.length === 0 && (
-                <div className="text-gray-500 text-sm">
-                  No tools or resources detected in this repository.
-                </div>
-              )}
+          {/* Tools Preview */}
+          {isLoadingPreview && (
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="flex items-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                <span className="text-blue-700">GitHub에서 tools 정보를 분석 중...</span>
+              </div>
             </div>
           )}
-          
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? "Deploying..." : "Deploy Server"}
-            </button>
-          </div>
+
+          {previewTools.length > 0 && (
+            <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+              <h3 className="text-sm font-medium text-green-800 mb-2">
+                발견된 Tools ({previewTools.length}개)
+              </h3>
+              <div className="space-y-2">
+                {previewTools.map((tool, index) => (
+                  <div key={index} className="text-sm text-green-700">
+                    • {tool.name}: {tool.description || '설명 없음'}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? '등록 중...' : 'MCP Server 등록'}
+          </button>
         </form>
       </div>
     </div>
