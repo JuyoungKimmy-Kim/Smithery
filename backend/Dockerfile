@@ -27,7 +27,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 #Runtime stage
 FROM python:3.9-slim
 
-#Proxy settings for build stage
+#Proxy settings for runtime stage
 ENV https_proxy=""
 ENV no_proxy=""
 COPY ./Certs/ca.crt /usr/local/share/ca-certificates/ca.crt 
@@ -41,11 +41,15 @@ RUN git config --global http.sslCAInfo /usr/local/share/ca-certificates/ca.crt
 
 ENV PYTHONPATH=/app:/app/backend
 
-COPY --from=builder /root/.local /root/.local
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+# Copy Python packages from builder
+COPY --from=builder /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
-ENV PATH=/root/.local/bin:$PATH
+# Copy backend code
+COPY backend/ ./backend/
+
+ENV PATH=/usr/local/bin:$PATH
 RUN echo "Asia/Seoul" > /etc/timezone
 
 EXPOSE 10001
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "10001"]
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "10001"]
