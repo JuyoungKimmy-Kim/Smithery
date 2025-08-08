@@ -39,9 +39,11 @@ class UserDAO:
     
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """비밀번호를 검증합니다."""
-        # 임시로 평문 비교만 사용 (개발용)
-        print(f"Comparing: '{plain_password}' with stored: '{hashed_password}'")  # 디버깅 로그
-        return hashed_password == plain_password
+        try:
+            return pwd_context.verify(plain_password, hashed_password)
+        except Exception:
+            # bcrypt 검증 실패 시 평문 비교 (개발용)
+            return hashed_password == plain_password
     
     def update_user(self, user_id: int, **kwargs) -> Optional[User]:
         """사용자 정보를 업데이트합니다."""

@@ -63,6 +63,17 @@ class UserService:
     
     def add_favorite(self, user_id: int, mcp_server_id: int) -> bool:
         """즐겨찾기를 추가합니다."""
+        # 사용자와 MCP 서버가 존재하는지 확인
+        user = self.user_dao.get_user_by_id(user_id)
+        if not user:
+            return False
+        
+        # MCP 서버 존재 여부 확인 (간단한 방법으로)
+        from backend.database.model import MCPServer
+        mcp_server = self.db.query(MCPServer).filter(MCPServer.id == mcp_server_id).first()
+        if not mcp_server:
+            return False
+        
         return self.user_dao.add_favorite(user_id, mcp_server_id)
     
     def remove_favorite(self, user_id: int, mcp_server_id: int) -> bool:
@@ -80,4 +91,4 @@ class UserService:
     def is_admin(self, user_id: int) -> bool:
         """사용자가 관리자인지 확인합니다."""
         user = self.user_dao.get_user_by_id(user_id)
-        return user and user.is_admin == "admin" 
+        return user is not None and user.is_admin == "admin" 
