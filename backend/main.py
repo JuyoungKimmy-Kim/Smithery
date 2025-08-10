@@ -19,7 +19,13 @@ app = FastAPI(
 # CORS 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 프로덕션에서는 특정 도메인만 허용
+    allow_origins=[
+        "http://localhost:3000",
+        "https://localhost",
+        "http://localhost",
+        "https://localhost:443",
+        "http://localhost:80"
+    ],  # 개발 환경에서 허용할 도메인들
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

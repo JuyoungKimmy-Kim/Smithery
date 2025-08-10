@@ -27,8 +27,8 @@ services:
       - POSTGRES_PORT=5432
       - POSTGRES_HOST=${POSTGRES_HOST:-db}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
-    ports:
-      - 10001:10001
+    expose:
+      - 10001
     depends_on:
       - db
 
@@ -43,9 +43,23 @@ services:
       - HTTP_PROXY=xxx
       - HTTPS_PROXY=xxx
       - NO_PROXY=xxx
-    ports:
-      - 10002:3000
+      - NEXT_PUBLIC_BACKEND_URL=https://localhost
+      - NEXT_PUBLIC_API_BASE_URL=https://localhost/api
+    expose:
+      - 3000
     depends_on:
+      - backend
+
+  nginx:
+    container_name: mcp-hub-nginx
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - frontend
       - backend
 
 volumes:
