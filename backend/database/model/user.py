@@ -9,8 +9,10 @@ class User(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String(100), unique=True, nullable=False)
     email = Column(String(255), unique=True, nullable=False)
-    password_hash = Column(String(255), nullable=False)
+    password_hash = Column(String(255), nullable=True)  # OIDC 사용자는 비밀번호 없을 수 있음
     is_admin = Column(String(10), default='user')  # 'user' 또는 'admin'
+    display_name = Column(String(255), nullable=True)  # 표시 이름
+    oidc_sub = Column(String(255), nullable=True, unique=True)  # OIDC subject identifier
     avatar_url = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

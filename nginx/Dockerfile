@@ -10,13 +10,13 @@ RUN mkdir -p /etc/nginx/ssl
 RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
     -keyout /etc/nginx/ssl/key.pem \
     -out /etc/nginx/ssl/cert.pem \
-    -subj "/C=KR/ST=Seoul/L=Seoul/O=Development/CN=localhost"
+    -subj "/C=KR/ST=Seoul/L=Seoul/O=Samsung/CN=ssai.samsungds.net"
 
 # Nginx 설정 파일 복사
-COPY nginx.conf /etc/nginx/nginx.conf
+COPY default.conf /etc/nginx/conf.d/default.conf
 
 # 포트 노출
-EXPOSE 80 443
+EXPOSE 9631
 
 # Nginx 시작
 CMD ["nginx", "-g", "daemon off;"] 

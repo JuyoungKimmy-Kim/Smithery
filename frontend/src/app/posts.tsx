@@ -51,12 +51,57 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
         
         if (response.ok) {
           const data = await response.json();
-          console.log('Fetched posts data:', data); // 전체 데이터 확인
-          console.log('Number of posts:', data.length); // 포스트 개수 확인
-          console.log('First post structure:', data[0]); // 첫 번째 포스트 구조 확인
+          console.log('=== POSTS API RESPONSE DEBUG ===');
+          console.log('Response status:', response.status);
+          console.log('Raw data length:', data.length);
+          console.log('Raw data:', data);
+          console.log('First item structure:', data[0]);
           
-          setAllPosts(data);
-          setPosts(data);
+          // 백엔드 데이터를 프론트엔드 형태로 변환
+          const transformedData = data.map((mcp: any, index: number) => {
+            console.log(`Transforming item ${index}:`, mcp);
+            
+            // tag 처리 로직 개선
+            let tagString = '';
+            if (mcp.tags) {
+              if (Array.isArray(mcp.tags)) {
+                // tag가 배열인 경우
+                if (mcp.tags.length > 0 && typeof mcp.tags[0] === 'object' && mcp.tags[0].name) {
+                  // tag가 객체 배열인 경우 (예: [{name: "tag1"}, {name: "tag2"}])
+                  tagString = mcp.tags.map((tag: any) => tag.name || tag).join(', ');
+                } else {
+                  // tag가 문자열 배열인 경우 (예: ["tag1", "tag2"])
+                  tagString = mcp.tags.join(', ');
+                }
+              } else if (typeof mcp.tags === 'string') {
+                // tag가 이미 문자열인 경우
+                tagString = mcp.tags;
+              }
+            }
+            
+            const transformed = {
+              id: mcp.id,
+              category: mcp.category || 'Unknown',
+              tags: tagString,
+              title: mcp.name || 'Unknown Name',
+              desc: mcp.description || 'No description',
+              date: mcp.created_at || 'Unknown date',
+              author: {
+                img: '/image/avatar1.jpg', // 올바른 아바타 경로 사용
+                name: mcp.owner?.username || 'Unknown Author'
+              }
+            };
+            
+            console.log(`Transformed item ${index}:`, transformed);
+            return transformed;
+          });
+          
+          console.log('Final transformed data length:', transformedData.length);
+          console.log('Final transformed data:', transformedData);
+          console.log('=== END DEBUG ===');
+          
+          setAllPosts(transformedData);
+          setPosts(transformedData);
         } else {
           console.error('Failed to fetch posts, status:', response.status);
           const errorText = await response.text();

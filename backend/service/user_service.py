@@ -91,4 +91,20 @@ class UserService:
     def is_admin(self, user_id: int) -> bool:
         """사용자가 관리자인지 확인합니다."""
         user = self.user_dao.get_user_by_id(user_id)
-        return user is not None and user.is_admin == "admin" 
+        return user is not None and user.is_admin == "admin"
+    
+    def get_user_by_email(self, email: str) -> Optional[User]:
+        """이메일로 사용자를 조회합니다."""
+        return self.user_dao.get_user_by_email(email)
+    
+    def create_oidc_user(self, email: str, name: str, oidc_sub: str = None) -> User:
+        """OIDC를 통해 새 사용자를 생성합니다."""
+        # OIDC 사용자는 이메일을 username으로 사용
+        username = email.split('@')[0]  # 이메일에서 도메인 제외
+        
+        # 중복 검사
+        if self.user_dao.get_user_by_email(email):
+            raise ValueError("이미 존재하는 이메일입니다.")
+        
+        # OIDC 사용자는 비밀번호 없이 생성
+        return self.user_dao.create_oidc_user(username, email, name, oidc_sub) 

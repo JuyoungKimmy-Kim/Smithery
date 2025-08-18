@@ -103,6 +103,10 @@ class MCPServerService:
         """승인 대기 중인 MCP 서버 목록을 조회합니다."""
         return self.mcp_server_dao.get_pending_mcp_servers()
     
+    def get_all_mcp_servers(self, limit: int = None, offset: int = 0) -> List[MCPServer]:
+        """모든 MCP 서버 목록을 조회합니다 (승인된 것과 pending 모두)."""
+        return self.mcp_server_dao.get_all_mcp_servers(limit, offset)
+    
     def approve_mcp_server(self, mcp_server_id: int) -> Optional[MCPServer]:
         """MCP 서버를 승인합니다."""
         return self.mcp_server_dao.update_mcp_server_status(mcp_server_id, 'approved')

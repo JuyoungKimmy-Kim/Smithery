@@ -118,6 +118,28 @@ export default function LoginPage() {
             </button>
           </div>
 
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-gray-50 text-gray-500">또는</span>
+            </div>
+          </div>
+
+          <div>
+            <button
+              type="button"
+              onClick={() => window.location.href = '/api/v1/oidc/login'}
+              className="group relative w-full flex justify-center py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              </svg>
+              회사 계정으로 로그인 (SSO)
+            </button>
+          </div>
+
           <div className="text-center">
             <Link href="/" className="text-sm text-blue-600 hover:text-blue-500">
               메인 페이지로 돌아가기

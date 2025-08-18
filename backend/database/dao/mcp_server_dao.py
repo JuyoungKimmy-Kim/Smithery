@@ -51,9 +51,16 @@ class MCPServerDAO:
     
     def get_pending_mcp_servers(self) -> List[MCPServer]:
         """승인 대기 중인 MCP 서버 목록을 조회합니다."""
-        return self.db.query(MCPServer).options(
-            joinedload(MCPServer.owner)
-        ).filter(MCPServer.status == 'pending').all()
+        return self.db.query(MCPServer).filter(MCPServer.status == 'pending').all()
+    
+    def get_all_mcp_servers(self, limit: int = None, offset: int = 0) -> List[MCPServer]:
+        """모든 MCP 서버 목록을 조회합니다 (승인된 것과 pending 모두)."""
+        query = self.db.query(MCPServer)
+        if limit:
+            query = query.limit(limit)
+        if offset:
+            query = query.offset(offset)
+        return query.all()
     
     def search_mcp_servers(self, keyword: str, status: str = 'approved') -> List[MCPServer]:
         """키워드로 MCP 서버를 검색합니다."""

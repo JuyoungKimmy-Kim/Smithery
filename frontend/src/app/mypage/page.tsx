@@ -109,7 +109,38 @@ export default function MyPage() {
         if (myServersResponse.ok) {
           const myServersData = await myServersResponse.json();
           console.log('My servers data:', myServersData);
-          setMyServers(myServersData);
+          
+          // 백엔드 데이터를 프론트엔드 형태로 변환
+          const transformedMyServers = myServersData.map((server: any) => {
+            // tag 처리 로직 개선
+            let tagString = '';
+            if (server.tags) {
+              if (Array.isArray(server.tags)) {
+                if (server.tags.length > 0 && typeof server.tags[0] === 'object' && server.tags[0].name) {
+                  tagString = server.tags.map((tag: any) => tag.name || tag).join(', ');
+                } else {
+                  tagString = server.tags.join(', ');
+                }
+              } else if (typeof server.tags === 'string') {
+                tagString = server.tags;
+              }
+            }
+            
+            return {
+              id: server.id,
+              category: server.category || 'Unknown',
+              tags: tagString,
+              title: server.name || 'Unknown Name',
+              desc: server.description || 'No description',
+              date: server.created_at || 'Unknown date',
+              author: {
+                img: '/image/avatar1.jpg',
+                name: server.owner?.username || 'Unknown Author'
+              }
+            };
+          });
+          
+          setMyServers(transformedMyServers);
         } else if (myServersResponse.status === 401) {
           console.error('Token expired, redirecting to login');
           localStorage.removeItem('token');
@@ -132,7 +163,38 @@ export default function MyPage() {
         if (favoritesResponse.ok) {
           const favoritesData = await favoritesResponse.json();
           console.log('Favorites data:', favoritesData);
-          setFavorites(favoritesData);
+          
+          // 백엔드 데이터를 프론트엔드 형태로 변환
+          const transformedFavorites = favoritesData.map((server: any) => {
+            // tag 처리 로직 개선
+            let tagString = '';
+            if (server.tags) {
+              if (Array.isArray(server.tags)) {
+                if (server.tags.length > 0 && typeof server.tags[0] === 'object' && server.tags[0].name) {
+                  tagString = server.tags.map((tag: any) => tag.name || tag).join(', ');
+                } else {
+                  tagString = server.tags.join(', ');
+                }
+              } else if (typeof server.tags === 'string') {
+                tagString = server.tags;
+              }
+            }
+            
+            return {
+              id: server.id,
+              category: server.category || 'Unknown',
+              tags: tagString,
+              title: server.name || 'Unknown Name',
+              desc: server.description || 'No description',
+              date: server.created_at || 'Unknown date',
+              author: {
+                img: '/image/avatar1.jpg',
+                name: server.owner?.username || 'Unknown Author'
+              }
+            };
+          });
+          
+          setFavorites(transformedFavorites);
         } else if (favoritesResponse.status === 401) {
           console.error('Token expired, redirecting to login');
           localStorage.removeItem('token');
@@ -145,18 +207,65 @@ export default function MyPage() {
 
         // Admin인 경우 승인 대기중인 서버 가져오기
         if (isAdmin) {
+          console.log('=== ADMIN PENDING API DEBUG ===');
+          console.log('User is admin, fetching pending servers...');
+          console.log('Admin status:', user?.is_admin);
+          
           const pendingResponse = await fetch('/api/mcp-servers/admin/pending', {
             headers: {
               'Authorization': `Bearer ${token}`
             }
           });
           
-          console.log('Pending servers response status:', pendingResponse.status);
+          console.log('Pending API URL:', '/api/mcp-servers/admin/pending');
+          console.log('Pending response status:', pendingResponse.status);
+          console.log('Pending response headers:', Object.fromEntries(pendingResponse.headers.entries()));
           
           if (pendingResponse.ok) {
             const pendingData = await pendingResponse.json();
-            console.log('Pending servers data:', pendingData);
-            setPendingServers(pendingData);
+            console.log('Pending servers raw data:', pendingData);
+            console.log('Pending servers count:', pendingData.length);
+            
+            // 백엔드 데이터를 프론트엔드 형태로 변환
+            const transformedPending = pendingData.map((server: any, index: number) => {
+              console.log(`Transforming pending server ${index}:`, server);
+              
+              // tag 처리 로직 개선
+              let tagString = '';
+              if (server.tags) {
+                if (Array.isArray(server.tags)) {
+                  if (server.tags.length > 0 && typeof server.tags[0] === 'object' && server.tags[0].name) {
+                    tagString = server.tags.map((tag: any) => tag.name || tag).join(', ');
+                  } else {
+                    tagString = server.tags.join(', ');
+                  }
+                } else if (typeof server.tags === 'string') {
+                  tagString = server.tags;
+                }
+              }
+              
+              const transformed = {
+                id: server.id,
+                category: server.category || 'Unknown',
+                tags: tagString,
+                title: server.name || 'Unknown Name',
+                desc: server.description || 'No description',
+                date: server.created_at || 'Unknown date',
+                author: {
+                  img: '/image/avatar1.jpg', // 올바른 아바타 경로 사용
+                  name: server.owner?.username || 'Unknown Author'
+                }
+              };
+              
+              console.log(`Transformed pending server ${index}:`, transformed);
+              return transformed;
+            });
+            
+            console.log('Final transformed pending servers:', transformedPending);
+            console.log('Final pending servers count:', transformedPending.length);
+            console.log('=== END ADMIN DEBUG ===');
+            
+            setPendingServers(transformedPending);
           } else if (pendingResponse.status === 401) {
             console.error('Token expired, redirecting to login');
             localStorage.removeItem('token');
@@ -164,7 +273,16 @@ export default function MyPage() {
             return;
           } else {
             const errorText = await pendingResponse.text();
-            console.error('Pending servers error:', errorText);
+            console.error('Pending servers error status:', pendingResponse.status);
+            console.error('Pending servers error text:', errorText);
+            
+            // 에러 응답도 JSON으로 파싱 시도
+            try {
+              const errorJson = JSON.parse(errorText);
+              console.error('Pending servers error JSON:', errorJson);
+            } catch (e) {
+              console.error('Pending servers error is not JSON');
+            }
           }
         }
       } catch (error) {

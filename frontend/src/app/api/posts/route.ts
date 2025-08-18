@@ -38,7 +38,7 @@ export async function GET() {
         desc: mcp.description || "No description available.",
         date: formattedDate,
         author: {
-          img: mcp.owner?.avatar_url || "/image/avatar1.jpg",
+          img: "/image/avatar1.jpg",
           name: mcp.owner ? mcp.owner.username : "Unknown User",
         },
       };

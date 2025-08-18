@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
-
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -10,7 +8,7 @@ export async function GET(
     const { id } = await params;
     console.log(`Frontend API: Fetching MCP server with ID: ${id}`);  // 디버깅 로그
     
-    const response = await fetch(`${BACKEND_URL}/api/v1/mcp-servers/${id}`, {
+    const response = await fetch(`/api/v1/mcp-servers/${id}`, {
       cache: 'no-store',  // 캐시 방지
       headers: {
         'Cache-Control': 'no-cache',
@@ -56,9 +54,9 @@ export async function PUT(
       headers['Authorization'] = authHeader;
     }
     
-    console.log(`Sending request to backend: ${BACKEND_URL}/api/v1/mcp-servers/${id}`);  // 디버깅 로그
+    console.log(`Sending request to backend: /api/v1/mcp-servers/${id}`);  // 디버깅 로그
     
-    const response = await fetch(`${BACKEND_URL}/api/v1/mcp-servers/${id}`, {
+    const response = await fetch(`/api/v1/mcp-servers/${id}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify(body),
@@ -99,9 +97,9 @@ export async function DELETE(
       headers['Authorization'] = authHeader;
     }
     
-    console.log(`Sending DELETE request to backend: ${BACKEND_URL}/api/v1/mcp-servers/admin/${id}`);  // 디버깅 로그
+    console.log(`Sending DELETE request to backend: /api/v1/mcp-servers/admin/${id}`);  // 디버깅 로그
     
-    const response = await fetch(`${BACKEND_URL}/api/v1/mcp-servers/admin/${id}`, {
+    const response = await fetch(`/api/v1/mcp-servers/admin/${id}`, {
       method: 'DELETE',
       headers,
     });

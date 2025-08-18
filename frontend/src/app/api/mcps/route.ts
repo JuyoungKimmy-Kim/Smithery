@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
-
 export async function GET() {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/v1/mcp-servers/`);
+    // nginx를 거쳐서 백엔드로 요청 (상대 경로 사용)
+    const response = await fetch('/api/v1/mcp-servers/');
     if (!response.ok) {
       throw new Error(`Backend API error: ${response.status}`);
     }
@@ -14,7 +13,7 @@ export async function GET() {
     const mcpsWithUserInfo = mcps.map((mcp: any) => ({
       ...mcp,
       author: mcp.owner ? mcp.owner.username : 'Unknown User',
-      avatar: '/images/avatar1.jpg' // 통일된 아바타 이미지
+      avatar: '/image/avatar1.jpg' // 통일된 아바타 이미지
     }));
     
     return NextResponse.json(mcpsWithUserInfo);
@@ -41,7 +40,7 @@ export async function POST(request: Request) {
     // 미리보기 요청인지 확인
     if (body.github_link && Object.keys(body).length === 1) {
       // 미리보기 API 호출
-      const response = await fetch(`${BACKEND_URL}/api/v1/mcp-servers/preview`, {
+      const response = await fetch('/api/v1/mcp-servers/preview', {
         method: 'POST',
         headers,
         body: JSON.stringify(body),
@@ -55,7 +54,7 @@ export async function POST(request: Request) {
       return NextResponse.json(result);
     } else {
       // 일반 MCP 서버 생성 API 호출
-      const response = await fetch(`${BACKEND_URL}/api/v1/mcp-servers/`, {
+      const response = await fetch('/api/v1/mcp-servers/', {
         method: 'POST',
         headers,
         body: JSON.stringify(body),

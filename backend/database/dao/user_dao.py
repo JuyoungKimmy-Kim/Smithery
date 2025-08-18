@@ -25,6 +25,21 @@ class UserDAO:
         self.db.refresh(user)
         return user
     
+    def create_oidc_user(self, username: str, email: str, name: str, oidc_sub: str = None) -> User:
+        """OIDC를 통해 새 사용자를 생성합니다."""
+        user = User(
+            username=username,
+            email=email,
+            password_hash=None,  # OIDC 사용자는 비밀번호 없음
+            is_admin="user",
+            display_name=name,
+            oidc_sub=oidc_sub
+        )
+        self.db.add(user)
+        self.db.commit()
+        self.db.refresh(user)
+        return user
+    
     def get_user_by_id(self, user_id: int) -> Optional[User]:
         """ID로 사용자를 조회합니다."""
         return self.db.query(User).filter(User.id == user_id).first()

@@ -190,12 +190,12 @@ def get_user_mcp_servers_by_username(
 
 # 관리자 전용 엔드포인트
 @router.post("/admin/approve", response_model=MCPServerResponse)
-def approve_mcp_server(
-    approval_request: AdminApprovalRequest,
+def approve_mcp_server_admin(
+    approval_request: MCPApprovalRequest,
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
-    """MCP 서버를 승인하거나 거부합니다."""
+    """Admin이 MCP 서버를 승인합니다."""
     mcp_service = MCPServerService(db)
     
     if approval_request.action == "approve":
@@ -232,6 +232,15 @@ def approve_all_pending_servers(
         "message": f"{result['approved_count']}개의 서버가 승인되었습니다.",
         "approved_count": result['approved_count']
     }
+
+@router.get("/admin/pending", response_model=List[MCPServerResponse])
+def get_pending_mcp_servers_admin(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Admin만 접근 가능한 승인 대기중인 MCP 서버 목록을 조회합니다."""
+    mcp_service = MCPServerService(db)
+    return mcp_service.get_pending_mcp_servers()
 
 @router.delete("/admin/{mcp_server_id}")
 def delete_mcp_server(
