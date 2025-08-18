@@ -12,6 +12,10 @@ class UserLogin(BaseModel):
     username: str
     password: str
 
+class ADLoginRequest(BaseModel):
+    username: str
+    email: str
+
 class UserResponse(BaseModel):
     id: int
     username: str
