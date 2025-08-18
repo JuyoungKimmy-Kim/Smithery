@@ -46,6 +46,10 @@ class UserService:
         """사용자명으로 사용자를 조회합니다."""
         return self.user_dao.get_user_by_username(username)
     
+    def get_user_by_email(self, email: str) -> Optional[User]:
+        """이메일로 사용자를 조회합니다."""
+        return self.user_dao.get_user_by_email(email)
+    
     def get_user_mcp_servers(self, user_id: int) -> List[MCPServer]:
         """사용자가 등록한 MCP 서버 목록을 조회합니다."""
         return self.user_dao.get_user_mcp_servers(user_id)

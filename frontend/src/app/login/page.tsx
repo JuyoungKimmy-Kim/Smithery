@@ -13,6 +13,7 @@ export default function LoginPage() {
     password: "",
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [isADLoading, setIsADLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleInputChange = (field: string, value: string) => {
@@ -53,6 +54,26 @@ export default function LoginPage() {
       setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleADLogin = async () => {
+    setIsADLoading(true);
+    setError("");
+
+    try {
+      // AD 로그인 페이지로 리다이렉트
+      // 실제 AD 로그인에서는 여기서 redirect가 발생하고
+      // 사용자가 AD 인증 후 돌아오면 username과 email을 받게 됩니다
+      
+      console.log("AD 로그인 페이지로 리다이렉트 중...");
+      
+      // AD 로그인 페이지로 이동 (더미 구현)
+      router.push('/ad-login');
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'AD 로그인 중 오류가 발생했습니다.');
+      setIsADLoading(false);
     }
   };
 
@@ -108,13 +129,31 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <div>
+          <div className="space-y-3">
             <button
               type="submit"
               disabled={isLoading}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? 'Signing in...' : 'Sign In'}
+            </button>
+            
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-gray-50 text-gray-500">또는</span>
+              </div>
+            </div>
+            
+            <button
+              type="button"
+              onClick={handleADLogin}
+              disabled={isADLoading}
+              className="group relative w-full flex justify-center py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isADLoading ? 'AD 로그인 중...' : 'AD 로그인'}
             </button>
           </div>
 

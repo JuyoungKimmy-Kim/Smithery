@@ -5,7 +5,7 @@ import logging
 
 from backend.database import get_db
 from backend.service import UserService
-from backend.api.schemas import UserCreate, UserLogin, UserResponse
+from backend.api.schemas import UserCreate, UserLogin, UserResponse, ADLoginRequest
 from backend.api.auth import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES, get_current_user
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
@@ -55,6 +55,47 @@ def login(user_data: UserLogin, db: Session = Depends(get_db)):
     
     print(f"Authentication successful for user: {user.username}")  # 디버깅 로그
     
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": str(user.id)}, expires_delta=access_token_expires
+    )
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": UserResponse.from_orm(user)
+    }
+
+@router.post("/ad-login")
+def ad_login(ad_data: ADLoginRequest, db: Session = Depends(get_db)):
+    """AD 로그인을 수행합니다."""
+    print(f"AD Login attempt for username: {ad_data.username}, email: {ad_data.email}")
+    
+    user_service = UserService(db)
+    
+    # 이메일로 사용자 조회
+    user = user_service.get_user_by_email(ad_data.email)
+    
+    if not user:
+        # 사용자가 존재하지 않으면 새로 생성
+        print(f"User not found, creating new user: {ad_data.username}")
+        try:
+            # AD 사용자는 임시 비밀번호로 생성 (실제로는 사용되지 않음)
+            user = user_service.create_user(
+                username=ad_data.username,
+                email=ad_data.email,
+                password="ad_user_temp_password_123"
+            )
+            print(f"New AD user created: {user.username}")
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to create AD user: {str(e)}"
+            )
+    else:
+        print(f"Existing AD user found: {user.username}")
+    
+    # JWT 토큰 생성
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": str(user.id)}, expires_delta=access_token_expires
