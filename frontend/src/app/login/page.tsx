@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
+import { getADFSConfig } from "@/constants/adfs";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -62,16 +63,30 @@ export default function LoginPage() {
     setError("");
 
     try {
-      // AD 로그인 페이지로 리다이렉트
-      // 실제 AD 로그인에서는 여기서 redirect가 발생하고
-      // 사용자가 AD 인증 후 돌아오면 username과 email을 받게 됩니다
+      // ADFS 설정을 사용해서 직접 AD 로그인 URL 생성
+      console.log("AD 로그인 URL 생성 중...");
       
-      console.log("AD 로그인 페이지로 리다이렉트 중...");
+      const adfsConfig = getADFSConfig();
+      console.log("ADFS 설정:", adfsConfig);
       
-      // AD 로그인 페이지로 이동 (더미 구현)
-      router.push('/ad-login');
+      const adfsLoginUrl = new URL(adfsConfig.IDP.AUTHORIZE_URL);
+      const params = new URLSearchParams();
+      
+      params.append('client_id', adfsConfig.IDP.CLIENT_ID);
+      params.append('redirect_uri', adfsConfig.SP.REDIRECT_URL);
+      params.append('response_type', 'code id_token');
+      params.append('scope', 'openid profile');
+      params.append('nonce', Math.random().toString(36).substr(2, 9));
+      
+      adfsLoginUrl.search = params.toString();
+      
+      console.log("AD 로그인 URL 생성 완료:", adfsLoginUrl.toString());
+      
+      // ADFS 로그인 페이지로 직접 리다이렉트
+      window.location.href = adfsLoginUrl.toString();
       
     } catch (err) {
+      console.error('AD 로그인 URL 생성 중 오류:', err);
       setError(err instanceof Error ? err.message : 'AD 로그인 중 오류가 발생했습니다.');
       setIsADLoading(false);
     }
