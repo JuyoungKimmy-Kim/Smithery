@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.orm import Session
 from datetime import timedelta
 import logging
@@ -17,22 +17,24 @@ AD_CLIENT_ID = os.getenv("AD_CLIENT_ID", "your-ad-client-id")
 AD_CLIENT_SECRET = os.getenv("AD_CLIENT_SECRET", "your-ad-client-secret")
 AD_TOKEN_ENDPOINT = os.getenv("AD_TOKEN_ENDPOINT", "https://adfs.company.com/adfs/oauth2/token")
 
-@router.post("/ad-login")
-async def ad_login(request: Request, db: Session = Depends(get_db)):
+@router.get("/ad-login")
+async def ad_login(code: str = None, state: str = None, response: Response = None, db: Session = Depends(get_db)):
     """AD 로그인을 처리합니다."""
+    
+    if not code:
+        # AD 로그인 시작
+        from datetime import datetime
+        return {
+            "message": "AD 로그인 시작",
+            "status": "initiated",
+            "timestamp": datetime.utcnow().isoformat(),
+            "endpoint": "/api/v1/auth/ad-login",
+            "method": "GET"
+        }
+    
+    # code가 있으면 토큰 교환 및 사용자 처리
     try:
-        # form 데이터 파싱
-        form_data = await request.form()
-        code = form_data.get("code")
-        state = form_data.get("state")
-        
-        if not code:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Authorization code is required"
-            )
-        
-        print(f"AD login received - code: {code[:10]}..., state: {state}")
+        print(f"AD login token verification - code: {code[:10]}..., state: {state}")
         
         # ADFS 토큰 엔드포인트에 토큰 교환 요청
         token_response = requests.post(
@@ -89,18 +91,31 @@ async def ad_login(request: Request, db: Session = Depends(get_db)):
             data={"sub": str(user.id)}, expires_delta=access_token_expires
         )
         
+        # 루트 페이지로 리다이렉트 (JWT 토큰과 사용자 정보를 query string으로 전달)
+        redirect_url = f"/?ad_auth=success&token={jwt_token}&user_id={user.id}&username={user.username}&email={user.email}"
+        
+        response.headers["Location"] = redirect_url
+        response.status_code = 302
+        
         return {
-            "access_token": jwt_token,
-            "token_type": "bearer",
-            "user": UserResponse.from_orm(user)
+            "message": "AD 로그인 성공",
+            "redirect_url": redirect_url,
+            "status": "success"
         }
         
     except Exception as e:
-        print(f"AD login error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"AD 로그인 처리 실패: {str(e)}"
-        )
+        print(f"AD login processing error: {str(e)}")
+        # 에러 발생 시에도 루트로 리다이렉트 (에러 정보 포함)
+        error_redirect_url = f"/?ad_auth=error&error_message={str(e)}"
+        
+        response.headers["Location"] = error_redirect_url
+        response.status_code = 302
+        
+        return {
+            "message": "AD 로그인 실패",
+            "redirect_url": error_redirect_url,
+            "status": "error"
+        }
 
 @router.post("/register", response_model=UserResponse)
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
