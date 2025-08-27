@@ -48,8 +48,8 @@ export default function LoginPage() {
       // AuthContext를 통해 로그인 처리
       login(result.access_token, result.user);
       
-      alert('로그인에 성공했습니다!');
-      router.push('/'); // 메인 페이지로 이동
+      // 메인 페이지로 이동
+      router.push('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
     } finally {

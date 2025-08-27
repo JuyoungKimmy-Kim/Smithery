@@ -10,10 +10,6 @@ import {
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 
-
-
-
-
 export function Navbar() {
   const [open, setOpen] = React.useState(false);
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
@@ -39,8 +35,10 @@ export function Navbar() {
 
   const handleLogoutClick = () => {
     logout();
-    router.push('/');
     setUserMenuOpen(false);
+    router.push('/');
+    // 페이지 새로고침
+    window.location.reload();
   };
 
   const handleMyPageClick = () => {
@@ -69,113 +67,115 @@ export function Navbar() {
   }, [userMenuOpen]);
 
   return (
-    <nav className="border-0 sticky top-0 z-50 bg-white shadow-sm">
-      <div className="container mx-auto flex items-center justify-between px-4 py-3">
-        <a
-          href="/"
-          className="text-lg font-bold text-blue-gray-900"
-        >
-          MCP Server Hub
-        </a>
-
-        <div className="hidden items-center gap-4 lg:flex">
-          <button 
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            onClick={handleDeployClick}
+    <>
+      <nav className="border-0 sticky top-0 z-50 bg-white shadow-sm">
+        <div className="container mx-auto flex items-center justify-between px-4 py-3">
+          <a
+            href="/"
+            className="text-lg font-bold text-blue-gray-900"
           >
-            Deploy Server
-          </button>
-          
-          {isAuthenticated ? (
-            <div className="relative user-menu">
-              <button
-                onClick={handleUserMenuToggle}
-                className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:text-gray-900 transition-colors rounded-lg hover:bg-gray-100"
-              >
-                <UserCircleIcon className="h-5 w-5" />
-                <span className="text-sm font-medium">{user?.username}</span>
-                <ChevronDownIcon className="h-4 w-4" />
-              </button>
-              
-              {userMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-                  <button
-                    onClick={handleMyPageClick}
-                    className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-2"
-                  >
-                    <UserCircleIcon className="h-4 w-4" />
-                    My Page
-                  </button>
-                  <hr className="my-1" />
-                  <button
-                    onClick={handleLogoutClick}
-                    className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 transition-colors"
-                  >
-                    Sign Out
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
+            MCP Server Hub
+          </a>
+
+          <div className="hidden items-center gap-4 lg:flex">
             <button 
-              onClick={handleLoginClick}
-              className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              onClick={handleDeployClick}
             >
-              Sign In
+              Deploy Server
             </button>
-          )}
-        </div>
-        <button
-          onClick={handleOpen}
-          className="ml-auto inline-block lg:hidden p-2 text-gray-700 hover:text-gray-900"
-        >
-          {open ? (
-            <XMarkIcon className="h-6 w-6" />
-          ) : (
-            <Bars3Icon className="h-6 w-6" />
-          )}
-        </button>
-      </div>
-      {open && (
-        <div className="lg:hidden border-t border-gray-200 bg-white">
-          <div className="container mx-auto px-4 py-4">
-            <div className="mt-4 space-y-2">
+            
+            {isAuthenticated ? (
+              <div className="relative user-menu">
+                <button
+                  onClick={handleUserMenuToggle}
+                  className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:text-gray-900 transition-colors rounded-lg hover:bg-gray-100"
+                >
+                  <UserCircleIcon className="h-5 w-5" />
+                  <span className="text-sm font-medium">{user?.username}</span>
+                  <ChevronDownIcon className="h-4 w-4" />
+                </button>
+                
+                {userMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                    <button
+                      onClick={handleMyPageClick}
+                      className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-2"
+                    >
+                      <UserCircleIcon className="h-4 w-4" />
+                      My Page
+                    </button>
+                    <hr className="my-1" />
+                    <button
+                      onClick={handleLogoutClick}
+                      className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 transition-colors"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
               <button 
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                onClick={handleDeployClick}
+                onClick={handleLoginClick}
+                className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors"
               >
-                Deploy Server
+                Sign In
               </button>
-              
-              {isAuthenticated ? (
-                <>
-                  <button
-                    onClick={handleMyPageClick}
-                    className="w-full px-4 py-2 text-left text-gray-700 hover:text-gray-900 transition-colors flex items-center gap-2"
-                  >
-                    <UserCircleIcon className="h-4 w-4" />
-                    My Page
-                  </button>
+            )}
+          </div>
+          <button
+            onClick={handleOpen}
+            className="ml-auto inline-block lg:hidden p-2 text-gray-700 hover:text-gray-900"
+          >
+            {open ? (
+              <XMarkIcon className="h-6 w-6" />
+            ) : (
+              <Bars3Icon className="h-6 w-6" />
+            )}
+          </button>
+        </div>
+        {open && (
+          <div className="lg:hidden border-t border-gray-200 bg-white">
+            <div className="container mx-auto px-4 py-4">
+              <div className="mt-4 space-y-2">
+                <button 
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  onClick={handleDeployClick}
+                >
+                  Deploy Server
+                </button>
+                
+                {isAuthenticated ? (
+                  <>
+                    <button
+                      onClick={handleMyPageClick}
+                      className="w-full px-4 py-2 text-left text-gray-700 hover:text-gray-900 transition-colors flex items-center gap-2"
+                    >
+                      <UserCircleIcon className="h-4 w-4" />
+                      My Page
+                    </button>
+                    <button 
+                      onClick={handleLogoutClick}
+                      className="w-full px-4 py-2 text-left text-gray-700 hover:text-gray-900 transition-colors"
+                    >
+                      Sign Out
+                    </button>
+                  </>
+                ) : (
                   <button 
-                    onClick={handleLogoutClick}
+                    onClick={handleLoginClick}
                     className="w-full px-4 py-2 text-left text-gray-700 hover:text-gray-900 transition-colors"
                   >
-                    Sign Out
+                    Sign In
                   </button>
-                </>
-              ) : (
-                <button 
-                  onClick={handleLoginClick}
-                  className="w-full px-4 py-2 text-left text-gray-700 hover:text-gray-900 transition-colors"
-                >
-                  Sign In
-                </button>
-              )}
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </nav>
+        )}
+      </nav>
+    </>
   );
 }
 
