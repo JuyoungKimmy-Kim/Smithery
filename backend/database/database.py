@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
 import os
-from typing import Generator, Optional
+from typing import Generator
 
 # 데이터베이스 URL 설정
 DATABASE_URL = os.getenv(
@@ -59,12 +59,6 @@ class Database:
         """
         self.drop_tables()
         self.create_tables()
-
-    def get_mcp_server_with_tools(self, mcp_server_id: int) -> Optional[MCPServer]:
-        """도구 정보와 함께 MCP 서버를 조회합니다."""
-        return self.db.query(MCPServer).options(
-            joinedload(MCPServer.tools).joinedload(MCPServerTool.parameters)
-        ).filter(MCPServer.id == mcp_server_id).first()
 
 # 전역 데이터베이스 인스턴스
 database = Database()
