@@ -149,10 +149,6 @@ export default function MCPServerDetail() {
               </p>
 
               <div className="flex items-center gap-6 text-sm text-gray-600">
-                <div className="flex items-center gap-2">
-                  <GlobeAltIcon className="h-4 w-4" />
-                  <span>Transport: {mcp.transport}</span>
-                </div>
                 {mcp.created_at && (
                   <div className="flex items-center gap-2">
                     <CalendarIcon className="h-4 w-4" />
@@ -331,16 +327,7 @@ export default function MCPServerDetail() {
             Metadata
           </h2>
           
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <p className="text-sm font-medium text-gray-600">
-                ID
-              </p>
-              <p className="text-gray-900">
-                {mcp.id}
-              </p>
-            </div>
-            
+          <div className="grid gap-4 md:grid-cols-2">       
             <div>
               <p className="text-sm font-medium text-gray-600">
                 GitHub Link
@@ -351,17 +338,7 @@ export default function MCPServerDetail() {
               >
                 {mcp.github_link}
               </button>
-            </div>
-            
-            <div>
-              <p className="text-sm font-medium text-gray-600">
-                Transport
-              </p>
-              <p className="text-gray-900">
-                {mcp.transport}
-              </p>
-            </div>
-            
+            </div>         
             <div>
               <p className="text-sm font-medium text-gray-600">
                 Status
