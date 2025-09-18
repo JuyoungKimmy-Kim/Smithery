@@ -121,7 +121,7 @@ export function BlogPostCard({
 
   return (
     <div 
-      className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 cursor-pointer relative"
+      className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 cursor-pointer relative h-80 flex flex-col"
       onClick={handleClick}
     >
       {/* 즐겨찾기 버튼 */}
@@ -143,21 +143,21 @@ export function BlogPostCard({
         </button>
       </div>
 
-      <div className="p-6">
+      <div className="p-6 flex flex-col h-full">
         <span className="text-sm font-medium text-blue-600 mb-2 block">
           {category}
         </span>
-        <h3 className="text-xl font-semibold text-gray-900 mb-2 normal-case transition-colors hover:text-gray-700 cursor-pointer">
+        <h3 className="text-xl font-semibold text-gray-900 mb-2 normal-case transition-colors hover:text-gray-700 cursor-pointer line-clamp-2">
           {title}
         </h3>
-        <p className="text-gray-600 mb-6 cursor-pointer">
+        <p className="text-gray-600 mb-4 cursor-pointer line-clamp-3 flex-grow">
           {desc}
         </p>
         <div className="mb-4">
           <TagList tags={tags} maxTags={4} />
         </div>
         <div 
-          className="flex items-center gap-4 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+          className="flex items-center gap-4 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors mt-auto"
           onClick={handleAuthorClick}
         >
           <img
