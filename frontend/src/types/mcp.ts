@@ -13,7 +13,7 @@ export interface MCPServerProperty {
 export interface MCPServerTool {
   name: string;
   description: string;
-  input_properties: MCPServerProperty[];
+  parameters: MCPServerProperty[];
 }
 
 export interface MCPServerResource {

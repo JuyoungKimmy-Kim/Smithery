@@ -23,6 +23,30 @@ export default function MCPServerDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set());
+  const [currentToolPage, setCurrentToolPage] = useState(1);
+  const toolsPerPage = 3;
+
+  const toggleToolExpansion = (index: number) => {
+    const newExpanded = new Set(expandedTools);
+    if (newExpanded.has(index)) {
+      newExpanded.delete(index);
+    } else {
+      newExpanded.add(index);
+    }
+    setExpandedTools(newExpanded);
+  };
+
+  // Tools 페이지네이션 계산
+  const totalToolPages = Math.ceil((mcp?.tools?.length || 0) / toolsPerPage);
+  const startToolIndex = (currentToolPage - 1) * toolsPerPage;
+  const endToolIndex = startToolIndex + toolsPerPage;
+  const currentTools = mcp?.tools?.slice(startToolIndex, endToolIndex) || [];
+
+  const handleToolPageChange = (page: number) => {
+    setCurrentToolPage(page);
+    setExpandedTools(new Set()); // 페이지 변경 시 모든 도구 접기
+  };
 
   useEffect(() => {
     const fetchMCP = async () => {
@@ -240,37 +264,94 @@ export default function MCPServerDetail() {
                   </h2>
                 </div>
                 <div className="grid gap-4">
-                  {mcp.tools.map((tool, index) => (
-                    <div key={index} className="border border-gray-200 rounded-lg p-4">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                        {tool.name}
-                      </h3>
-                      <p className="text-sm text-gray-600 mb-3">
-                        {tool.description}
-                      </p>
-                      {tool.input_properties && tool.input_properties.length > 0 && (
-                        <div>
-                          <p className="text-sm font-medium text-gray-900 mb-2">
-                            Input Properties:
+                  {currentTools.map((tool, index) => {
+                    const actualIndex = startToolIndex + index;
+                    return (
+                      <div 
+                        key={actualIndex} 
+                        className="border border-gray-200 rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                        onClick={() => toggleToolExpansion(actualIndex)}
+                      >
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                          {tool.name}
+                        </h3>
+                        <div className="text-sm text-gray-600 mb-3">
+                          <p 
+                            className={`${tool.description.length > 100 ? (expandedTools.has(actualIndex) ? '' : 'overflow-hidden') : ''}`}
+                            style={{
+                              display: tool.description.length > 100 && !expandedTools.has(actualIndex) ? '-webkit-box' : 'block',
+                              WebkitLineClamp: tool.description.length > 100 && !expandedTools.has(actualIndex) ? 2 : 'unset',
+                              WebkitBoxOrient: 'vertical'
+                            }}
+                          >
+                            {tool.description}
                           </p>
-                          <div className="space-y-1">
-                            {tool.input_properties.map((prop, propIndex) => (
-                              <div key={propIndex} className="flex items-center gap-2 text-xs">
-                                <span className="font-medium">{prop.name}</span>
-                                {prop.required && (
-                                  <span className="px-1 py-0.5 bg-red-100 text-red-800 text-xs rounded">Required</span>
-                                )}
-                                {prop.description && (
-                                  <span className="text-gray-600">- {prop.description}</span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        {tool.parameters && tool.parameters.length > 0 && (
+                          <div 
+                            className={`transition-all duration-300 ease-in-out ${
+                              tool.description.length > 100 && !expandedTools.has(actualIndex) 
+                                ? 'max-h-0 overflow-hidden opacity-0' 
+                                : 'max-h-96 opacity-100'
+                            }`}
+                          >
+                            <p className="text-sm font-medium text-gray-900 mb-2">
+                              Input Properties:
+                            </p>
+                            <div className="space-y-1">
+                              {tool.parameters.map((prop, propIndex) => (
+                                <div key={propIndex} className="flex items-center gap-2 text-xs">
+                                  <span className="font-medium">{prop.name}</span>
+                                  {prop.required && (
+                                    <span className="px-1 py-0.5 bg-red-100 text-red-800 text-xs rounded">Required</span>
+                                  )}
+                                  {prop.description && (
+                                    <span className="text-gray-600">- {prop.description}</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
+                
+                {/* Tools 페이지네이션 */}
+                {totalToolPages > 1 && (
+                  <div className="flex justify-center items-center gap-2 mt-6">
+                    <button
+                      onClick={() => handleToolPageChange(currentToolPage - 1)}
+                      disabled={currentToolPage === 1}
+                      className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      이전
+                    </button>
+                    
+                    {Array.from({ length: totalToolPages }, (_, i) => i + 1).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => handleToolPageChange(page)}
+                        className={`px-3 py-2 text-sm font-medium rounded-md ${
+                          currentToolPage === page
+                            ? 'bg-blue-600 text-white'
+                            : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                    
+                    <button
+                      onClick={() => handleToolPageChange(currentToolPage + 1)}
+                      disabled={currentToolPage === totalToolPages}
+                      className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      다음
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

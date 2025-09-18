@@ -138,7 +138,9 @@ class MCPServerDAO:
     
     def get_mcp_server_with_tools(self, mcp_server_id: int) -> Optional[MCPServer]:
         """도구 정보와 함께 MCP 서버를 조회합니다."""
-        return self.db.query(MCPServer).filter(MCPServer.id == mcp_server_id).first()
+        return self.db.query(MCPServer).options(
+            joinedload(MCPServer.tools).joinedload(MCPServerTool.parameters)
+        ).filter(MCPServer.id == mcp_server_id).first()
     
     def get_mcp_servers_by_owner(self, owner_id: int) -> List[MCPServer]:
         """소유자별 MCP 서버 목록을 조회합니다."""
