@@ -38,8 +38,12 @@ class MCPServerService:
     
     def create_mcp_server(self, mcp_server_data: Dict[str, Any], owner_id: int) -> MCPServer:
         """새 MCP 서버를 생성합니다."""
-        # GitHub 링크에서 도구 정보 추출 (skeleton 구현)
-        tools_data = self._extract_tools_from_github(mcp_server_data['github_link'])
+        # 프론트엔드에서 전송한 tools 데이터가 있으면 사용
+        tools_data = mcp_server_data.get('tools', [])
+        
+        # tools 데이터가 없으면 GitHub에서 추출 시도
+        if not tools_data:
+            tools_data = self._extract_tools_from_github(mcp_server_data['github_link'])
         
         # 태그 처리
         tags = mcp_server_data.get('tags', [])
@@ -73,7 +77,8 @@ class MCPServerService:
                 "parameters": [
                     {
                         "name": "param1",
-                        "description": "Example parameter"
+                        "description": "Example parameter",
+                        "required": False
                     }
                 ]
             }
@@ -82,6 +87,10 @@ class MCPServerService:
     def get_approved_mcp_servers(self, limit: int = None, offset: int = 0) -> List[MCPServer]:
         """승인된 MCP 서버 목록을 조회합니다."""
         return self.mcp_server_dao.get_approved_mcp_servers(limit, offset)
+    
+    def get_pending_mcp_servers(self) -> List[MCPServer]:
+        """승인 대기중인 MCP 서버 목록을 조회합니다."""
+        return self.mcp_server_dao.get_pending_mcp_servers()
     
     def get_mcp_server_by_id(self, mcp_server_id: int) -> Optional[MCPServer]:
         """ID로 MCP 서버를 조회합니다."""
@@ -99,38 +108,81 @@ class MCPServerService:
         """카테고리별 MCP 서버 목록을 조회합니다."""
         return self.mcp_server_dao.get_mcp_servers_by_category(category, status)
     
-    def get_pending_mcp_servers(self) -> List[MCPServer]:
-        """승인 대기 중인 MCP 서버 목록을 조회합니다."""
-        return self.mcp_server_dao.get_pending_mcp_servers()
-    
-    def approve_mcp_server(self, mcp_server_id: int) -> Optional[MCPServer]:
-        """MCP 서버를 승인합니다."""
-        return self.mcp_server_dao.update_mcp_server_status(mcp_server_id, 'approved')
-    
-    def reject_mcp_server(self, mcp_server_id: int) -> Optional[MCPServer]:
-        """MCP 서버를 거부합니다."""
-        return self.mcp_server_dao.update_mcp_server_status(mcp_server_id, 'rejected')
-    
-    def approve_all_pending_servers(self) -> dict:
-        """모든 승인 대기중인 MCP 서버를 일괄 승인합니다."""
-        return self.mcp_server_dao.approve_all_pending_servers()
+    def update_mcp_server(self, mcp_server_id: int, mcp_server_data) -> Optional[MCPServer]:
+        """MCP 서버를 수정합니다."""
+        # Pydantic 모델을 딕셔너리로 변환
+        if hasattr(mcp_server_data, 'dict'):
+            data_dict = mcp_server_data.dict()
+        else:
+            data_dict = mcp_server_data
+        
+        # tools 데이터가 있으면 업데이트
+        if 'tools' in data_dict and data_dict['tools'] is not None:
+            # 기존 tools 삭제
+            mcp_server = self.get_mcp_server_by_id(mcp_server_id)
+            if mcp_server:
+                for tool in mcp_server.tools:
+                    self.db.delete(tool)
+                self.db.commit()
+            
+            # 새 tools 추가
+            tools_data = data_dict['tools']
+            if tools_data:
+                # Pydantic 모델을 딕셔너리로 변환
+                tools_dict = []
+                for tool in tools_data:
+                    if hasattr(tool, 'dict'):
+                        tool_dict = tool.dict()
+                    else:
+                        tool_dict = tool
+                    tools_dict.append(tool_dict)
+                
+                self.mcp_server_dao.add_tools_to_mcp_server(mcp_server_id, tools_dict)
+        
+        # tools 키를 제거하고 나머지 데이터로 업데이트
+        update_data = {k: v for k, v in data_dict.items() if k != 'tools'}
+        return self.mcp_server_dao.update_mcp_server(mcp_server_id, update_data)
     
     def delete_mcp_server(self, mcp_server_id: int) -> bool:
         """MCP 서버를 삭제합니다."""
         return self.mcp_server_dao.delete_mcp_server(mcp_server_id)
     
-    def get_mcp_servers_by_owner(self, owner_id: int) -> List[MCPServer]:
-        """소유자별 MCP 서버 목록을 조회합니다."""
-        return self.mcp_server_dao.get_mcp_servers_by_owner(owner_id)
+    def approve_mcp_server(self, mcp_server_id: int) -> Optional[MCPServer]:
+        """MCP 서버를 승인합니다."""
+        mcp_server = self.get_mcp_server_by_id(mcp_server_id)
+        if mcp_server:
+            mcp_server.status = 'approved'
+            self.db.commit()
+            self.db.refresh(mcp_server)
+        return mcp_server
+    
+    def reject_mcp_server(self, mcp_server_id: int) -> Optional[MCPServer]:
+        """MCP 서버를 거부합니다."""
+        mcp_server = self.get_mcp_server_by_id(mcp_server_id)
+        if mcp_server:
+            mcp_server.status = 'rejected'
+            self.db.commit()
+            self.db.refresh(mcp_server)
+        return mcp_server
+    
+    def approve_all_pending_servers(self) -> Dict[str, int]:
+        """모든 승인 대기중인 MCP 서버를 일괄 승인합니다."""
+        pending_servers = self.get_pending_mcp_servers()
+        approved_count = 0
+        
+        for server in pending_servers:
+            server.status = 'approved'
+            approved_count += 1
+        
+        self.db.commit()
+        return {"approved_count": approved_count}
     
     def get_popular_tags(self, limit: int = 10) -> List[Tag]:
         """인기 태그 목록을 조회합니다."""
-        return self.mcp_server_dao.get_popular_tags(limit)
+        # 간단한 구현 - 실제로는 사용 빈도 기반으로 정렬해야 함
+        return self.db.query(Tag).limit(limit).all()
     
     def get_categories(self) -> List[str]:
         """모든 카테고리 목록을 조회합니다."""
-        return self.mcp_server_dao.get_categories()
-    
-    def update_mcp_server(self, mcp_server_id: int, update_data: Dict[str, Any]) -> Optional[MCPServer]:
-        """MCP 서버를 수정합니다."""
-        return self.mcp_server_dao.update_mcp_server(mcp_server_id, update_data)
+        categories = self.db.query(MCPServer.category).distinct().all()
+        return [cat[0] for cat in categories if cat[0]]

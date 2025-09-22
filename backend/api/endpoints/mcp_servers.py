@@ -21,8 +21,6 @@ def create_mcp_server(
     db: Session = Depends(get_db)
 ):
     """새 MCP 서버를 생성합니다."""
-    print(f"Creating MCP server with data: {mcp_server_data}")  # 디버깅 로그
-    print(f"Current user: {current_user.username} (ID: {current_user.id})")  # 디버깅 로그
     
     mcp_service = MCPServerService(db)
     
@@ -30,10 +28,8 @@ def create_mcp_server(
         mcp_server = mcp_service.create_mcp_server(
             mcp_server_data.dict(), current_user.id
         )
-        print(f"Created MCP server: {mcp_server.name} (ID: {mcp_server.id})")  # 디버깅 로그
         return mcp_server
     except Exception as e:
-        print(f"Error creating MCP server: {e}")  # 디버깅 로그
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create MCP server: {str(e)}"
@@ -86,19 +82,16 @@ def get_mcp_servers(
 @router.get("/{mcp_server_id}", response_model=MCPServerResponse)
 def get_mcp_server(mcp_server_id: int, db: Session = Depends(get_db)):
     """특정 MCP 서버의 상세 정보를 조회합니다."""
-    print(f"Fetching MCP server with ID: {mcp_server_id}")  # 디버깅 로그
     
     mcp_service = MCPServerService(db)
     mcp_server = mcp_service.get_mcp_server_with_tools(mcp_server_id)
     
     if not mcp_server:
-        print(f"MCP server not found with ID: {mcp_server_id}")  # 디버깅 로그
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="MCP Server not found"
         )
     
-    print(f"Found MCP server: {mcp_server.name}")  # 디버깅 로그
     return mcp_server
 
 @router.post("/search", response_model=SearchResponse)
@@ -274,32 +267,25 @@ def update_mcp_server(
     db: Session = Depends(get_db)
 ):
     """MCP 서버를 수정합니다. 등록자만 수정 가능합니다."""
-    print(f"Update request for MCP server {mcp_server_id} by user {current_user.username} (ID: {current_user.id})")  # 디버깅 로그
-    print(f"Request data: {mcp_server_data}")  # 디버깅 로그
     
     mcp_service = MCPServerService(db)
     
     # MCP 서버 존재 확인 및 소유자 확인
     existing_server = mcp_service.get_mcp_server_by_id(mcp_server_id)
     if not existing_server:
-        print(f"MCP server {mcp_server_id} not found")  # 디버깅 로그
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="MCP Server not found"
         )
     
-    print(f"Existing server owner_id: {existing_server.owner_id}, current_user.id: {current_user.id}")  # 디버깅 로그
-    print(f"Current user is_admin: {current_user.is_admin}")  # 디버깅 로그
     
     # 등록자 또는 관리자만 수정 가능
     if existing_server.owner_id != current_user.id and current_user.is_admin != 'admin':
-        print(f"Permission denied: owner_id={existing_server.owner_id}, user_id={current_user.id}, is_admin={current_user.is_admin}")  # 디버깅 로그
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the server owner or admin can update this server"
         )
     
-    print(f"Permission granted, updating server...")  # 디버깅 로그
     
     # 서버 수정
     updated_server = mcp_service.update_mcp_server(mcp_server_id, mcp_server_data)
@@ -309,7 +295,6 @@ def update_mcp_server(
             detail="MCP Server not found"
         )
     
-    print(f"Updated server data: {updated_server.name}, {updated_server.description}, {updated_server.category}")  # 디버깅 로그
     return updated_server
 
 @router.delete("/{mcp_server_id}")
