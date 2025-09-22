@@ -27,6 +27,17 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
+# Tool 관련 스키마
+class MCPServerPropertyCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    required: bool = False
+
+class MCPServerToolCreate(BaseModel):
+    name: str
+    description: str
+    parameters: List[MCPServerPropertyCreate] = []
+
 # MCP Server 관련 스키마
 class MCPServerCreate(BaseModel):
     name: str
@@ -35,6 +46,7 @@ class MCPServerCreate(BaseModel):
     category: str
     tags: Optional[str] = None  # 콤마로 구분된 태그 문자열
     config: Optional[Dict[str, Any]] = None
+    tools: Optional[List[MCPServerToolCreate]] = []  # tools 추가
 
 class MCPServerUpdate(BaseModel):
     name: Optional[str] = None
@@ -42,6 +54,7 @@ class MCPServerUpdate(BaseModel):
     category: Optional[str] = None
     tags: Optional[str] = None
     config: Optional[Dict[str, Any]] = None
+    tools: Optional[List[MCPServerToolCreate]] = []  # tools 추가
 
 class MCPServerToolResponse(BaseModel):
     id: int
@@ -56,6 +69,7 @@ class MCPServerPropertyResponse(BaseModel):
     id: int
     name: str
     description: Optional[str] = None
+    required: bool = False
     
     class Config:
         from_attributes = True
@@ -103,11 +117,7 @@ class FavoriteResponse(BaseModel):
     success: bool
     message: str
 
-# 관리자 관련 스키마
+# 관리자 승인 관련 스키마
 class AdminApprovalRequest(BaseModel):
     mcp_server_id: int
     action: str  # 'approve' 또는 'reject'
-
-# Forward references 해결
-MCPServerToolResponse.model_rebuild()
-MCPServerResponse.model_rebuild() 
