@@ -65,12 +65,12 @@ function Hero({ onSearch }: HeroProps) {
         <h1
           className="mx-auto w-full text-[30px] lg:text-[48px] font-bold leading-[45px] lg:leading-[60px] text-white"
         >
-          DS Agent's Gateway
+          Where Agents Meet Skills
         </h1>
         <p
           className="mx-auto mt-8 mb-4 w-full px-8 text-gray-300 lg:w-10/12 lg:px-12 xl:w-8/12 xl:px-20 text-lg"
         >
-          Integrate your AI with 5566 skills and extensions built by the community.
+          Join a growing community and explore MCP servers built for every use case.
         </p>
         <div className="grid place-items-start justify-center gap-2">
           <div className="mt-8 flex flex-col items-center justify-center gap-4 md:flex-row">
