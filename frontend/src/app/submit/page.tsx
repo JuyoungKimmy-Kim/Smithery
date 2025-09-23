@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { MCPServer, TransportType, MCPServerTool, MCPServerProperty } from "../../types/mcp";
 import { MCP_CATEGORIES } from "@/constants/categories";
 import { useAuth } from "@/contexts/AuthContext";
-import { PlusIcon, TrashIcon, PencilIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, TrashIcon, PencilIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 
 export default function SubmitMCPPage() {
   const router = useRouter();
@@ -24,6 +24,7 @@ export default function SubmitMCPPage() {
   const [previewTools, setPreviewTools] = useState<any[]>([]);
   const [previewResources, setPreviewResources] = useState<any[]>([]);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   
   // Tools 관리 상태
   const [tools, setTools] = useState<MCPServerTool[]>([]);
@@ -279,8 +280,7 @@ export default function SubmitMCPPage() {
       }
 
       const result = await response.json();
-      alert('MCP Server가 성공적으로 등록되었습니다!');
-      router.push('/'); // 메인 페이지로 이동
+      setShowSuccessModal(true);
     } catch (err) {
       if (err instanceof Error && err.message.includes('JSON')) {
         setError('Server Config JSON 형식이 올바르지 않습니다.');
@@ -290,6 +290,21 @@ export default function SubmitMCPPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false);
+    router.push('/');
+  };
+
+  const handleViewMCPList = () => {
+    setShowSuccessModal(false);
+    router.push('/');
+  };
+
+  const handleViewMyPage = () => {
+    setShowSuccessModal(false);
+    router.push('/mypage');
   };
 
   // 로그인하지 않은 경우 로딩 표시
@@ -306,6 +321,43 @@ export default function SubmitMCPPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center py-12">
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 transform transition-all">
+            <div className="p-8 text-center">
+              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-6">
+                <CheckCircleIcon className="h-8 w-8 text-green-600" />
+              </div>
+              
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                MCP 서버 등록이 완료되었습니다.
+              </h3>
+              
+              <div className="text-gray-600 mb-8 space-y-2">
+                <p>승인 후 MCP 목록에서 확인할 수 있으며,</p>
+                <p>내 등록 서버는 My Page에서 확인하세요.</p>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={handleViewMCPList}
+                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  MCP 목록 보기
+                </button>
+                <button
+                  onClick={handleViewMyPage}
+                  className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                >
+                  My Page
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="w-full max-w-4xl p-8 bg-white shadow-lg rounded-lg">
         <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">
           Deploy a New MCP Server
