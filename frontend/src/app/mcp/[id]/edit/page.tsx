@@ -39,6 +39,7 @@ export default function EditMCPServerPage() {
   const [parameterForm, setParameterForm] = useState({
     name: "",
     description: "",
+    type: "",  // type 필드 추가
     required: false
   });
 
@@ -184,6 +185,7 @@ export default function EditMCPServerPage() {
     const newParameter: MCPServerProperty = {
       name: parameterForm.name.trim(),
       description: parameterForm.description.trim(),
+      type: parameterForm.type,
       required: parameterForm.required
     };
 
@@ -195,6 +197,7 @@ export default function EditMCPServerPage() {
     setParameterForm({
       name: "",
       description: "",
+      type: "",
       required: false
     });
     setShowAddParameter(false);
@@ -490,7 +493,10 @@ export default function EditMCPServerPage() {
                             <div className="space-y-1">
                               {tool.parameters.map((param, paramIndex) => (
                                 <div key={paramIndex} className="text-xs text-gray-600">
-                                  • {param.name} {param.required && <span className="text-red-600">(required)</span>}
+                                  • {param.name} 
+                                  {param.type && <span className="text-blue-600"> ({param.type})</span>}
+                                  {!param.type && <span className="text-gray-400"> (no type)</span>}
+                                  {param.required && <span className="text-red-600"> (required)</span>}
                                   {param.description && ` - ${param.description}`}
                                 </div>
                               ))}
@@ -575,6 +581,8 @@ export default function EditMCPServerPage() {
                           {toolForm.parameters.map((param, index) => (
                             <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
                               <span className="text-sm font-medium">{param.name}</span>
+                              {param.type && <span className="text-xs text-blue-600">({param.type})</span>}
+                              {!param.type && <span className="text-xs text-gray-400">(no type)</span>}
                               {param.required && <span className="text-xs text-red-600">(required)</span>}
                               {param.description && <span className="text-xs text-gray-600">- {param.description}</span>}
                               <button
@@ -592,7 +600,7 @@ export default function EditMCPServerPage() {
                       {/* Add Parameter Form */}
                       {showAddParameter && (
                         <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-2">
                             <input
                               type="text"
                               placeholder="Parameter name"
@@ -607,6 +615,24 @@ export default function EditMCPServerPage() {
                               onChange={(e) => setParameterForm(prev => ({ ...prev, description: e.target.value }))}
                               className="px-2 py-1 text-sm border border-gray-300 rounded"
                             />
+                            <select
+                              value={parameterForm.type}
+                              onChange={(e) => setParameterForm(prev => ({ ...prev, type: e.target.value }))}
+                              className="px-2 py-1 text-sm border border-gray-300 rounded"
+                            >
+                              <option value="">Select type</option>
+                              <option value="string">String</option>
+                              <option value="integer">Integer</option>
+                              <option value="number">Number</option>
+                              <option value="boolean">Boolean</option>
+                              <option value="object">Object</option>
+                              <option value="array">Array</option>
+                              <option value="null">Null</option>
+                              <option value="uri">URI</option>
+                              <option value="json">JSON</option>
+                              <option value="enum">Enum</option>
+                              <option value="any">Any</option>
+                            </select>
                             <label className="flex items-center gap-1 text-sm">
                               <input
                                 type="checkbox"

@@ -147,6 +147,7 @@ class MCPServerDAO:
                 param = MCPServerProperty(
                     name=param_data['name'],
                     description=param_data.get('description'),
+                    type=param_data.get('type'),  # type 필드 추가
                     required=param_data.get('required', False),
                     tool_id=tool.id
                 )

@@ -31,6 +31,7 @@ class UserResponse(BaseModel):
 class MCPServerPropertyCreate(BaseModel):
     name: str
     description: Optional[str] = None
+    type: Optional[str] = None  # type 필드 추가
     required: bool = False
 
 class MCPServerToolCreate(BaseModel):
@@ -69,6 +70,7 @@ class MCPServerPropertyResponse(BaseModel):
     id: int
     name: str
     description: Optional[str] = None
+    type: Optional[str] = None  # type 필드 추가
     required: bool = False
     
     class Config:

@@ -7,6 +7,7 @@ export enum TransportType {
 export interface MCPServerProperty {
   name: string;
   description?: string;
+  type?: string;  // 이미 추가됨
   required: boolean;
 }
 
