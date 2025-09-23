@@ -302,6 +302,11 @@ export default function MCPServerDetail() {
                               {tool.parameters.map((prop, propIndex) => (
                                 <div key={propIndex} className="flex items-center gap-2 text-xs">
                                   <span className="font-medium">{prop.name}</span>
+                                  {prop.type && (
+                                    <span className="px-1 py-0.5 bg-blue-100 text-blue-800 text-xs rounded">
+                                      {prop.type}
+                                    </span>
+                                  )}
                                   {prop.required && (
                                     <span className="px-1 py-0.5 bg-red-100 text-red-800 text-xs rounded">Required</span>
                                   )}
