@@ -290,7 +290,7 @@ export default function MCPServerDetail() {
                         {tool.parameters && tool.parameters.length > 0 && (
                           <div 
                             className={`transition-all duration-300 ease-in-out ${
-                              tool.description.length > 100 && !expandedTools.has(actualIndex) 
+                              !expandedTools.has(actualIndex) 
                                 ? 'max-h-0 overflow-hidden opacity-0' 
                                 : 'max-h-96 opacity-100'
                             }`}
