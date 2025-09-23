@@ -39,6 +39,7 @@ export default function EditMCPServerPage() {
   const [parameterForm, setParameterForm] = useState({
     name: "",
     description: "",
+    type: "",  // type 필드 추가
     required: false
   });
 
@@ -184,6 +185,7 @@ export default function EditMCPServerPage() {
     const newParameter: MCPServerProperty = {
       name: parameterForm.name.trim(),
       description: parameterForm.description.trim(),
+      type: parameterForm.type, // type 필드 추가
       required: parameterForm.required
     };
 
@@ -195,6 +197,7 @@ export default function EditMCPServerPage() {
     setParameterForm({
       name: "",
       description: "",
+      type: "", // type 필드 초기화
       required: false
     });
     setShowAddParameter(false);

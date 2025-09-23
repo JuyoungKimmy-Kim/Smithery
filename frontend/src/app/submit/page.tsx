@@ -39,6 +39,7 @@ export default function SubmitMCPPage() {
   const [parameterForm, setParameterForm] = useState({
     name: "",
     description: "",
+    type: "",  // type 필드 추가
     required: false
   });
 
@@ -178,6 +179,7 @@ export default function SubmitMCPPage() {
     const newParameter: MCPServerProperty = {
       name: parameterForm.name.trim(),
       description: parameterForm.description.trim(),
+      type: parameterForm.type, // type 필드 추가
       required: parameterForm.required
     };
 
@@ -189,6 +191,7 @@ export default function SubmitMCPPage() {
     setParameterForm({
       name: "",
       description: "",
+      type: "",
       required: false
     });
     setShowAddParameter(false);

@@ -43,7 +43,8 @@ class MCPServerProperty(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    required = Column(Boolean, default=False)  # required 필드 추가
+    type = Column(String(50), nullable=True)  # type 필드 추가 (string, integer, boolean, object, array 등)
+    required = Column(Boolean, default=False)
     tool_id = Column(Integer, ForeignKey('mcp_server_tools.id'), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
