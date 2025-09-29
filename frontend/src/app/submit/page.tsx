@@ -22,7 +22,6 @@ export default function SubmitMCPPage() {
   const [error, setError] = useState("");
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
   const [previewTools, setPreviewTools] = useState<any[]>([]);
-  const [previewResources, setPreviewResources] = useState<any[]>([]);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   
@@ -66,46 +65,199 @@ export default function SubmitMCPPage() {
       }));
     }
 
-    // GitHub 링크가 변경되면 tools 미리보기 업데이트
-    if (field === 'github_link' && value.trim()) {
-      handleGitHubLinkChange(value);
+    // GitHub 링크 변경 시 특별한 처리 없음
+  };
+
+
+  // Server Config 변경 감지 및 MCP Server Tools 미리보기
+  const handleConfigChange = async (configValue: string) => {
+    if (!configValue.trim()) {
+      setPreviewTools([]);
+      return;
+    }
+    
+    try {
+      // JSON 문자열 정리 (제어 문자 제거)
+      const cleanedConfigValue = configValue
+        .replace(/[\r\n\t]/g, '') // 줄바꿈, 캐리지 리턴, 탭 제거
+        .replace(/\s+/g, ' ') // 연속된 공백을 하나로
+        .trim();
+      
+      console.log('Cleaned config value:', cleanedConfigValue);
+      
+      const config = JSON.parse(cleanedConfigValue);
+      
+      // type=streamable-http이고 url이 있는 경우에만 MCP Server 연결 시도
+      if (config.type === 'streamable-http' && config.url) {
+        console.log('MCP Server Config detected:', config);
+        await detectAndPreviewTools(config);
+      } else {
+        // streamable-http가 아닌 경우 기존 preview 초기화
+        setPreviewTools([]);
+      }
+    } catch (error) {
+      console.error('Config 파싱 실패:', error);
+      console.error('원본 configValue:', configValue);
+      // JSON 파싱 실패 시 기존 preview 초기화
+      setPreviewTools([]);
     }
   };
 
-  const handleGitHubLinkChange = async (githubLink: string) => {
-    if (!githubLink.startsWith('https://github.com/')) {
-      setPreviewTools([]);
-      setPreviewResources([]);
-      return;
-    }
-
-    setIsLoadingPreview(true);
+  // MCP Server 상태 확인
+  const checkMCPServerStatus = async (url: string) => {
     try {
-      // 백엔드 API를 통해 tools 정보 미리보기 요청
-      const response = await fetch('/api/mcps', {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3초 타임아웃
+      
+      const response = await fetch(url, {
+        method: 'HEAD',
+        signal: controller.signal,
+        mode: 'cors' // CORS 요청 허용
+      });
+      
+      clearTimeout(timeoutId);
+      return { isRunning: response.ok };
+    } catch (error) {
+      console.error('MCP Server 상태 확인 실패:', error);
+      return { isRunning: false };
+    }
+  };
+
+  // JSON-RPC tools/list 요청
+  const requestToolsList = async (config: any) => {
+    const jsonRpcRequest = {
+      jsonrpc: "2.0",
+      method: "tools/list",
+      id: Date.now(),
+      params: {}
+    };
+
+    try {
+      console.log('Sending JSON-RPC request:', jsonRpcRequest);
+      
+      const response = await fetch(config.url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          'Accept': 'text/event-stream'
         },
-        body: JSON.stringify({ github_link: githubLink }),
+        body: JSON.stringify(jsonRpcRequest)
       });
 
       if (response.ok) {
-        const data = await response.json();
-        console.log('Preview API Response:', data); // 디버깅용 로그
-        setPreviewTools(data.tools || []);
-        setPreviewResources(data.resources || []);
-        console.log('Set Preview Tools:', data.tools || []); // 설정된 tools 확인
+        console.log('JSON-RPC response received, processing SSE stream...');
+        await handleSSEStream(response);
       } else {
-        console.log('Preview API failed:', response.status); // 실패 로그
+        console.error('JSON-RPC request failed:', response.status);
         setPreviewTools([]);
-        setPreviewResources([]);
       }
     } catch (error) {
-      console.error('Tools 미리보기 로드 실패:', error);
+      console.error('tools/list 요청 실패:', error);
       setPreviewTools([]);
-      setPreviewResources([]);
+    }
+  };
+
+  // SSE 스트림 처리
+  const handleSSEStream = async (response: Response) => {
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    if (!reader) {
+      console.error('Response body reader not available');
+      return;
+    }
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // 마지막 불완전한 라인은 버퍼에 보관
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6).trim();
+            if (data === '[DONE]') {
+              console.log('SSE stream completed');
+              break;
+            }
+            
+            try {
+              const parsed = JSON.parse(data);
+              console.log('SSE data received:', parsed);
+              
+              // 다양한 형식의 tools 데이터 파싱 시도
+              let tools = null;
+              
+              // 1. 표준 MCP 형식 (jsonrpc 2.0)
+              if (parsed.result && parsed.result.tools) {
+                tools = parsed.result.tools;
+              }
+              // 2. 직접 tools 배열
+              else if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].name) {
+                tools = parsed;
+              }
+              // 3. tools 속성이 있는 객체
+              else if (parsed.tools && Array.isArray(parsed.tools)) {
+                tools = parsed.tools;
+              }
+              // 4. data 속성에 tools가 있는 경우
+              else if (parsed.data && Array.isArray(parsed.data)) {
+                tools = parsed.data;
+              }
+              // 5. available_functions 등의 다른 속성명
+              else if (parsed.available_functions && Array.isArray(parsed.available_functions)) {
+                tools = parsed.available_functions;
+              }
+              // 6. functions 속성
+              else if (parsed.functions && Array.isArray(parsed.functions)) {
+                tools = parsed.functions;
+              }
+              
+              if (tools && Array.isArray(tools) && tools.length > 0) {
+                console.log('Tools received from MCP Server:', tools);
+                setPreviewTools(tools);
+              } else {
+                console.log('No valid tools found in response:', parsed);
+              }
+            } catch (e) {
+              console.error('SSE 데이터 파싱 실패:', e, 'Raw data:', data);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('SSE 스트림 처리 실패:', error);
+      setPreviewTools([]);
+    } finally {
+      reader.releaseLock();
+    }
+  };
+
+  // MCP Server 감지 및 Tools 미리보기
+  const detectAndPreviewTools = async (config: any) => {
+    setIsLoadingPreview(true);
+    
+    try {
+      console.log('Checking MCP Server status:', config.url);
+      
+      // 1. MCP Server가 실행 중인지 확인
+      const serverStatus = await checkMCPServerStatus(config.url);
+      
+      if (serverStatus.isRunning) {
+        console.log('MCP Server is running, requesting tools list...');
+        // 2. JSON-RPC tools/list 요청
+        await requestToolsList(config);
+      } else {
+        console.log('MCP Server is not running or not accessible');
+        setPreviewTools([]);
+      }
+    } catch (error) {
+      console.error('MCP Server 감지 실패:', error);
+      setPreviewTools([]);
     } finally {
       setIsLoadingPreview(false);
     }
@@ -248,10 +400,39 @@ export default function SubmitMCPPage() {
     setEditingParameterIndex(null);
   };
 
+  // MCP 서버 tools 데이터를 MCPServerTool 형식으로 변환
+  const convertMCPToolsToMCPServerTools = (mcpTools: any[]): MCPServerTool[] => {
+    return mcpTools.map(tool => {
+      const parameters: MCPServerProperty[] = [];
+      
+      // inputSchema에서 parameters 추출
+      if (tool.inputSchema && tool.inputSchema.properties) {
+        Object.entries(tool.inputSchema.properties).forEach(([paramName, paramInfo]: [string, any]) => {
+          parameters.push({
+            name: paramName,
+            description: paramInfo.description || '',
+            type: paramInfo.type || 'string',
+            required: tool.inputSchema.required?.includes(paramName) || false
+          });
+        });
+      }
+      
+      return {
+        name: tool.name,
+        description: tool.description || '',
+        parameters: parameters
+      };
+    });
+  };
+
   const handleUsePreviewTools = () => {
     if (previewTools.length > 0) {
-      setTools(previewTools);
-      alert(`${previewTools.length}개의 tools가 추가되었습니다.`);
+      // MCP 서버 tools를 MCPServerTool 형식으로 변환
+      const convertedTools = convertMCPToolsToMCPServerTools(previewTools);
+      console.log('Original MCP tools:', previewTools);
+      console.log('Converted tools:', convertedTools);
+      setTools(convertedTools);
+      alert(`${convertedTools.length}개의 tools가 추가되었습니다.`);
     }
   };
 
@@ -523,11 +704,18 @@ export default function SubmitMCPPage() {
             </label>
             <textarea
               value={formData.config}
-              onChange={(e) => handleInputChange('config', e.target.value)}
+              onChange={(e) => {
+                handleInputChange('config', e.target.value);
+                // Config 변경 시 MCP Server Tools 미리보기 시도
+                handleConfigChange(e.target.value);
+              }}
               rows={4}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder='{"key": "value"}'
+              placeholder='{"type": "streamable-http", "url": "http://localhost:3000"}'
             />
+            <p className="mt-1 text-xs text-gray-500">
+              MCP Server 설정을 JSON 형식으로 입력하세요. type이 "streamable-http"인 경우 자동으로 tools를 미리보기합니다.
+            </p>
           </div>
 
           {/* Tools Preview */}
@@ -535,31 +723,69 @@ export default function SubmitMCPPage() {
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
               <div className="flex items-center">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                <span className="text-blue-700">GitHub에서 tools 정보를 분석 중...</span>
+                <span className="text-blue-700">MCP Server에서 tools 정보를 가져오는 중...</span>
               </div>
             </div>
           )}
 
           {previewTools.length > 0 && (
             <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium text-green-800">
-                  발견된 Tools ({previewTools.length}개)
+                  MCP Server Tools ({previewTools.length}개)
                 </h3>
                 <button
                   type="button"
                   onClick={handleUsePreviewTools}
-                  className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                  className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors"
                 >
                   모두 추가
                 </button>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {previewTools.map((tool, index) => (
-                  <div key={index} className="text-sm text-green-700">
-                    • {tool.name}: {tool.description || '설명 없음'}
+                  <div key={index} className="bg-white rounded-lg p-3 border border-green-200">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-green-900 text-sm">{tool.name}</h4>
+                        <p className="text-xs text-green-700 mt-1">{tool.description || '설명 없음'}</p>
+                        
+                        {/* Parameters 정보 표시 */}
+                        {tool.inputSchema && tool.inputSchema.properties && (
+                          <div className="mt-2">
+                            <p className="text-xs font-medium text-gray-700 mb-1">Parameters:</p>
+                            <div className="space-y-1">
+                              {Object.entries(tool.inputSchema.properties).map(([paramName, paramInfo]: [string, any]) => (
+                                <div key={paramName} className="text-xs text-gray-600 flex items-center gap-2">
+                                  <span className="font-medium">{paramName}</span>
+                                  <span className="text-blue-600">({paramInfo.type || 'any'})</span>
+                                  {tool.inputSchema.required?.includes(paramName) && (
+                                    <span className="text-red-600 text-xs">required</span>
+                                  )}
+                                  {paramInfo.description && (
+                                    <span className="text-gray-500">- {paramInfo.description}</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* MCP Server 연결 실패 메시지 */}
+          {formData.config && !isLoadingPreview && previewTools.length === 0 && (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+              <div className="flex items-center">
+                <div className="text-yellow-600 mr-2">⚠️</div>
+                <span className="text-yellow-700 text-sm">
+                  MCP Server에 연결할 수 없습니다. Server Config를 확인하고 서버가 실행 중인지 확인해주세요.
+                </span>
               </div>
             </div>
           )}
@@ -589,7 +815,7 @@ export default function SubmitMCPPage() {
                       <div className="flex-1">
                         <h3 className="font-medium text-gray-900">{tool.name}</h3>
                         <p className="text-sm text-gray-600 mt-1">{tool.description}</p>
-                        {tool.parameters.length > 0 && (
+                        {tool.parameters && tool.parameters.length > 0 && (
                           <div className="mt-2">
                             <p className="text-xs font-medium text-gray-700 mb-1">Parameters:</p>
                             <div className="space-y-1">
@@ -599,6 +825,22 @@ export default function SubmitMCPPage() {
                                   {param.type && <span className="text-blue-600"> ({param.type})</span>}
                                   {param.required && <span className="text-red-600"> (required)</span>}
                                   {param.description && ` - ${param.description}`}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {/* MCP Server tools의 inputSchema 구조 처리 */}
+                        {tool.inputSchema && tool.inputSchema.properties && Object.keys(tool.inputSchema.properties).length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-xs font-medium text-gray-700 mb-1">Parameters:</p>
+                            <div className="space-y-1">
+                              {Object.entries(tool.inputSchema.properties).map(([paramName, paramInfo]: [string, any]) => (
+                                <div key={paramName} className="text-xs text-gray-600">
+                                  • {paramName} 
+                                  {paramInfo.type && <span className="text-blue-600"> ({paramInfo.type})</span>}
+                                  {tool.inputSchema.required?.includes(paramName) && <span className="text-red-600"> (required)</span>}
+                                  {paramInfo.description && ` - ${paramInfo.description}`}
                                 </div>
                               ))}
                             </div>
