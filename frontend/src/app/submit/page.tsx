@@ -406,13 +406,13 @@ export default function SubmitMCPPage() {
       const parameters: MCPServerProperty[] = [];
       
       // inputSchema에서 parameters 추출
-      if (tool.inputSchema && tool.inputSchema.properties) {
+      if (tool.inputSchema?.properties) {
         Object.entries(tool.inputSchema.properties).forEach(([paramName, paramInfo]: [string, any]) => {
           parameters.push({
             name: paramName,
             description: paramInfo.description || '',
             type: paramInfo.type || 'string',
-            required: tool.inputSchema.required?.includes(paramName) || false
+            required: tool.inputSchema?.required?.includes(paramName) || false
           });
         });
       }
@@ -751,7 +751,7 @@ export default function SubmitMCPPage() {
                         <p className="text-xs text-green-700 mt-1">{tool.description || '설명 없음'}</p>
                         
                         {/* Parameters 정보 표시 */}
-                        {tool.inputSchema && tool.inputSchema.properties && (
+                        {tool.inputSchema?.properties && (
                           <div className="mt-2">
                             <p className="text-xs font-medium text-gray-700 mb-1">Parameters:</p>
                             <div className="space-y-1">
@@ -759,7 +759,7 @@ export default function SubmitMCPPage() {
                                 <div key={paramName} className="text-xs text-gray-600 flex items-center gap-2">
                                   <span className="font-medium">{paramName}</span>
                                   <span className="text-blue-600">({paramInfo.type || 'any'})</span>
-                                  {tool.inputSchema.required?.includes(paramName) && (
+                                  {tool.inputSchema?.required?.includes(paramName) && (
                                     <span className="text-red-600 text-xs">required</span>
                                   )}
                                   {paramInfo.description && (
@@ -831,7 +831,7 @@ export default function SubmitMCPPage() {
                           </div>
                         )}
                         {/* MCP Server tools의 inputSchema 구조 처리 */}
-                        {tool.inputSchema && tool.inputSchema.properties && Object.keys(tool.inputSchema.properties).length > 0 && (
+                        {tool.inputSchema?.properties && Object.keys(tool.inputSchema.properties).length > 0 && (
                           <div className="mt-2">
                             <p className="text-xs font-medium text-gray-700 mb-1">Parameters:</p>
                             <div className="space-y-1">
@@ -839,7 +839,7 @@ export default function SubmitMCPPage() {
                                 <div key={paramName} className="text-xs text-gray-600">
                                   • {paramName} 
                                   {paramInfo.type && <span className="text-blue-600"> ({paramInfo.type})</span>}
-                                  {tool.inputSchema.required?.includes(paramName) && <span className="text-red-600"> (required)</span>}
+                                  {tool.inputSchema?.required?.includes(paramName) && <span className="text-red-600"> (required)</span>}
                                   {paramInfo.description && ` - ${paramInfo.description}`}
                                 </div>
                               ))}
