@@ -42,6 +42,7 @@ export default function EditMCPServerPage() {
     type: "",  // type 필드 추가
     required: false
   });
+  const [editingParameterIndex, setEditingParameterIndex] = useState<number | null>(null);
 
   // tags를 문자열로 변환하는 함수
   const formatTagsToString = (tags: any): string => {
@@ -208,6 +209,49 @@ export default function EditMCPServerPage() {
       ...prev,
       parameters: prev.parameters.filter((_, i) => i !== index)
     }));
+  };
+
+  const handleEditParameter = (index: number) => {
+    const param = toolForm.parameters[index];
+    setParameterForm({
+      name: param.name,
+      description: param.description || "",
+      type: param.type || "",
+      required: param.required
+    });
+    setEditingParameterIndex(index);
+    setShowAddParameter(true);
+  };
+
+  const handleUpdateParameter = () => {
+    if (!parameterForm.name.trim()) {
+      alert('Parameter name은 필수입니다.');
+      return;
+    }
+
+    if (editingParameterIndex !== null) {
+      const updatedParameters = [...toolForm.parameters];
+      updatedParameters[editingParameterIndex] = {
+        name: parameterForm.name.trim(),
+        description: parameterForm.description.trim(),
+        type: parameterForm.type,
+        required: parameterForm.required
+      };
+      
+      setToolForm(prev => ({
+        ...prev,
+        parameters: updatedParameters
+      }));
+    }
+
+    setParameterForm({
+      name: "",
+      description: "",
+      type: "",
+      required: false
+    });
+    setShowAddParameter(false);
+    setEditingParameterIndex(null);
   };
 
   const validateForm = () => {
@@ -585,21 +629,33 @@ export default function EditMCPServerPage() {
                               {!param.type && <span className="text-xs text-gray-400">(no type)</span>}
                               {param.required && <span className="text-xs text-red-600">(required)</span>}
                               {param.description && <span className="text-xs text-gray-600">- {param.description}</span>}
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteParameter(index)}
-                                className="ml-auto text-red-600 hover:text-red-800"
-                              >
-                                <TrashIcon className="h-3 w-3" />
-                              </button>
+                              <div className="flex gap-1 ml-auto">
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditParameter(index)}
+                                  className="text-blue-600 hover:text-blue-800"
+                                >
+                                  <PencilIcon className="h-3 w-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteParameter(index)}
+                                  className="text-red-600 hover:text-red-800"
+                                >
+                                  <TrashIcon className="h-3 w-3" />
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
                       )}
 
-                      {/* Add Parameter Form */}
+                      {/* Add/Edit Parameter Form */}
                       {showAddParameter && (
                         <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">
+                            {editingParameterIndex !== null ? 'Edit Parameter' : 'Add Parameter'}
+                          </h4>
                           <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-2">
                             <input
                               type="text"
@@ -645,14 +701,23 @@ export default function EditMCPServerPage() {
                           <div className="flex gap-2">
                             <button
                               type="button"
-                              onClick={handleAddParameter}
+                              onClick={editingParameterIndex !== null ? handleUpdateParameter : handleAddParameter}
                               className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
                             >
-                              Add
+                              {editingParameterIndex !== null ? 'Update' : 'Add'}
                             </button>
                             <button
                               type="button"
-                              onClick={() => setShowAddParameter(false)}
+                              onClick={() => {
+                                setShowAddParameter(false);
+                                setEditingParameterIndex(null);
+                                setParameterForm({
+                                  name: "",
+                                  description: "",
+                                  type: "",
+                                  required: false
+                                });
+                              }}
                               className="px-3 py-1 bg-gray-500 text-white text-sm rounded hover:bg-gray-600"
                             >
                               Cancel
