@@ -36,6 +36,7 @@ export default function SubmitMCPPage() {
     parameters: [] as MCPServerProperty[]
   });
   const [showAddParameter, setShowAddParameter] = useState(false);
+  const [editingParameterIndex, setEditingParameterIndex] = useState<number | null>(null);
   const [parameterForm, setParameterForm] = useState({
     name: "",
     description: "",
@@ -202,6 +203,49 @@ export default function SubmitMCPPage() {
       ...prev,
       parameters: prev.parameters.filter((_, i) => i !== index)
     }));
+  };
+
+  const handleEditParameter = (index: number) => {
+    const param = toolForm.parameters[index];
+    setParameterForm({
+      name: param.name,
+      description: param.description || "",
+      type: param.type || "",
+      required: param.required
+    });
+    setEditingParameterIndex(index);
+    setShowAddParameter(true);
+  };
+
+  const handleUpdateParameter = () => {
+    if (!parameterForm.name.trim()) {
+      alert('Parameter name은 필수입니다.');
+      return;
+    }
+
+    if (editingParameterIndex !== null) {
+      const updatedParameters = [...toolForm.parameters];
+      updatedParameters[editingParameterIndex] = {
+        name: parameterForm.name.trim(),
+        description: parameterForm.description.trim(),
+        type: parameterForm.type,
+        required: parameterForm.required
+      };
+      
+      setToolForm(prev => ({
+        ...prev,
+        parameters: updatedParameters
+      }));
+    }
+
+    setParameterForm({
+      name: "",
+      description: "",
+      type: "",
+      required: false
+    });
+    setShowAddParameter(false);
+    setEditingParameterIndex(null);
   };
 
   const handleUsePreviewTools = () => {
@@ -639,23 +683,36 @@ export default function SubmitMCPPage() {
                             <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
                               <span className="text-sm font-medium">{param.name}</span>
                               {param.type && <span className="text-xs text-blue-600">({param.type})</span>}
+                              {!param.type && <span className="text-xs text-gray-400">(no type)</span>}
                               {param.required && <span className="text-xs text-red-600">(required)</span>}
                               {param.description && <span className="text-xs text-gray-600">- {param.description}</span>}
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteParameter(index)}
-                                className="ml-auto text-red-600 hover:text-red-800"
-                              >
-                                <TrashIcon className="h-3 w-3" />
-                              </button>
+                              <div className="flex gap-1 ml-auto">
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditParameter(index)}
+                                  className="text-blue-600 hover:text-blue-800"
+                                >
+                                  <PencilIcon className="h-3 w-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteParameter(index)}
+                                  className="text-red-600 hover:text-red-800"
+                                >
+                                  <TrashIcon className="h-3 w-3" />
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
                       )}
 
-                      {/* Add Parameter Form */}
+                      {/* Add/Edit Parameter Form */}
                       {showAddParameter && (
                         <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">
+                            {editingParameterIndex !== null ? 'Edit Parameter' : 'Add Parameter'}
+                          </h4>
                           <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-2">
                             <input
                               type="text"
@@ -683,6 +740,11 @@ export default function SubmitMCPPage() {
                               <option value="boolean">Boolean</option>
                               <option value="object">Object</option>
                               <option value="array">Array</option>
+                              <option value="null">Null</option>
+                              <option value="uri">URI</option>
+                              <option value="json">JSON</option>
+                              <option value="enum">Enum</option>
+                              <option value="any">Any</option>
                             </select>
                             <label className="flex items-center gap-1 text-sm">
                               <input
@@ -696,14 +758,23 @@ export default function SubmitMCPPage() {
                           <div className="flex gap-2">
                             <button
                               type="button"
-                              onClick={handleAddParameter}
+                              onClick={editingParameterIndex !== null ? handleUpdateParameter : handleAddParameter}
                               className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
                             >
-                              Add
+                              {editingParameterIndex !== null ? 'Update' : 'Add'}
                             </button>
                             <button
                               type="button"
-                              onClick={() => setShowAddParameter(false)}
+                              onClick={() => {
+                                setShowAddParameter(false);
+                                setEditingParameterIndex(null);
+                                setParameterForm({
+                                  name: "",
+                                  description: "",
+                                  type: "",
+                                  required: false
+                                });
+                              }}
                               className="px-3 py-1 bg-gray-500 text-white text-sm rounded hover:bg-gray-600"
                             >
                               Cancel
