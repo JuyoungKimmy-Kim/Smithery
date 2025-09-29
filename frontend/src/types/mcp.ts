@@ -15,6 +15,12 @@ export interface MCPServerTool {
   name: string;
   description: string;
   parameters: MCPServerProperty[];
+  // MCP 서버에서 받은 원본 데이터를 위한 선택적 속성들
+  inputSchema?: {
+    type: string;
+    properties?: { [key: string]: any };
+    required?: string[];
+  };
 }
 
 export interface MCPServerResource {
