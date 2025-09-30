@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { MCPServer, TransportType, ProtocolType, MCPServerTool, MCPServerProperty } from "../../types/mcp";
+import { MCPServer, ProtocolType, MCPServerTool, MCPServerProperty } from "../../types/mcp";
 import { MCP_CATEGORIES } from "@/constants/categories";
 import { useAuth } from "@/contexts/AuthContext";
 import { PlusIcon, TrashIcon, PencilIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
@@ -27,7 +27,6 @@ export default function SubmitMCPPage() {
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   
-  // Tools 관리 상태
   const [tools, setTools] = useState<MCPServerTool[]>([]);
   const [showAddTool, setShowAddTool] = useState(false);
   const [editingToolIndex, setEditingToolIndex] = useState<number | null>(null);
@@ -41,11 +40,10 @@ export default function SubmitMCPPage() {
   const [parameterForm, setParameterForm] = useState({
     name: "",
     description: "",
-    type: "",  // type 필드 추가
+    type: "",
     required: false
   });
 
-  // 인증 상태 확인
   useEffect(() => {
     if (!isAuthenticated) {
       alert('Sign in required.');
@@ -67,11 +65,9 @@ export default function SubmitMCPPage() {
       }));
     }
 
-    // GitHub 링크 변경 시 특별한 처리 없음
   };
 
 
-  // URL 변경 감지 및 MCP Server Tools 미리보기
   const handleUrlChange = async (url: string, protocol: string) => {
     if (!url.trim() || !protocol) {
       setPreviewTools([]);
@@ -87,22 +83,16 @@ export default function SubmitMCPPage() {
     }
   };
 
-  // Server Config 변경 감지 (tools 미리보기 없음)
-  const handleConfigChange = (configValue: string) => {
-    // Server Config는 단순히 입력값만 저장하고 tools 미리보기는 하지 않음
-    console.log('Server Config changed:', configValue);
-  };
 
-  // MCP Server 상태 확인
   const checkMCPServerStatus = async (url: string) => {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3초 타임아웃
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
       
       const response = await fetch(url, {
         method: 'HEAD',
         signal: controller.signal,
-        mode: 'cors' // CORS 요청 허용
+        mode: 'cors'
       });
       
       clearTimeout(timeoutId);
@@ -113,7 +103,6 @@ export default function SubmitMCPPage() {
     }
   };
 
-  // 프로토콜별 JSON-RPC tools/list 요청
   const requestToolsList = async (config: any) => {
     const jsonRpcRequest = {
       jsonrpc: "2.0",
@@ -173,7 +162,6 @@ export default function SubmitMCPPage() {
           break;
           
         case ProtocolType.STDIO:
-          // STDIO는 브라우저에서 직접 실행할 수 없으므로 처리하지 않음
           console.log('STDIO protocol - not supported in browser');
           setPreviewTools([]);
           break;
@@ -188,11 +176,9 @@ export default function SubmitMCPPage() {
     }
   };
 
-  // WebSocket을 통한 tools/list 요청
   const requestToolsListWebSocket = async (url: string, jsonRpcRequest: any) => {
     return new Promise((resolve, reject) => {
       try {
-        // WebSocket URL 변환 (http -> ws, https -> wss)
         const wsUrl = url.replace(/^http/, 'ws');
         const ws = new WebSocket(wsUrl);
         
@@ -227,7 +213,6 @@ export default function SubmitMCPPage() {
           console.log('WebSocket closed');
         };
         
-        // 5초 타임아웃
         setTimeout(() => {
           if (ws.readyState === WebSocket.OPEN) {
             ws.close();
@@ -243,7 +228,6 @@ export default function SubmitMCPPage() {
     });
   };
 
-  // SSE 스트림 처리
   const handleSSEStream = async (response: Response) => {
     const reader = response.body?.getReader();
     const decoder = new TextDecoder();
@@ -261,7 +245,7 @@ export default function SubmitMCPPage() {
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // 마지막 불완전한 라인은 버퍼에 보관
+        buffer = lines.pop() || '';
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
@@ -275,30 +259,23 @@ export default function SubmitMCPPage() {
               const parsed = JSON.parse(data);
               console.log('SSE data received:', parsed);
               
-              // 다양한 형식의 tools 데이터 파싱 시도
               let tools = null;
               
-              // 1. 표준 MCP 형식 (jsonrpc 2.0)
               if (parsed.result && parsed.result.tools) {
                 tools = parsed.result.tools;
               }
-              // 2. 직접 tools 배열
               else if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].name) {
                 tools = parsed;
               }
-              // 3. tools 속성이 있는 객체
               else if (parsed.tools && Array.isArray(parsed.tools)) {
                 tools = parsed.tools;
               }
-              // 4. data 속성에 tools가 있는 경우
               else if (parsed.data && Array.isArray(parsed.data)) {
                 tools = parsed.data;
               }
-              // 5. available_functions 등의 다른 속성명
               else if (parsed.available_functions && Array.isArray(parsed.available_functions)) {
                 tools = parsed.available_functions;
               }
-              // 6. functions 속성
               else if (parsed.functions && Array.isArray(parsed.functions)) {
                 tools = parsed.functions;
               }
@@ -323,21 +300,18 @@ export default function SubmitMCPPage() {
     }
   };
 
-  // MCP Server 감지 및 Tools 미리보기
   const detectAndPreviewTools = async (config: any) => {
     setIsLoadingPreview(true);
     
     try {
       console.log('Checking MCP Server status:', config.url, 'Protocol:', config.protocol);
       
-      // STDIO는 별도 처리 (사용자가 실행한 서버와 통신)
       if (config.protocol === ProtocolType.STDIO) {
         console.log('STDIO protocol detected - attempting to connect to user-run server');
         await requestToolsList(config);
         return;
       }
       
-      // 1. MCP Server가 실행 중인지 확인 (HTTP/HTTP-STREAM만)
       if (config.protocol === ProtocolType.HTTP || config.protocol === ProtocolType.HTTP_STREAM) {
         const serverStatus = await checkMCPServerStatus(config.url);
         
@@ -349,7 +323,6 @@ export default function SubmitMCPPage() {
       }
       
       console.log('MCP Server is accessible, requesting tools list...');
-      // 2. 프로토콜별 JSON-RPC tools/list 요청
       await requestToolsList(config);
     } catch (error) {
       console.error('MCP Server 감지 실패:', error);
@@ -359,7 +332,6 @@ export default function SubmitMCPPage() {
     }
   };
 
-  // Tools 관련 함수들
   const handleAddTool = () => {
     setToolForm({
       name: "",
@@ -394,12 +366,10 @@ export default function SubmitMCPPage() {
     };
 
     if (editingToolIndex !== null) {
-      // 편집 모드
       const updatedTools = [...tools];
       updatedTools[editingToolIndex] = newTool;
       setTools(updatedTools);
     } else {
-      // 추가 모드
       setTools([...tools, newTool]);
     }
 
@@ -428,7 +398,7 @@ export default function SubmitMCPPage() {
     const newParameter: MCPServerProperty = {
       name: parameterForm.name.trim(),
       description: parameterForm.description.trim(),
-      type: parameterForm.type, // type 필드 추가
+      type: parameterForm.type,
       required: parameterForm.required
     };
 
@@ -496,12 +466,10 @@ export default function SubmitMCPPage() {
     setEditingParameterIndex(null);
   };
 
-  // MCP 서버 tools 데이터를 MCPServerTool 형식으로 변환
   const convertMCPToolsToMCPServerTools = (mcpTools: any[]): MCPServerTool[] => {
     return mcpTools.map(tool => {
       const parameters: MCPServerProperty[] = [];
       
-      // inputSchema에서 parameters 추출
       if (tool.inputSchema?.properties) {
         Object.entries(tool.inputSchema.properties).forEach(([paramName, paramInfo]: [string, any]) => {
           parameters.push({
@@ -523,10 +491,7 @@ export default function SubmitMCPPage() {
 
   const handleUsePreviewTools = () => {
     if (previewTools.length > 0) {
-      // MCP 서버 tools를 MCPServerTool 형식으로 변환
       const convertedTools = convertMCPToolsToMCPServerTools(previewTools);
-      console.log('Original MCP tools:', previewTools);
-      console.log('Converted tools:', convertedTools);
       setTools(convertedTools);
       alert(`${convertedTools.length}개의 tools가 추가되었습니다.`);
     }
@@ -535,7 +500,6 @@ export default function SubmitMCPPage() {
   const validateForm = () => {
     const errors: {[key: string]: string} = {};
     
-    // 필수 필드 검증
     if (!formData.name.trim()) {
       errors.name = "Server Name은 필수입니다.";
     }
@@ -558,9 +522,7 @@ export default function SubmitMCPPage() {
       errors.protocol = "Protocol은 필수입니다.";
     }
     
-    // URL은 optional이지만 입력된 경우 유효성 검사
     if (formData.url.trim() && formData.protocol !== ProtocolType.STDIO) {
-      // HTTP/WebSocket 프로토콜만 URL 형식 검사
       if (!isValidUrl(formData.url)) {
         errors.url = "유효한 URL을 입력해주세요.";
       }
@@ -570,7 +532,6 @@ export default function SubmitMCPPage() {
     return Object.keys(errors).length === 0;
   };
 
-  // URL 유효성 검사
   const isValidUrl = (url: string) => {
     try {
       new URL(url);
@@ -584,13 +545,11 @@ export default function SubmitMCPPage() {
     e.preventDefault();
     setError("");
     
-    // 인증 확인
     if (!isAuthenticated) {
       setError("Sign in required.");
       return;
     }
     
-    // 폼 검증
     if (!validateForm()) {
       return;
     }
@@ -598,7 +557,6 @@ export default function SubmitMCPPage() {
     setIsSubmitting(true);
 
     try {
-      // config 처리: 기존 JSON config가 있으면 사용, 없으면 URL로 생성
       let config = {};
       if (formData.config.trim()) {
         try {
@@ -607,23 +565,20 @@ export default function SubmitMCPPage() {
           throw new Error('Server Config JSON 형식이 올바르지 않습니다.');
         }
       } else if (formData.url.trim()) {
-        // URL이 있으면 config에 URL 저장
         config = { url: formData.url.trim() };
       }
 
-      // 백엔드 스키마에 맞는 데이터 형식으로 변환
       const mcpServerData = {
         name: formData.name.trim(),
         category: formData.category.trim(),
         github_link: formData.github_link.trim(),
         description: formData.description.trim(),
-        tags: formData.tags.trim(), // 콤마로 구분된 문자열
+        tags: formData.tags.trim(),
         protocol: formData.protocol.trim(),
         config: config,
-        tools: tools // tools 추가
+        tools: tools
       };
 
-      console.log('Submitting MCP Server:', mcpServerData); // 디버깅용 로그
 
       const response = await fetch('/api/mcps', {
         method: 'POST',
@@ -667,7 +622,6 @@ export default function SubmitMCPPage() {
     router.push('/mypage');
   };
 
-  // 로그인하지 않은 경우 로딩 표시
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
@@ -730,7 +684,7 @@ export default function SubmitMCPPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Server Name - 필수 */}
+          {/* Server Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Server Name *
@@ -750,7 +704,7 @@ export default function SubmitMCPPage() {
             )}
           </div>
           
-          {/* Category - 필수 */}
+          {/* Category */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Category *
@@ -775,7 +729,7 @@ export default function SubmitMCPPage() {
             )}
           </div>
 
-          {/* GitHub Link - 필수 */}
+          {/* GitHub Link */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               GitHub Link *
@@ -795,7 +749,7 @@ export default function SubmitMCPPage() {
             )}
           </div>
 
-          {/* Description - 필수 */}
+          {/* Description */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Description *
@@ -897,10 +851,7 @@ export default function SubmitMCPPage() {
             </label>
             <textarea
               value={formData.config}
-              onChange={(e) => {
-                handleInputChange('config', e.target.value);
-                handleConfigChange(e.target.value);
-              }}
+              onChange={(e) => handleInputChange('config', e.target.value)}
               rows={4}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder='{"type": "streamable-http", "url": "http://localhost:3000"}'
@@ -910,7 +861,6 @@ export default function SubmitMCPPage() {
             </p>
           </div>
 
-          {/* Tools Preview */}
           {isLoadingPreview && (
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
               <div className="flex items-center">
@@ -970,7 +920,6 @@ export default function SubmitMCPPage() {
             </div>
           )}
 
-          {/* MCP Server 연결 실패 메시지 */}
           {formData.url && formData.protocol && !isLoadingPreview && previewTools.length === 0 && formData.protocol !== ProtocolType.STDIO && (
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
               <div className="flex items-center">
@@ -982,7 +931,6 @@ export default function SubmitMCPPage() {
             </div>
           )}
 
-          {/* STDIO 프로토콜 안내 메시지 */}
           {formData.protocol === ProtocolType.STDIO && (
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
               <div className="flex items-center">
@@ -996,7 +944,6 @@ export default function SubmitMCPPage() {
             </div>
           )}
 
-          {/* Tools Management */}
           <div className="border-t pt-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-800">
@@ -1012,7 +959,6 @@ export default function SubmitMCPPage() {
               </button>
             </div>
 
-            {/* Tools List */}
             {tools.length > 0 && (
               <div className="space-y-3 mb-4">
                 {tools.map((tool, index) => (
@@ -1036,7 +982,6 @@ export default function SubmitMCPPage() {
                             </div>
                           </div>
                         )}
-                        {/* MCP Server tools의 inputSchema 구조 처리 */}
                         {tool.inputSchema?.properties && Object.keys(tool.inputSchema.properties).length > 0 && (
                           <div className="mt-2">
                             <p className="text-xs font-medium text-gray-700 mb-1">Parameters:</p>
@@ -1075,7 +1020,6 @@ export default function SubmitMCPPage() {
               </div>
             )}
 
-            {/* Add/Edit Tool Modal */}
             {showAddTool && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                 <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -1155,7 +1099,6 @@ export default function SubmitMCPPage() {
                         </div>
                       )}
 
-                      {/* Add/Edit Parameter Form */}
                       {showAddParameter && (
                         <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
                           <h4 className="text-sm font-medium text-gray-700 mb-2">
@@ -1258,7 +1201,6 @@ export default function SubmitMCPPage() {
             )}
           </div>
 
-          {/* Submit Button */}
           <button
             type="submit"
             disabled={isSubmitting}

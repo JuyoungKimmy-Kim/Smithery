@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { MCPServer, TransportType, ProtocolType, MCPServerTool, MCPServerProperty } from "../../../../types/mcp";
+import { MCPServer, ProtocolType, MCPServerTool, MCPServerProperty } from "../../../../types/mcp";
 import { MCP_CATEGORIES } from "@/constants/categories";
 import { useAuth } from "@/contexts/AuthContext";
 import { PlusIcon, TrashIcon, PencilIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
@@ -28,7 +28,6 @@ export default function EditMCPServerPage() {
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  // Tools 관리 상태
   const [tools, setTools] = useState<MCPServerTool[]>([]);
   const [showAddTool, setShowAddTool] = useState(false);
   const [editingToolIndex, setEditingToolIndex] = useState<number | null>(null);
@@ -41,12 +40,11 @@ export default function EditMCPServerPage() {
   const [parameterForm, setParameterForm] = useState({
     name: "",
     description: "",
-    type: "",  // type 필드 추가
+    type: "",
     required: false
   });
   const [editingParameterIndex, setEditingParameterIndex] = useState<number | null>(null);
 
-  // tags를 문자열로 변환하는 함수
   const formatTagsToString = (tags: any): string => {
     if (!tags) return "";
     if (typeof tags === 'string') return tags;
@@ -60,7 +58,6 @@ export default function EditMCPServerPage() {
     return "";
   };
 
-  // 인증 상태 확인
   useEffect(() => {
     if (!isAuthenticated) {
       alert('Sign in required.');
@@ -68,7 +65,6 @@ export default function EditMCPServerPage() {
     }
   }, [isAuthenticated, router]);
 
-  // 기존 MCP 서버 데이터 로드
   useEffect(() => {
     const fetchMCP = async () => {
       try {
@@ -77,22 +73,17 @@ export default function EditMCPServerPage() {
           const data = await response.json();
           setMcp(data);
           
-          // 폼 데이터 초기화
           setFormData({
             name: data.name || "",
             category: data.category || "",
             github_link: data.github_link || "",
             description: data.description || "",
             tags: formatTagsToString(data.tags),
-            protocol: data.protocol || "http", // 기본값을 http로 설정
+            protocol: data.protocol || "http",
             url: data.config?.url || "",
             config: data.config ? JSON.stringify(data.config, null, 2) : ""
           });
           
-          console.log('Loaded MCP data:', data); // 디버깅용 로그
-          console.log('Protocol value:', data.protocol); // 디버깅용 로그
-
-          // tools 데이터 초기화
           setTools(data.tools || []);
         } else {
           setError("MCP server not found");
@@ -115,7 +106,6 @@ export default function EditMCPServerPage() {
       [field]: value
     }));
     
-    // 입력 시 해당 필드의 validation error 제거
     if (validationErrors[field]) {
       setValidationErrors(prev => ({
         ...prev,
@@ -124,7 +114,6 @@ export default function EditMCPServerPage() {
     }
   };
 
-  // Tools 관련 함수들
   const handleAddTool = () => {
     setToolForm({
       name: "",
@@ -159,12 +148,10 @@ export default function EditMCPServerPage() {
     };
 
     if (editingToolIndex !== null) {
-      // 편집 모드
       const updatedTools = [...tools];
       updatedTools[editingToolIndex] = newTool;
       setTools(updatedTools);
     } else {
-      // 추가 모드
       setTools([...tools, newTool]);
     }
 
@@ -264,7 +251,6 @@ export default function EditMCPServerPage() {
   const validateForm = () => {
     const errors: {[key: string]: string} = {};
     
-    // 필수 필드 검증 (name과 github_link는 읽기 전용이므로 검증하지 않음)
     if (!formData.category.trim()) {
       errors.category = "Category는 필수입니다.";
     }
@@ -277,9 +263,7 @@ export default function EditMCPServerPage() {
       errors.protocol = "Protocol은 필수입니다.";
     }
     
-    // URL은 optional이지만 입력된 경우 유효성 검사
     if (formData.url.trim() && formData.protocol !== ProtocolType.STDIO) {
-      // HTTP/WebSocket 프로토콜만 URL 형식 검사
       try {
         new URL(formData.url);
       } catch {
@@ -295,7 +279,6 @@ export default function EditMCPServerPage() {
     e.preventDefault();
     setError("");
     
-    // 폼 검증
     if (!validateForm()) {
       return;
     }
@@ -303,7 +286,6 @@ export default function EditMCPServerPage() {
     setIsSubmitting(true);
 
     try {
-      // config 처리: 기존 JSON config가 있으면 사용, 없으면 URL로 생성
       let config = {};
       if (formData.config.trim()) {
         try {
@@ -312,18 +294,16 @@ export default function EditMCPServerPage() {
           throw new Error('Server Config JSON 형식이 올바르지 않습니다.');
         }
       } else if (formData.url.trim()) {
-        // URL이 있으면 config에 URL 저장
         config = { url: formData.url.trim() };
       }
 
-      // 폼 데이터를 MCPServer 형식으로 변환
       const updateData = {
         description: formData.description.trim(),
         category: formData.category.trim(),
         protocol: formData.protocol.trim(),
-        tags: formData.tags.trim(), // 콤마로 구분된 문자열로 전송
+        tags: formData.tags.trim(),
         config: config,
-        tools: tools // tools 추가
+        tools: tools
       };
 
       const response = await fetch(`/api/mcps/${params.id}`, {
@@ -439,7 +419,7 @@ export default function EditMCPServerPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Server Name - 읽기 전용 */}
+          {/* Server Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Server Name
@@ -452,7 +432,7 @@ export default function EditMCPServerPage() {
             />
           </div>
           
-          {/* GitHub Link - 읽기 전용 */}
+          {/* GitHub Link */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               GitHub Link
@@ -465,7 +445,7 @@ export default function EditMCPServerPage() {
             />
           </div>
           
-          {/* Description - 필수 */}
+          {/* Description */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Description *
@@ -485,7 +465,7 @@ export default function EditMCPServerPage() {
             )}
           </div>
           
-           {/* Category - 필수 (드롭다운) */}
+           {/* Category */}
            <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Category *
@@ -510,7 +490,7 @@ export default function EditMCPServerPage() {
             )}
           </div>
 
-          {/* Tags - 선택적 */}
+          {/* Tags */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Tags (comma separated)
@@ -573,7 +553,6 @@ export default function EditMCPServerPage() {
             </p>
           </div>
 
-          {/* STDIO 프로토콜 안내 메시지 */}
           {formData.protocol === ProtocolType.STDIO && (
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
               <div className="flex items-center">
@@ -587,7 +566,6 @@ export default function EditMCPServerPage() {
             </div>
           )}
 
-          {/* Server Config - 선택적 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Server Config (JSON)
@@ -604,7 +582,6 @@ export default function EditMCPServerPage() {
             </p>
           </div>
 
-          {/* Tools Management */}
           <div className="border-t pt-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-800">
@@ -620,7 +597,6 @@ export default function EditMCPServerPage() {
               </button>
             </div>
 
-            {/* Tools List */}
             {tools.length > 0 && (
               <div className="space-y-3 mb-4">
                 {tools.map((tool, index) => (
@@ -668,7 +644,6 @@ export default function EditMCPServerPage() {
               </div>
             )}
 
-            {/* Add/Edit Tool Modal */}
             {showAddTool && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                 <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -748,7 +723,6 @@ export default function EditMCPServerPage() {
                         </div>
                       )}
 
-                      {/* Add/Edit Parameter Form */}
                       {showAddParameter && (
                         <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
                           <h4 className="text-sm font-medium text-gray-700 mb-2">
