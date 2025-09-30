@@ -45,6 +45,7 @@ class MCPServerCreate(BaseModel):
     github_link: str
     description: str
     category: str
+    protocol: str  # 프로토콜 타입 추가
     tags: Optional[str] = None  # 콤마로 구분된 태그 문자열
     config: Optional[Dict[str, Any]] = None
     tools: Optional[List[MCPServerToolCreate]] = []  # tools 추가
@@ -53,6 +54,7 @@ class MCPServerUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     category: Optional[str] = None
+    protocol: Optional[str] = None  # 프로토콜 타입 추가
     tags: Optional[str] = None
     config: Optional[Dict[str, Any]] = None
     tools: Optional[List[MCPServerToolCreate]] = []  # tools 추가
@@ -83,6 +85,7 @@ class MCPServerResponse(BaseModel):
     description: str
     category: str
     status: str
+    protocol: str  # 프로토콜 타입 추가
     config: Optional[Dict[str, Any]] = None
     owner_id: int
     created_at: datetime

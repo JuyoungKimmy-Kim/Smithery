@@ -4,10 +4,17 @@ export enum TransportType {
   STDIO = "stdio"
 }
 
+export enum ProtocolType {
+  HTTP = "http",
+  HTTP_STREAM = "http-stream", 
+  WEBSOCKET = "websocket",
+  STDIO = "stdio"
+}
+
 export interface MCPServerProperty {
   name: string;
   description?: string;
-  type?: string;  // 이미 추가됨
+  type?: string;
   required: boolean;
 }
 
@@ -35,6 +42,7 @@ export interface MCPServer {
   name: string;
   description: string;
   transport: TransportType;
+  protocol: ProtocolType;
   category?: string;
   tags?: string[];
   status?: string;

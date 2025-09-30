@@ -26,6 +26,7 @@ class MCPServerDAO:
             description=mcp_server_data['description'],
             category=mcp_server_data['category'],
             status='pending',  # 승인 대기 상태로 생성
+            protocol=mcp_server_data.get('protocol', 'http'),  # 기본값은 http
             config=mcp_server_data.get('config'),
             owner_id=owner_id,
             tags=tag_objects
@@ -88,7 +89,7 @@ class MCPServerDAO:
             return None
         
         # 기본 필드 업데이트
-        for field in ['name', 'description', 'category', 'config']:
+        for field in ['name', 'description', 'category', 'protocol', 'config']:
             if field in mcp_server_data and mcp_server_data[field] is not None:
                 setattr(mcp_server, field, mcp_server_data[field])
         
