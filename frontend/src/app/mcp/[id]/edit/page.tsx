@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { MCPServer, TransportType, MCPServerTool, MCPServerProperty } from "../../../../types/mcp";
+import { MCPServer, TransportType, ProtocolType, MCPServerTool, MCPServerProperty } from "../../../../types/mcp";
 import { MCP_CATEGORIES } from "@/constants/categories";
 import { useAuth } from "@/contexts/AuthContext";
 import { PlusIcon, TrashIcon, PencilIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
@@ -18,6 +18,8 @@ export default function EditMCPServerPage() {
     github_link: "",
     description: "",
     tags: "",
+    protocol: "",
+    url: "",
     config: ""
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -82,8 +84,13 @@ export default function EditMCPServerPage() {
             github_link: data.github_link || "",
             description: data.description || "",
             tags: formatTagsToString(data.tags),
+            protocol: data.protocol || "http", // 기본값을 http로 설정
+            url: data.config?.url || "",
             config: data.config ? JSON.stringify(data.config, null, 2) : ""
           });
+          
+          console.log('Loaded MCP data:', data); // 디버깅용 로그
+          console.log('Protocol value:', data.protocol); // 디버깅용 로그
 
           // tools 데이터 초기화
           setTools(data.tools || []);
@@ -266,6 +273,20 @@ export default function EditMCPServerPage() {
       errors.description = "Description은 필수입니다.";
     }
     
+    if (!formData.protocol.trim()) {
+      errors.protocol = "Protocol은 필수입니다.";
+    }
+    
+    // URL은 optional이지만 입력된 경우 유효성 검사
+    if (formData.url.trim() && formData.protocol !== ProtocolType.STDIO) {
+      // HTTP/WebSocket 프로토콜만 URL 형식 검사
+      try {
+        new URL(formData.url);
+      } catch {
+        errors.url = "유효한 URL을 입력해주세요.";
+      }
+    }
+    
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -282,12 +303,26 @@ export default function EditMCPServerPage() {
     setIsSubmitting(true);
 
     try {
+      // config 처리: 기존 JSON config가 있으면 사용, 없으면 URL로 생성
+      let config = {};
+      if (formData.config.trim()) {
+        try {
+          config = JSON.parse(formData.config);
+        } catch (error) {
+          throw new Error('Server Config JSON 형식이 올바르지 않습니다.');
+        }
+      } else if (formData.url.trim()) {
+        // URL이 있으면 config에 URL 저장
+        config = { url: formData.url.trim() };
+      }
+
       // 폼 데이터를 MCPServer 형식으로 변환
       const updateData = {
         description: formData.description.trim(),
         category: formData.category.trim(),
+        protocol: formData.protocol.trim(),
         tags: formData.tags.trim(), // 콤마로 구분된 문자열로 전송
-        config: formData.config ? JSON.parse(formData.config) : {},
+        config: config,
         tools: tools // tools 추가
       };
 
@@ -489,6 +524,69 @@ export default function EditMCPServerPage() {
             />
           </div>
           
+          {/* Protocol */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Protocol *
+            </label>
+            <select
+              required
+              value={formData.protocol}
+              onChange={(e) => handleInputChange('protocol', e.target.value)}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                validationErrors.protocol ? 'border-red-500' : 'border-gray-300'
+              }`}
+            >
+              <option value="">Select a protocol</option>
+              <option value={ProtocolType.HTTP}>HTTP</option>
+              <option value={ProtocolType.HTTP_STREAM}>HTTP-Stream</option>
+              <option value={ProtocolType.WEBSOCKET}>WebSocket</option>
+              <option value={ProtocolType.STDIO}>STDIO</option>
+            </select>
+            {validationErrors.protocol && (
+              <p className="mt-1 text-sm text-red-600">{validationErrors.protocol}</p>
+            )}
+          </div>
+
+          {/* URL */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Server URL
+            </label>
+            <input
+              type="url"
+              value={formData.url}
+              onChange={(e) => handleInputChange('url', e.target.value)}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                validationErrors.url ? 'border-red-500' : 'border-gray-300'
+              }`}
+              placeholder={formData.protocol === ProtocolType.STDIO ? "python stdio_test_mcp_server.py" : "http://localhost:3000"}
+            />
+            {validationErrors.url && (
+              <p className="mt-1 text-sm text-red-600">{validationErrors.url}</p>
+            )}
+            <p className="mt-1 text-xs text-gray-500">
+              {formData.protocol === ProtocolType.STDIO 
+                ? "MCP 서버 실행 명령어를 입력하세요."
+                : "MCP Server의 URL을 입력하세요."
+              }
+            </p>
+          </div>
+
+          {/* STDIO 프로토콜 안내 메시지 */}
+          {formData.protocol === ProtocolType.STDIO && (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+              <div className="flex items-center">
+                <div className="text-yellow-600 mr-2">⚠️</div>
+                <div className="text-yellow-700 text-sm">
+                  <p className="font-medium mb-1">STDIO 프로토콜 안내:</p>
+                  <p>STDIO 프로토콜은 브라우저에서 직접 미리보기할 수 없습니다.</p>
+                  <p>수동으로 tools를 추가해주세요.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Server Config - 선택적 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">

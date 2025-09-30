@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { MCPServer, TransportType, MCPServerTool, MCPServerProperty } from "../../types/mcp";
+import { MCPServer, TransportType, ProtocolType, MCPServerTool, MCPServerProperty } from "../../types/mcp";
 import { MCP_CATEGORIES } from "@/constants/categories";
 import { useAuth } from "@/contexts/AuthContext";
 import { PlusIcon, TrashIcon, PencilIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
@@ -16,6 +16,8 @@ export default function SubmitMCPPage() {
     github_link: "",
     description: "",
     tags: "",
+    protocol: "",
+    url: "",
     config: ""
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,38 +71,26 @@ export default function SubmitMCPPage() {
   };
 
 
-  // Server Config 변경 감지 및 MCP Server Tools 미리보기
-  const handleConfigChange = async (configValue: string) => {
-    if (!configValue.trim()) {
+  // URL 변경 감지 및 MCP Server Tools 미리보기
+  const handleUrlChange = async (url: string, protocol: string) => {
+    if (!url.trim() || !protocol) {
       setPreviewTools([]);
       return;
     }
     
     try {
-      // JSON 문자열 정리 (제어 문자 제거)
-      const cleanedConfigValue = configValue
-        .replace(/[\r\n\t]/g, '') // 줄바꿈, 캐리지 리턴, 탭 제거
-        .replace(/\s+/g, ' ') // 연속된 공백을 하나로
-        .trim();
-      
-      console.log('Cleaned config value:', cleanedConfigValue);
-      
-      const config = JSON.parse(cleanedConfigValue);
-      
-      // type=streamable-http이고 url이 있는 경우에만 MCP Server 연결 시도
-      if (config.type === 'streamable-http' && config.url) {
-        console.log('MCP Server Config detected:', config);
-        await detectAndPreviewTools(config);
-      } else {
-        // streamable-http가 아닌 경우 기존 preview 초기화
-        setPreviewTools([]);
-      }
+      console.log('MCP Server URL detected:', url, 'Protocol:', protocol);
+      await detectAndPreviewTools({ url: url.trim(), protocol });
     } catch (error) {
-      console.error('Config 파싱 실패:', error);
-      console.error('원본 configValue:', configValue);
-      // JSON 파싱 실패 시 기존 preview 초기화
+      console.error('URL 처리 실패:', error);
       setPreviewTools([]);
     }
+  };
+
+  // Server Config 변경 감지 (tools 미리보기 없음)
+  const handleConfigChange = (configValue: string) => {
+    // Server Config는 단순히 입력값만 저장하고 tools 미리보기는 하지 않음
+    console.log('Server Config changed:', configValue);
   };
 
   // MCP Server 상태 확인
@@ -123,7 +113,7 @@ export default function SubmitMCPPage() {
     }
   };
 
-  // JSON-RPC tools/list 요청
+  // 프로토콜별 JSON-RPC tools/list 요청
   const requestToolsList = async (config: any) => {
     const jsonRpcRequest = {
       jsonrpc: "2.0",
@@ -135,26 +125,122 @@ export default function SubmitMCPPage() {
     try {
       console.log('Sending JSON-RPC request:', jsonRpcRequest);
       
-      const response = await fetch(config.url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'text/event-stream'
-        },
-        body: JSON.stringify(jsonRpcRequest)
-      });
+      let response;
+      
+      switch (config.protocol) {
+        case ProtocolType.HTTP:
+          response = await fetch(config.url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(jsonRpcRequest)
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('HTTP response received:', data);
+            if (data.result && data.result.tools) {
+              setPreviewTools(data.result.tools);
+            }
+          } else {
+            console.error('HTTP JSON-RPC request failed:', response.status);
+            setPreviewTools([]);
+          }
+          break;
+          
+        case ProtocolType.HTTP_STREAM:
+          response = await fetch(config.url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'text/event-stream'
+            },
+            body: JSON.stringify(jsonRpcRequest)
+          });
 
-      if (response.ok) {
-        console.log('JSON-RPC response received, processing SSE stream...');
-        await handleSSEStream(response);
-      } else {
-        console.error('JSON-RPC request failed:', response.status);
-        setPreviewTools([]);
+          if (response.ok) {
+            console.log('HTTP-Stream response received, processing SSE stream...');
+            await handleSSEStream(response);
+          } else {
+            console.error('HTTP-Stream JSON-RPC request failed:', response.status);
+            setPreviewTools([]);
+          }
+          break;
+          
+        case ProtocolType.WEBSOCKET:
+          await requestToolsListWebSocket(config.url, jsonRpcRequest);
+          break;
+          
+        case ProtocolType.STDIO:
+          // STDIO는 브라우저에서 직접 실행할 수 없으므로 처리하지 않음
+          console.log('STDIO protocol - not supported in browser');
+          setPreviewTools([]);
+          break;
+          
+        default:
+          console.error('Unsupported protocol:', config.protocol);
+          setPreviewTools([]);
       }
     } catch (error) {
       console.error('tools/list 요청 실패:', error);
       setPreviewTools([]);
     }
+  };
+
+  // WebSocket을 통한 tools/list 요청
+  const requestToolsListWebSocket = async (url: string, jsonRpcRequest: any) => {
+    return new Promise((resolve, reject) => {
+      try {
+        // WebSocket URL 변환 (http -> ws, https -> wss)
+        const wsUrl = url.replace(/^http/, 'ws');
+        const ws = new WebSocket(wsUrl);
+        
+        ws.onopen = () => {
+          console.log('WebSocket connected');
+          ws.send(JSON.stringify(jsonRpcRequest));
+        };
+        
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('WebSocket response received:', data);
+            
+            if (data.result && data.result.tools) {
+              setPreviewTools(data.result.tools);
+            }
+            ws.close();
+            resolve(data);
+          } catch (error) {
+            console.error('WebSocket message parsing failed:', error);
+            reject(error);
+          }
+        };
+        
+        ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          setPreviewTools([]);
+          reject(error);
+        };
+        
+        ws.onclose = () => {
+          console.log('WebSocket closed');
+        };
+        
+        // 5초 타임아웃
+        setTimeout(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.close();
+            reject(new Error('WebSocket timeout'));
+          }
+        }, 5000);
+        
+      } catch (error) {
+        console.error('WebSocket connection failed:', error);
+        setPreviewTools([]);
+        reject(error);
+      }
+    });
   };
 
   // SSE 스트림 처리
@@ -242,19 +328,29 @@ export default function SubmitMCPPage() {
     setIsLoadingPreview(true);
     
     try {
-      console.log('Checking MCP Server status:', config.url);
+      console.log('Checking MCP Server status:', config.url, 'Protocol:', config.protocol);
       
-      // 1. MCP Server가 실행 중인지 확인
-      const serverStatus = await checkMCPServerStatus(config.url);
-      
-      if (serverStatus.isRunning) {
-        console.log('MCP Server is running, requesting tools list...');
-        // 2. JSON-RPC tools/list 요청
+      // STDIO는 별도 처리 (사용자가 실행한 서버와 통신)
+      if (config.protocol === ProtocolType.STDIO) {
+        console.log('STDIO protocol detected - attempting to connect to user-run server');
         await requestToolsList(config);
-      } else {
-        console.log('MCP Server is not running or not accessible');
-        setPreviewTools([]);
+        return;
       }
+      
+      // 1. MCP Server가 실행 중인지 확인 (HTTP/HTTP-STREAM만)
+      if (config.protocol === ProtocolType.HTTP || config.protocol === ProtocolType.HTTP_STREAM) {
+        const serverStatus = await checkMCPServerStatus(config.url);
+        
+        if (!serverStatus.isRunning) {
+          console.log('MCP Server is not running or not accessible');
+          setPreviewTools([]);
+          return;
+        }
+      }
+      
+      console.log('MCP Server is accessible, requesting tools list...');
+      // 2. 프로토콜별 JSON-RPC tools/list 요청
+      await requestToolsList(config);
     } catch (error) {
       console.error('MCP Server 감지 실패:', error);
       setPreviewTools([]);
@@ -458,8 +554,30 @@ export default function SubmitMCPPage() {
       errors.description = "Description은 필수입니다.";
     }
     
+    if (!formData.protocol.trim()) {
+      errors.protocol = "Protocol은 필수입니다.";
+    }
+    
+    // URL은 optional이지만 입력된 경우 유효성 검사
+    if (formData.url.trim() && formData.protocol !== ProtocolType.STDIO) {
+      // HTTP/WebSocket 프로토콜만 URL 형식 검사
+      if (!isValidUrl(formData.url)) {
+        errors.url = "유효한 URL을 입력해주세요.";
+      }
+    }
+    
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
+  };
+
+  // URL 유효성 검사
+  const isValidUrl = (url: string) => {
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -480,6 +598,19 @@ export default function SubmitMCPPage() {
     setIsSubmitting(true);
 
     try {
+      // config 처리: 기존 JSON config가 있으면 사용, 없으면 URL로 생성
+      let config = {};
+      if (formData.config.trim()) {
+        try {
+          config = JSON.parse(formData.config);
+        } catch (error) {
+          throw new Error('Server Config JSON 형식이 올바르지 않습니다.');
+        }
+      } else if (formData.url.trim()) {
+        // URL이 있으면 config에 URL 저장
+        config = { url: formData.url.trim() };
+      }
+
       // 백엔드 스키마에 맞는 데이터 형식으로 변환
       const mcpServerData = {
         name: formData.name.trim(),
@@ -487,7 +618,8 @@ export default function SubmitMCPPage() {
         github_link: formData.github_link.trim(),
         description: formData.description.trim(),
         tags: formData.tags.trim(), // 콤마로 구분된 문자열
-        config: formData.config ? JSON.parse(formData.config) : {},
+        protocol: formData.protocol.trim(),
+        config: config,
         tools: tools // tools 추가
       };
 
@@ -697,6 +829,67 @@ export default function SubmitMCPPage() {
             />
           </div>
 
+          {/* Protocol */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Protocol *
+            </label>
+            <select
+              required
+              value={formData.protocol}
+              onChange={(e) => {
+                handleInputChange('protocol', e.target.value);
+                // Protocol과 URL이 모두 있을 때 미리보기 시도
+                if (formData.url.trim()) {
+                  handleUrlChange(formData.url, e.target.value);
+                }
+              }}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                validationErrors.protocol ? 'border-red-500' : 'border-gray-300'
+              }`}
+            >
+              <option value="">Select a protocol</option>
+              <option value={ProtocolType.HTTP}>HTTP</option>
+              <option value={ProtocolType.HTTP_STREAM}>HTTP-Stream</option>
+              <option value={ProtocolType.WEBSOCKET}>WebSocket</option>
+              <option value={ProtocolType.STDIO}>STDIO</option>
+            </select>
+            {validationErrors.protocol && (
+              <p className="mt-1 text-sm text-red-600">{validationErrors.protocol}</p>
+            )}
+          </div>
+
+          {/* URL */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Server URL
+            </label>
+            <input
+              type="url"
+              value={formData.url}
+              onChange={(e) => {
+                handleInputChange('url', e.target.value);
+                // Protocol과 URL이 모두 있을 때 미리보기 시도
+                if (formData.protocol.trim()) {
+                  handleUrlChange(e.target.value, formData.protocol);
+                }
+              }}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                validationErrors.url ? 'border-red-500' : 'border-gray-300'
+              }`}
+              placeholder={formData.protocol === ProtocolType.STDIO ? "python stdio_test_mcp_server.py" : "http://localhost:3000"}
+            />
+            {validationErrors.url && (
+              <p className="mt-1 text-sm text-red-600">{validationErrors.url}</p>
+            )}
+            <p className="mt-1 text-xs text-gray-500">
+              {formData.protocol === ProtocolType.STDIO 
+                ? "MCP 서버 실행 명령어를 입력하세요. Protocol과 함께 입력하면 자동으로 tools를 미리보기합니다."
+                : "MCP Server의 URL을 입력하세요. Protocol과 함께 입력하면 자동으로 tools를 미리보기합니다."
+              }
+            </p>
+          </div>
+
           {/* Server Config */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -706,7 +899,6 @@ export default function SubmitMCPPage() {
               value={formData.config}
               onChange={(e) => {
                 handleInputChange('config', e.target.value);
-                // Config 변경 시 MCP Server Tools 미리보기 시도
                 handleConfigChange(e.target.value);
               }}
               rows={4}
@@ -714,7 +906,7 @@ export default function SubmitMCPPage() {
               placeholder='{"type": "streamable-http", "url": "http://localhost:3000"}'
             />
             <p className="mt-1 text-xs text-gray-500">
-              MCP Server 설정을 JSON 형식으로 입력하세요. type이 "streamable-http"인 경우 자동으로 tools를 미리보기합니다.
+              MCP Server 설정을 JSON 형식으로 입력하세요.
             </p>
           </div>
 
@@ -779,13 +971,27 @@ export default function SubmitMCPPage() {
           )}
 
           {/* MCP Server 연결 실패 메시지 */}
-          {formData.config && !isLoadingPreview && previewTools.length === 0 && (
+          {formData.url && formData.protocol && !isLoadingPreview && previewTools.length === 0 && formData.protocol !== ProtocolType.STDIO && (
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
               <div className="flex items-center">
                 <div className="text-yellow-600 mr-2">⚠️</div>
                 <span className="text-yellow-700 text-sm">
-                  MCP Server에 연결할 수 없습니다. Server Config를 확인하고 서버가 실행 중인지 확인해주세요.
+                  MCP Server에 연결할 수 없습니다. Server URL과 프로토콜을 확인하고 서버가 실행 중인지 확인해주세요.
                 </span>
+              </div>
+            </div>
+          )}
+
+          {/* STDIO 프로토콜 안내 메시지 */}
+          {formData.protocol === ProtocolType.STDIO && (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+              <div className="flex items-center">
+                <div className="text-yellow-600 mr-2">⚠️</div>
+                <div className="text-yellow-700 text-sm">
+                  <p className="font-medium mb-1">STDIO 프로토콜 안내:</p>
+                  <p>STDIO 프로토콜은 브라우저에서 직접 미리보기할 수 없습니다.</p>
+                  <p>수동으로 tools를 추가해주세요.</p>
+                </div>
               </div>
             </div>
           )}

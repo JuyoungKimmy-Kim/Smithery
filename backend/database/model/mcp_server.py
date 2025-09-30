@@ -13,6 +13,7 @@ class MCPServer(Base):
     description = Column(Text, nullable=False)
     category = Column(String(100), nullable=False)
     status = Column(String(20), default='pending')  # 'pending', 'approved', 'rejected'
+    protocol = Column(String(20), nullable=False)  # 'http', 'http-stream', 'websocket', 'stdio'
     config = Column(JSON, nullable=True)
     owner_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
