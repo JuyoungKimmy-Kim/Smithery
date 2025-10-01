@@ -45,7 +45,7 @@ class MCPServerDAO:
         """승인된 MCP 서버 목록을 조회합니다."""
         query = self.db.query(MCPServer).options(
             joinedload(MCPServer.owner)
-        ).filter(MCPServer.status == 'approved')
+        ).filter(MCPServer.status == 'approved').order_by(MCPServer.created_at.desc())
         if limit:
             query = query.limit(limit).offset(offset)
         return query.all()
@@ -54,7 +54,7 @@ class MCPServerDAO:
         """승인 대기중인 MCP 서버 목록을 조회합니다."""
         return self.db.query(MCPServer).options(
             joinedload(MCPServer.owner)
-        ).filter(MCPServer.status == 'pending').all()
+        ).filter(MCPServer.status == 'pending').order_by(MCPServer.created_at.desc()).all()
     
     def search_mcp_servers(self, keyword: str, status: str = 'approved') -> List[MCPServer]:
         """키워드로 MCP 서버를 검색합니다."""
@@ -68,7 +68,7 @@ class MCPServerDAO:
                     MCPServer.description.ilike(f'%{keyword}%')
                 )
             )
-        )
+        ).order_by(MCPServer.created_at.desc())
         return query.all()
     
     def get_mcp_servers_by_category(self, category: str, status: str = 'approved') -> List[MCPServer]:
@@ -80,7 +80,7 @@ class MCPServerDAO:
                 MCPServer.category == category,
                 MCPServer.status == status
             )
-        ).all()
+        ).order_by(MCPServer.created_at.desc()).all()
     
     def update_mcp_server(self, mcp_server_id: int, mcp_server_data: Dict[str, Any]) -> Optional[MCPServer]:
         """MCP 서버를 수정합니다."""
