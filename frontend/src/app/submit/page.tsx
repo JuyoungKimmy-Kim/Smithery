@@ -84,91 +84,35 @@ export default function SubmitMCPPage() {
   };
 
 
-  const checkMCPServerStatus = async (url: string) => {
+  const requestToolsList = async (config: any) => {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      console.log('Requesting tools via backend proxy:', config);
       
-      const response = await fetch(url, {
-        method: 'HEAD',
-        signal: controller.signal,
-        mode: 'cors'
+      // 백엔드 프록시 API를 통해 tools 가져오기
+      const response = await fetch('/api/mcp-servers/preview-tools', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          url: config.url,
+          protocol: config.protocol
+        })
       });
       
-      clearTimeout(timeoutId);
-      return { isRunning: response.ok };
-    } catch (error) {
-      console.error('MCP Server 상태 확인 실패:', error);
-      return { isRunning: false };
-    }
-  };
-
-  const requestToolsList = async (config: any) => {
-    const jsonRpcRequest = {
-      jsonrpc: "2.0",
-      method: "tools/list",
-      id: Date.now(),
-      params: {}
-    };
-
-    try {
-      console.log('Sending JSON-RPC request:', jsonRpcRequest);
-      
-      let response;
-      
-      switch (config.protocol) {
-        case ProtocolType.HTTP:
-          response = await fetch(config.url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(jsonRpcRequest)
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            console.log('HTTP response received:', data);
-            if (data.result && data.result.tools) {
-              setPreviewTools(data.result.tools);
-            }
-          } else {
-            console.error('HTTP JSON-RPC request failed:', response.status);
-            setPreviewTools([]);
-          }
-          break;
-          
-        case ProtocolType.HTTP_STREAM:
-          response = await fetch(config.url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'text/event-stream'
-            },
-            body: JSON.stringify(jsonRpcRequest)
-          });
-
-          if (response.ok) {
-            console.log('HTTP-Stream response received, processing SSE stream...');
-            await handleSSEStream(response);
-          } else {
-            console.error('HTTP-Stream JSON-RPC request failed:', response.status);
-            setPreviewTools([]);
-          }
-          break;
-          
-        case ProtocolType.WEBSOCKET:
-          await requestToolsListWebSocket(config.url, jsonRpcRequest);
-          break;
-          
-        case ProtocolType.STDIO:
-          console.log('STDIO protocol - not supported in browser');
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Backend proxy response:', data);
+        
+        if (data.success && data.tools && data.tools.length > 0) {
+          setPreviewTools(data.tools);
+        } else {
+          console.log('No tools found or request failed:', data.message);
           setPreviewTools([]);
-          break;
-          
-        default:
-          console.error('Unsupported protocol:', config.protocol);
-          setPreviewTools([]);
+        }
+      } else {
+        console.error('Backend proxy request failed:', response.status);
+        setPreviewTools([]);
       }
     } catch (error) {
       console.error('tools/list 요청 실패:', error);
@@ -176,156 +120,15 @@ export default function SubmitMCPPage() {
     }
   };
 
-  const requestToolsListWebSocket = async (url: string, jsonRpcRequest: any) => {
-    return new Promise((resolve, reject) => {
-      try {
-        const wsUrl = url.replace(/^http/, 'ws');
-        const ws = new WebSocket(wsUrl);
-        
-        ws.onopen = () => {
-          console.log('WebSocket connected');
-          ws.send(JSON.stringify(jsonRpcRequest));
-        };
-        
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            console.log('WebSocket response received:', data);
-            
-            if (data.result && data.result.tools) {
-              setPreviewTools(data.result.tools);
-            }
-            ws.close();
-            resolve(data);
-          } catch (error) {
-            console.error('WebSocket message parsing failed:', error);
-            reject(error);
-          }
-        };
-        
-        ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
-          setPreviewTools([]);
-          reject(error);
-        };
-        
-        ws.onclose = () => {
-          console.log('WebSocket closed');
-        };
-        
-        setTimeout(() => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.close();
-            reject(new Error('WebSocket timeout'));
-          }
-        }, 5000);
-        
-      } catch (error) {
-        console.error('WebSocket connection failed:', error);
-        setPreviewTools([]);
-        reject(error);
-      }
-    });
-  };
-
-  const handleSSEStream = async (response: Response) => {
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    if (!reader) {
-      console.error('Response body reader not available');
-      return;
-    }
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6).trim();
-            if (data === '[DONE]') {
-              console.log('SSE stream completed');
-              break;
-            }
-            
-            try {
-              const parsed = JSON.parse(data);
-              console.log('SSE data received:', parsed);
-              
-              let tools = null;
-              
-              if (parsed.result && parsed.result.tools) {
-                tools = parsed.result.tools;
-              }
-              else if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].name) {
-                tools = parsed;
-              }
-              else if (parsed.tools && Array.isArray(parsed.tools)) {
-                tools = parsed.tools;
-              }
-              else if (parsed.data && Array.isArray(parsed.data)) {
-                tools = parsed.data;
-              }
-              else if (parsed.available_functions && Array.isArray(parsed.available_functions)) {
-                tools = parsed.available_functions;
-              }
-              else if (parsed.functions && Array.isArray(parsed.functions)) {
-                tools = parsed.functions;
-              }
-              
-              if (tools && Array.isArray(tools) && tools.length > 0) {
-                console.log('Tools received from MCP Server:', tools);
-                setPreviewTools(tools);
-              } else {
-                console.log('No valid tools found in response:', parsed);
-              }
-            } catch (e) {
-              console.error('SSE 데이터 파싱 실패:', e, 'Raw data:', data);
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error('SSE 스트림 처리 실패:', error);
-      setPreviewTools([]);
-    } finally {
-      reader.releaseLock();
-    }
-  };
 
   const detectAndPreviewTools = async (config: any) => {
     setIsLoadingPreview(true);
     
     try {
-      console.log('Checking MCP Server status:', config.url, 'Protocol:', config.protocol);
-      
-      if (config.protocol === ProtocolType.STDIO) {
-        console.log('STDIO protocol detected - attempting to connect to user-run server');
-        await requestToolsList(config);
-        return;
-      }
-      
-      if (config.protocol === ProtocolType.HTTP || config.protocol === ProtocolType.HTTP_STREAM) {
-        const serverStatus = await checkMCPServerStatus(config.url);
-        
-        if (!serverStatus.isRunning) {
-          console.log('MCP Server is not running or not accessible');
-          setPreviewTools([]);
-          return;
-        }
-      }
-      
-      console.log('MCP Server is accessible, requesting tools list...');
+      console.log('Fetching tools from MCP Server:', config.url, 'Protocol:', config.protocol);
       await requestToolsList(config);
     } catch (error) {
-      console.error('MCP Server 감지 실패:', error);
+      console.error('MCP Server tools 가져오기 실패:', error);
       setPreviewTools([]);
     } finally {
       setIsLoadingPreview(false);
