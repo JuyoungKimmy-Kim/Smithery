@@ -66,7 +66,7 @@ function Hero({ onSearch }: HeroProps) {
   };
 
   return (
-    <header className="mt-5 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-16 relative overflow-hidden">
+    <header className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-16 relative overflow-hidden">
       {/* 애니메이션 배경 효과 */}
       <div className="absolute inset-0 bg-gradient-to-r from-blue-400/10 via-purple-400/10 to-pink-400/10 animate-pulse"></div>
       <div className="absolute top-0 left-0 w-full h-full">
