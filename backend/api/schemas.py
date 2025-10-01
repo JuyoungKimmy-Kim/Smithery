@@ -126,3 +126,18 @@ class FavoriteResponse(BaseModel):
 class AdminApprovalRequest(BaseModel):
     mcp_server_id: int
     action: str  # 'approve' 또는 'reject'
+
+# MCP Tools 미리보기 관련 스키마
+class PreviewToolsRequest(BaseModel):
+    url: str
+    protocol: str  # 'http', 'http-stream', 'websocket', 'stdio'
+
+class PreviewToolResponse(BaseModel):
+    name: str
+    description: Optional[str] = None
+    inputSchema: Optional[Dict[str, Any]] = None
+
+class PreviewToolsResponse(BaseModel):
+    tools: List[PreviewToolResponse]
+    success: bool
+    message: Optional[str] = None
