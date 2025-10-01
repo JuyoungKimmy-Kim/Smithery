@@ -1,6 +1,7 @@
 fastapi
 uvicorn
 httpx
+aiohttp
 pydantic
 jinja2
 python-multipart

@@ -3,12 +3,12 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from backend.database import get_db
-from backend.service import MCPServerService, UserService
+from backend.service import MCPServerService, UserService, MCPProxyService
 from backend.database.model import User
 from backend.api.schemas import (
     MCPServerCreate, MCPServerResponse, MCPServerUpdate,
     SearchRequest, SearchResponse, FavoriteRequest, FavoriteResponse,
-    AdminApprovalRequest, TagResponse
+    AdminApprovalRequest, TagResponse, PreviewToolsRequest, PreviewToolsResponse
 )
 from backend.api.auth import get_current_user, get_current_admin_user
 
@@ -59,6 +59,26 @@ def preview_mcp_server(github_link: dict, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
+        )
+
+@router.post("/preview-tools", response_model=PreviewToolsResponse)
+async def preview_mcp_tools(request: PreviewToolsRequest):
+    """
+    MCP 서버에서 tools를 미리보기합니다.
+    HTTPS -> HTTP Mixed Content 문제와 CORS 문제를 해결하기 위한 프록시 엔드포인트
+    """
+    try:
+        result = await MCPProxyService.fetch_tools(request.url, request.protocol)
+        return PreviewToolsResponse(
+            tools=result.get("tools", []),
+            success=result.get("success", False),
+            message=result.get("message")
+        )
+    except Exception as e:
+        return PreviewToolsResponse(
+            tools=[],
+            success=False,
+            message=f"Failed to preview tools: {str(e)}"
         )
 
 @router.get("/", response_model=List[MCPServerResponse])
