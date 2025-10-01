@@ -94,65 +94,77 @@ class MCPProxyService:
                     "Content-Type": "application/json",
                     "Accept": "application/json, text/event-stream"
                 },
-                timeout=aiohttp.ClientTimeout(total=10)
-            ) as response:
-                content_type = response.headers.get('Content-Type', '')
-                
-                # 200 OK + JSON 응답인 경우 (즉시 응답)
-                if response.status == 200 and 'application/json' in content_type:
-                    data = await response.json()
-                    tools = data.get("result", {}).get("tools", [])
-                    return {
-                        "success": True,
-                        "tools": tools,
-                        "message": "Tools fetched successfully"
-                    }
-                
-                # 202 Accepted 응답인 경우 (SSE 스트림으로 전환)
-                if response.status == 202:
-                    # 응답 본문에서 스트림 URL 또는 엔드포인트 정보를 가져옴
-                    response_data = await response.json()
-                    stream_url = response_data.get('stream_url') or response_data.get('endpoint') or url
-                    
-                    # GET 요청으로 SSE 스트림 구독
-                    return await MCPProxyService._fetch_sse_stream(session, stream_url, payload)
-                
-                # 200 OK + SSE 스트림인 경우 (바로 스트림 응답)
-                if response.status == 200:
-                    return await MCPProxyService._process_sse_stream(response)
-                
-                # 기타 오류
-                return {
-                    "success": False,
-                    "tools": [],
-                    "message": f"HTTP-Stream request failed with status {response.status}"
-                }
-    
-    @staticmethod
-    async def _fetch_sse_stream(session: aiohttp.ClientSession, stream_url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """GET 요청으로 SSE 스트림 구독"""
-        try:
-            async with session.get(
-                stream_url,
-                headers={
-                    "Accept": "text/event-stream"
-                },
                 timeout=aiohttp.ClientTimeout(total=30)
             ) as response:
-                if response.status == 200:
+                content_type = response.headers.get('Content-Type', '').lower()
+                
+                # 1. Content-Type으로 먼저 판단 (가장 확실한 방법)
+                if 'application/json' in content_type:
+                    # JSON 응답인 경우 - 즉시 처리
+                    data = await response.json()
+                    
+                    # 정상 응답 (200, 201 등)
+                    if response.status in [200, 201]:
+                        tools = data.get("result", {}).get("tools", [])
+                        return {
+                            "success": True,
+                            "tools": tools,
+                            "message": "Tools fetched successfully"
+                        }
+                    
+                    # 202 Accepted - 처리 진행 중이지만 결과를 기다림
+                    elif response.status == 202:
+                        # 응답 본문에 이미 결과가 있으면 사용
+                        if "result" in data and "tools" in data["result"]:
+                            tools = data["result"]["tools"]
+                            return {
+                                "success": True,
+                                "tools": tools,
+                                "message": "Tools fetched successfully"
+                            }
+                        # 결과가 없으면 에러 처리
+                        return {
+                            "success": False,
+                            "tools": [],
+                            "message": f"Request accepted but no result available: {data}"
+                        }
+                    
+                    # 기타 에러
+                    else:
+                        return {
+                            "success": False,
+                            "tools": [],
+                            "message": f"HTTP request failed with status {response.status}: {data}"
+                        }
+                
+                # 2. SSE 스트림 응답인 경우
+                elif 'text/event-stream' in content_type:
                     return await MCPProxyService._process_sse_stream(response)
+                
+                # 3. Content-Type이 명확하지 않은 경우 - 본문을 읽어서 판단
                 else:
-                    return {
-                        "success": False,
-                        "tools": [],
-                        "message": f"SSE stream request failed with status {response.status}"
-                    }
-        except Exception as e:
-            return {
-                "success": False,
-                "tools": [],
-                "message": f"Failed to connect to SSE stream: {str(e)}"
-            }
+                    text = await response.text()
+                    
+                    # JSON 파싱 시도
+                    try:
+                        data = json.loads(text)
+                        tools = data.get("result", {}).get("tools", [])
+                        return {
+                            "success": True,
+                            "tools": tools,
+                            "message": "Tools fetched successfully"
+                        }
+                    except json.JSONDecodeError:
+                        # SSE 형식인지 확인
+                        if text.strip().startswith('data:'):
+                            # SSE를 텍스트로 파싱
+                            return MCPProxyService._parse_sse_text(text)
+                        
+                        return {
+                            "success": False,
+                            "tools": [],
+                            "message": f"Unknown response format. Status: {response.status}, Content-Type: {content_type}"
+                        }
     
     @staticmethod
     async def _process_sse_stream(response: aiohttp.ClientResponse) -> Dict[str, Any]:
@@ -183,6 +195,39 @@ class MCPProxyService:
             "success": True,
             "tools": tools,
             "message": "Tools fetched successfully from SSE stream"
+        }
+    
+    @staticmethod
+    def _parse_sse_text(text: str) -> Dict[str, Any]:
+        """SSE 텍스트를 파싱"""
+        tools = []
+        lines = text.split('\n')
+        
+        for line in lines:
+            line = line.strip()
+            if line.startswith('data:'):
+                try:
+                    data_str = line[5:].strip()
+                    if data_str and data_str != '[DONE]':
+                        data = json.loads(data_str)
+                        
+                        # 다양한 응답 형식 처리
+                        if 'result' in data and 'tools' in data['result']:
+                            tools = data['result']['tools']
+                            break
+                        elif isinstance(data, list) and len(data) > 0:
+                            tools = data
+                            break
+                        elif 'tools' in data:
+                            tools = data['tools']
+                            break
+                except json.JSONDecodeError:
+                    continue
+        
+        return {
+            "success": True,
+            "tools": tools,
+            "message": "Tools fetched successfully from SSE text"
         }
     
     @staticmethod
