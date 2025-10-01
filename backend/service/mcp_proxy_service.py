@@ -86,9 +86,13 @@ class MCPProxyService:
     @staticmethod
     async def _fetch_http_stream(url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """HTTP-Stream (SSE) 프로토콜로 tools 가져오기"""
+        post_error = None
+        get_error = None
+        
         async with aiohttp.ClientSession() as session:
-            # 먼저 POST 시도
+            # 먼저 POST로 직접 시도 (단일 요청/응답 패턴)
             try:
+                print(f"[HTTP-Stream] Trying POST to {url}")
                 async with session.post(
                     url,
                     json=payload,
@@ -98,32 +102,141 @@ class MCPProxyService:
                     },
                     timeout=aiohttp.ClientTimeout(total=30)
                 ) as response:
+                    print(f"[HTTP-Stream] POST response: status={response.status}, content-type={response.headers.get('Content-Type')}")
+                    
                     # 405 Method Not Allowed가 아니면 처리
                     if response.status != 405:
-                        return await MCPProxyService._handle_http_response(response)
+                        result = await MCPProxyService._handle_http_response(response)
+                        print(f"[HTTP-Stream] POST result: success={result.get('success')}, tools_count={len(result.get('tools', []))}")
+                        return result
                     
-                    # 405면 GET으로 fallback
-                    print(f"POST returned 405, trying GET for {url}")
+                    # 405면 두 단계 구조 시도
+                    post_error = f"POST returned 405 Method Not Allowed"
+                    print(f"[HTTP-Stream] {post_error}, trying two-step stream pattern")
+            except asyncio.TimeoutError:
+                post_error = "POST request timed out after 30 seconds"
+                print(f"[HTTP-Stream] {post_error}")
             except Exception as e:
-                # POST 실패 시 GET으로 fallback
-                print(f"POST failed: {e}, trying GET for {url}")
+                post_error = f"POST failed: {type(e).__name__}: {str(e)}"
+                print(f"[HTTP-Stream] {post_error}")
             
-            # GET 시도 (SSE 스트림 전용)
+            # 두 단계 구조 시도: GET으로 스트림 열고 → POST로 요청
             try:
-                async with session.get(
-                    url,
-                    headers={
-                        "Accept": "text/event-stream, application/json"
-                    },
-                    timeout=aiohttp.ClientTimeout(total=30)
-                ) as response:
-                    return await MCPProxyService._handle_http_response(response)
+                print(f"[HTTP-Stream] Trying two-step pattern: GET stream + POST request")
+                return await MCPProxyService._fetch_two_step_stream(session, url, payload)
+            except asyncio.TimeoutError:
+                get_error = "Two-step stream request timed out"
+                print(f"[HTTP-Stream] {get_error}")
             except Exception as e:
-                return {
-                    "success": False,
-                    "tools": [],
-                    "message": f"Both POST and GET requests failed: {str(e)}"
-                }
+                get_error = f"Two-step stream failed: {type(e).__name__}: {str(e)}"
+                print(f"[HTTP-Stream] {get_error}")
+            
+            # 모든 방법 실패
+            return {
+                "success": False,
+                "tools": [],
+                "message": f"All methods failed - POST: {post_error}, Two-step: {get_error}"
+            }
+    
+    @staticmethod
+    async def _fetch_two_step_stream(session: aiohttp.ClientSession, url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        두 단계 HTTP-Stream 처리:
+        1. GET으로 SSE 스트림 열기 (연결 유지)
+        2. 스트림에서 endpoint와 session_id 받기
+        3. POST로 JSON-RPC 요청 (session_id 포함)
+        4. 스트림에서 응답 받기
+        """
+        print(f"[Two-Step] Opening SSE stream with GET to {url}")
+        
+        # 1단계: GET으로 스트림 열기
+        async with session.get(
+            url,
+            headers={"Accept": "text/event-stream"},
+            timeout=aiohttp.ClientTimeout(total=60)
+        ) as stream_response:
+            if stream_response.status != 200:
+                raise Exception(f"Failed to open stream: status={stream_response.status}")
+            
+            print(f"[Two-Step] Stream opened, waiting for endpoint and session_id")
+            
+            endpoint = None
+            session_id = None
+            
+            # 스트림에서 endpoint와 session_id 읽기
+            async for line in stream_response.content:
+                line_str = line.decode('utf-8').strip()
+                print(f"[Two-Step] Stream line: {line_str}")
+                
+                if line_str.startswith('data:'):
+                    data_str = line_str[5:].strip()
+                    try:
+                        data = json.loads(data_str)
+                        
+                        # endpoint와 session_id 추출
+                        if 'endpoint' in data:
+                            endpoint = data.get('endpoint')
+                            session_id = data.get('session_id')
+                            print(f"[Two-Step] Received endpoint={endpoint}, session_id={session_id}")
+                            break
+                    except json.JSONDecodeError:
+                        continue
+            
+            if not endpoint:
+                raise Exception("No endpoint received from stream")
+            
+            # 2단계: POST로 JSON-RPC 요청 (session_id 포함)
+            print(f"[Two-Step] Sending POST to {endpoint} with session_id={session_id}")
+            
+            # payload에 session_id 추가
+            payload_with_session = {**payload}
+            if session_id:
+                payload_with_session['session_id'] = session_id
+            
+            # 별도 요청으로 POST 전송
+            async with session.post(
+                endpoint,
+                json=payload_with_session,
+                headers={"Content-Type": "application/json"},
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as post_response:
+                print(f"[Two-Step] POST response: status={post_response.status}")
+                
+                # POST는 202나 200을 반환할 수 있음 (결과는 스트림으로)
+                if post_response.status not in [200, 202]:
+                    raise Exception(f"POST request failed: status={post_response.status}")
+            
+            # 3단계: 스트림에서 응답 받기
+            print(f"[Two-Step] Waiting for response in stream")
+            
+            tools = []
+            async for line in stream_response.content:
+                line_str = line.decode('utf-8').strip()
+                print(f"[Two-Step] Response line: {line_str}")
+                
+                if line_str.startswith('data:'):
+                    data_str = line_str[5:].strip()
+                    if data_str and data_str != '[DONE]':
+                        try:
+                            data = json.loads(data_str)
+                            
+                            # tools/list 응답 확인
+                            if 'result' in data and 'tools' in data['result']:
+                                tools = data['result']['tools']
+                                print(f"[Two-Step] Received {len(tools)} tools")
+                                break
+                            elif 'tools' in data:
+                                tools = data['tools']
+                                print(f"[Two-Step] Received {len(tools)} tools")
+                                break
+                        except json.JSONDecodeError:
+                            continue
+            
+            return {
+                "success": True,
+                "tools": tools,
+                "message": "Tools fetched successfully via two-step stream"
+            }
     
     @staticmethod
     async def _handle_http_response(response: aiohttp.ClientResponse) -> Dict[str, Any]:
