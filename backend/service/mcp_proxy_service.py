@@ -87,84 +87,116 @@ class MCPProxyService:
     async def _fetch_http_stream(url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """HTTP-Stream (SSE) 프로토콜로 tools 가져오기"""
         async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url,
-                json=payload,
-                headers={
-                    "Content-Type": "application/json",
-                    "Accept": "application/json, text/event-stream"
-                },
-                timeout=aiohttp.ClientTimeout(total=30)
-            ) as response:
-                content_type = response.headers.get('Content-Type', '').lower()
+            # 먼저 POST 시도
+            try:
+                async with session.post(
+                    url,
+                    json=payload,
+                    headers={
+                        "Content-Type": "application/json",
+                        "Accept": "application/json, text/event-stream"
+                    },
+                    timeout=aiohttp.ClientTimeout(total=30)
+                ) as response:
+                    # 405 Method Not Allowed가 아니면 처리
+                    if response.status != 405:
+                        return await MCPProxyService._handle_http_response(response)
+                    
+                    # 405면 GET으로 fallback
+                    print(f"POST returned 405, trying GET for {url}")
+            except Exception as e:
+                # POST 실패 시 GET으로 fallback
+                print(f"POST failed: {e}, trying GET for {url}")
+            
+            # GET 시도 (SSE 스트림 전용)
+            try:
+                async with session.get(
+                    url,
+                    headers={
+                        "Accept": "text/event-stream, application/json"
+                    },
+                    timeout=aiohttp.ClientTimeout(total=30)
+                ) as response:
+                    return await MCPProxyService._handle_http_response(response)
+            except Exception as e:
+                return {
+                    "success": False,
+                    "tools": [],
+                    "message": f"Both POST and GET requests failed: {str(e)}"
+                }
+    
+    @staticmethod
+    async def _handle_http_response(response: aiohttp.ClientResponse) -> Dict[str, Any]:
+        """HTTP 응답 처리 (POST/GET 공통)"""
+        content_type = response.headers.get('Content-Type', '').lower()
+        
+        # 1. Content-Type으로 먼저 판단
+        if 'application/json' in content_type:
+            # JSON 응답인 경우 - 즉시 처리
+            data = await response.json()
+            
+            # 정상 응답 (200, 201 등)
+            if response.status in [200, 201]:
+                tools = data.get("result", {}).get("tools", [])
+                return {
+                    "success": True,
+                    "tools": tools,
+                    "message": "Tools fetched successfully"
+                }
+            
+            # 202 Accepted - 처리 진행 중이지만 결과를 기다림
+            elif response.status == 202:
+                # 응답 본문에 이미 결과가 있으면 사용
+                if "result" in data and "tools" in data["result"]:
+                    tools = data["result"]["tools"]
+                    return {
+                        "success": True,
+                        "tools": tools,
+                        "message": "Tools fetched successfully"
+                    }
+                # 결과가 없으면 에러 처리
+                return {
+                    "success": False,
+                    "tools": [],
+                    "message": f"Request accepted but no result available: {data}"
+                }
+            
+            # 기타 에러
+            else:
+                return {
+                    "success": False,
+                    "tools": [],
+                    "message": f"HTTP request failed with status {response.status}: {data}"
+                }
+        
+        # 2. SSE 스트림 응답인 경우
+        elif 'text/event-stream' in content_type:
+            return await MCPProxyService._process_sse_stream(response)
+        
+        # 3. Content-Type이 명확하지 않은 경우 - 본문을 읽어서 판단
+        else:
+            text = await response.text()
+            
+            # JSON 파싱 시도
+            try:
+                data = json.loads(text)
+                tools = data.get("result", {}).get("tools", [])
+                return {
+                    "success": True,
+                    "tools": tools,
+                    "message": "Tools fetched successfully"
+                }
+            except json.JSONDecodeError:
+                # SSE 형식인지 확인
+                if text.strip().startswith('data:'):
+                    # SSE를 텍스트로 파싱
+                    return MCPProxyService._parse_sse_text(text)
                 
-                # 1. Content-Type으로 먼저 판단 (가장 확실한 방법)
-                if 'application/json' in content_type:
-                    # JSON 응답인 경우 - 즉시 처리
-                    data = await response.json()
-                    
-                    # 정상 응답 (200, 201 등)
-                    if response.status in [200, 201]:
-                        tools = data.get("result", {}).get("tools", [])
-                        return {
-                            "success": True,
-                            "tools": tools,
-                            "message": "Tools fetched successfully"
-                        }
-                    
-                    # 202 Accepted - 처리 진행 중이지만 결과를 기다림
-                    elif response.status == 202:
-                        # 응답 본문에 이미 결과가 있으면 사용
-                        if "result" in data and "tools" in data["result"]:
-                            tools = data["result"]["tools"]
-                            return {
-                                "success": True,
-                                "tools": tools,
-                                "message": "Tools fetched successfully"
-                            }
-                        # 결과가 없으면 에러 처리
-                        return {
-                            "success": False,
-                            "tools": [],
-                            "message": f"Request accepted but no result available: {data}"
-                        }
-                    
-                    # 기타 에러
-                    else:
-                        return {
-                            "success": False,
-                            "tools": [],
-                            "message": f"HTTP request failed with status {response.status}: {data}"
-                        }
-                
-                # 2. SSE 스트림 응답인 경우
-                elif 'text/event-stream' in content_type:
-                    return await MCPProxyService._process_sse_stream(response)
-                
-                # 3. Content-Type이 명확하지 않은 경우 - 본문을 읽어서 판단
-                else:
-                    text = await response.text()
-                    
-                    # JSON 파싱 시도
-                    try:
-                        data = json.loads(text)
-                        tools = data.get("result", {}).get("tools", [])
-                        return {
-                            "success": True,
-                            "tools": tools,
-                            "message": "Tools fetched successfully"
-                        }
-                    except json.JSONDecodeError:
-                        # SSE 형식인지 확인
-                        if text.strip().startswith('data:'):
-                            # SSE를 텍스트로 파싱
-                            return MCPProxyService._parse_sse_text(text)
-                        
-                        return {
-                            "success": False,
-                            "tools": [],
-                            "message": f"Unknown response format. Status: {response.status}, Content-Type: {content_type}"
-                        }
+                return {
+                    "success": False,
+                    "tools": [],
+                    "message": f"Unknown response format. Status: {response.status}, Content-Type: {content_type}"
+                }
     
     @staticmethod
     async def _process_sse_stream(response: aiohttp.ClientResponse) -> Dict[str, Any]:
