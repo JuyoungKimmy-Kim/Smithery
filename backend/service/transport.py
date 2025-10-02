@@ -110,68 +110,119 @@ class HttpStreamTransport(Transport):
         self.session: Optional[aiohttp.ClientSession] = None
         self.session_id: Optional[str] = None
         self._last_response: str = ""
+        print(f"[HttpStreamTransport] 초기화: URL={url}")
     
     async def write(self, message: str) -> None:
         """HTTP-Stream 요청 전송"""
+        print(f"[HttpStreamTransport] write 호출: message={message[:100]}...")
+        
         if not self.session:
             self.session = aiohttp.ClientSession()
+            print(f"[HttpStreamTransport] 새 세션 생성")
         
         payload = json.loads(message)
+        print(f"[HttpStreamTransport] 파싱된 payload: {payload}")
         
         # 먼저 세션 기반 스트림 시도
         if not self.session_id:
+            print(f"[HttpStreamTransport] 세션 ID 없음, 세션 모드 시도")
             await self._try_session_mode()
         
         if self.session_id:
             # 세션 기반 모드
+            print(f"[HttpStreamTransport] 세션 기반 모드 사용: session_id={self.session_id}")
             payload["session_id"] = self.session_id
-            async with self.session.post(
-                f"{self.url.rstrip('/')}/rpc",
-                json=payload,
-                headers={"Content-Type": "application/json"},
-                timeout=aiohttp.ClientTimeout(total=10)
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    self._last_response = json.dumps(data)
-                else:
-                    error_data = {
-                        "error": {
-                            "code": response.status,
-                            "message": f"Session request failed with status {response.status}"
+            rpc_url = f"{self.url.rstrip('/')}/rpc"
+            print(f"[HttpStreamTransport] RPC 요청 URL: {rpc_url}")
+            
+            try:
+                async with self.session.post(
+                    rpc_url,
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                    timeout=aiohttp.ClientTimeout(total=10)
+                ) as response:
+                    print(f"[HttpStreamTransport] 세션 요청 응답: status={response.status}")
+                    print(f"[HttpStreamTransport] 응답 헤더: {dict(response.headers)}")
+                    
+                    if response.status == 200:
+                        data = await response.json()
+                        print(f"[HttpStreamTransport] 세션 응답 성공: {data}")
+                        self._last_response = json.dumps(data)
+                    else:
+                        response_text = await response.text()
+                        print(f"[HttpStreamTransport] 세션 요청 실패: status={response.status}, body={response_text}")
+                        error_data = {
+                            "error": {
+                                "code": response.status,
+                                "message": f"Session request failed with status {response.status}",
+                                "details": response_text
+                            }
                         }
+                        self._last_response = json.dumps(error_data)
+            except Exception as e:
+                print(f"[HttpStreamTransport] 세션 요청 예외: {e}")
+                error_data = {
+                    "error": {
+                        "message": f"Session request exception: {str(e)}"
                     }
-                    self._last_response = json.dumps(error_data)
+                }
+                self._last_response = json.dumps(error_data)
         else:
             # POST + SSE 기반 모드
+            print(f"[HttpStreamTransport] POST + SSE 기반 모드 사용")
             await self._post_stream_mode(payload)
     
     async def _try_session_mode(self) -> None:
         """세션 기반 스트림 모드 시도"""
+        stream_url = f"{self.url.rstrip('/')}/stream"
+        print(f"[HttpStreamTransport] 세션 모드 시도: URL={stream_url}")
+        
         try:
             async with self.session.get(
-                f"{self.url.rstrip('/')}/stream",
+                stream_url,
                 headers={"Accept": "text/event-stream"},
                 timeout=aiohttp.ClientTimeout(total=3)
             ) as response:
+                print(f"[HttpStreamTransport] 스트림 요청 응답: status={response.status}")
+                print(f"[HttpStreamTransport] 스트림 응답 헤더: {dict(response.headers)}")
+                
                 if response.status == 200:
+                    print(f"[HttpStreamTransport] 스트림 연결 성공, 세션 ID 대기 중...")
+                    line_count = 0
                     async for line in response.content:
+                        line_count += 1
                         line_str = line.decode('utf-8').strip()
+                        print(f"[HttpStreamTransport] 스트림 라인 {line_count}: {line_str}")
+                        
                         if line_str.startswith('data:'):
                             try:
                                 data_str = line_str[5:].strip()
                                 if data_str and data_str != '[DONE]':
                                     data = json.loads(data_str)
+                                    print(f"[HttpStreamTransport] 파싱된 스트림 데이터: {data}")
                                     if data.get("event") == "session":
                                         self.session_id = data.get("session_id")
+                                        print(f"[HttpStreamTransport] 세션 ID 획득: {self.session_id}")
                                         break
-                            except json.JSONDecodeError:
+                            except json.JSONDecodeError as e:
+                                print(f"[HttpStreamTransport] JSON 파싱 실패: {e}, data={data_str}")
                                 continue
-        except Exception:
-            pass  # 세션 모드 실패 시 POST 모드로 fallback
+                    
+                    if not self.session_id:
+                        print(f"[HttpStreamTransport] 세션 ID를 찾을 수 없음 (처리된 라인: {line_count})")
+                else:
+                    response_text = await response.text()
+                    print(f"[HttpStreamTransport] 스트림 요청 실패: status={response.status}, body={response_text}")
+        except Exception as e:
+            print(f"[HttpStreamTransport] 세션 모드 예외: {e}")
+            # 세션 모드 실패 시 POST 모드로 fallback
     
     async def _post_stream_mode(self, payload: Dict[str, Any]) -> None:
         """POST + SSE 기반 모드"""
+        print(f"[HttpStreamTransport] POST 스트림 모드 시작: URL={self.url}")
+        print(f"[HttpStreamTransport] POST payload: {payload}")
+        
         try:
             async with self.session.post(
                 self.url,
@@ -183,34 +234,46 @@ class HttpStreamTransport(Transport):
                 timeout=aiohttp.ClientTimeout(total=10)
             ) as response:
                 content_type = response.headers.get('Content-Type', '')
+                print(f"[HttpStreamTransport] POST 응답: status={response.status}, content_type={content_type}")
+                print(f"[HttpStreamTransport] POST 응답 헤더: {dict(response.headers)}")
                 
                 # 200 OK + JSON 응답인 경우 (즉시 응답)
                 if response.status == 200 and 'application/json' in content_type:
+                    print(f"[HttpStreamTransport] 즉시 JSON 응답 처리")
                     data = await response.json()
+                    print(f"[HttpStreamTransport] JSON 응답 데이터: {data}")
                     self._last_response = json.dumps(data)
                     return
                 
                 # 202 Accepted 응답인 경우 (SSE 스트림으로 전환)
                 if response.status == 202:
+                    print(f"[HttpStreamTransport] 202 Accepted, 스트림 URL 획득 시도")
                     response_data = await response.json()
+                    print(f"[HttpStreamTransport] 202 응답 데이터: {response_data}")
                     stream_url = response_data.get('stream_url') or response_data.get('endpoint') or self.url
+                    print(f"[HttpStreamTransport] 스트림 URL: {stream_url}")
                     await self._fetch_sse_stream(stream_url)
                     return
                 
                 # 200 OK + SSE 스트림인 경우 (바로 스트림 응답)
                 if response.status == 200:
+                    print(f"[HttpStreamTransport] 200 OK + SSE 스트림 처리")
                     await self._process_sse_stream(response)
                     return
                 
                 # 기타 오류
+                response_text = await response.text()
+                print(f"[HttpStreamTransport] POST 요청 실패: status={response.status}, body={response_text}")
                 error_data = {
                     "error": {
                         "code": response.status,
-                        "message": f"HTTP-Stream request failed with status {response.status}"
+                        "message": f"HTTP-Stream request failed with status {response.status}",
+                        "details": response_text
                     }
                 }
                 self._last_response = json.dumps(error_data)
         except Exception as e:
+            print(f"[HttpStreamTransport] POST 스트림 모드 예외: {e}")
             error_data = {
                 "error": {
                     "message": f"HTTP-Stream request failed: {str(e)}"
@@ -220,23 +283,33 @@ class HttpStreamTransport(Transport):
     
     async def _fetch_sse_stream(self, stream_url: str) -> None:
         """GET 요청으로 SSE 스트림 구독"""
+        print(f"[HttpStreamTransport] SSE 스트림 구독: URL={stream_url}")
+        
         try:
             async with self.session.get(
                 stream_url,
                 headers={"Accept": "text/event-stream"},
                 timeout=aiohttp.ClientTimeout(total=30)
             ) as response:
+                print(f"[HttpStreamTransport] SSE 스트림 응답: status={response.status}")
+                print(f"[HttpStreamTransport] SSE 응답 헤더: {dict(response.headers)}")
+                
                 if response.status == 200:
+                    print(f"[HttpStreamTransport] SSE 스트림 연결 성공, 데이터 처리 시작")
                     await self._process_sse_stream(response)
                 else:
+                    response_text = await response.text()
+                    print(f"[HttpStreamTransport] SSE 스트림 요청 실패: status={response.status}, body={response_text}")
                     error_data = {
                         "error": {
                             "code": response.status,
-                            "message": f"SSE stream request failed with status {response.status}"
+                            "message": f"SSE stream request failed with status {response.status}",
+                            "details": response_text
                         }
                     }
                     self._last_response = json.dumps(error_data)
         except Exception as e:
+            print(f"[HttpStreamTransport] SSE 스트림 연결 예외: {e}")
             error_data = {
                 "error": {
                     "message": f"Failed to connect to SSE stream: {str(e)}"
@@ -246,28 +319,47 @@ class HttpStreamTransport(Transport):
     
     async def _process_sse_stream(self, response: aiohttp.ClientResponse) -> None:
         """SSE 스트림 데이터 처리"""
+        print(f"[HttpStreamTransport] SSE 스트림 데이터 처리 시작")
         tools = []
+        line_count = 0
+        
         async for line in response.content:
+            line_count += 1
             line_str = line.decode('utf-8').strip()
+            print(f"[HttpStreamTransport] SSE 라인 {line_count}: {line_str}")
+            
             if line_str.startswith('data:'):
                 try:
                     data_str = line_str[5:].strip()
+                    print(f"[HttpStreamTransport] SSE 데이터: {data_str}")
+                    
                     if data_str and data_str != '[DONE]':
                         data = json.loads(data_str)
+                        print(f"[HttpStreamTransport] 파싱된 SSE 데이터: {data}")
                         
                         # 다양한 응답 형식 처리
                         if 'result' in data and 'tools' in data['result']:
                             tools = data['result']['tools']
+                            print(f"[HttpStreamTransport] result.tools 형식으로 tools 발견: {len(tools)}개")
                             break
                         elif isinstance(data, list) and len(data) > 0:
                             tools = data
+                            print(f"[HttpStreamTransport] 리스트 형식으로 tools 발견: {len(tools)}개")
                             break
                         elif 'tools' in data:
                             tools = data['tools']
+                            print(f"[HttpStreamTransport] 직접 tools 형식으로 tools 발견: {len(tools)}개")
                             break
-                except json.JSONDecodeError:
+                        else:
+                            print(f"[HttpStreamTransport] tools를 찾을 수 없는 데이터 형식")
+                    elif data_str == '[DONE]':
+                        print(f"[HttpStreamTransport] 스트림 종료 신호 [DONE] 수신")
+                        break
+                except json.JSONDecodeError as e:
+                    print(f"[HttpStreamTransport] SSE JSON 파싱 실패: {e}, data={data_str}")
                     continue
         
+        print(f"[HttpStreamTransport] SSE 처리 완료: 총 {line_count}라인, {len(tools)}개 tools")
         result_data = {
             "result": {
                 "tools": tools
