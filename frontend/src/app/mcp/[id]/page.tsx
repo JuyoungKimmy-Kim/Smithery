@@ -11,6 +11,8 @@ import {
   BookOpenIcon,
   PencilIcon,
   TrashIcon,
+  ClipboardDocumentIcon,
+  CheckIcon,
 } from "@heroicons/react/24/outline";
 import { MCPServer } from "@/types/mcp";
 import { useAuth } from "@/contexts/AuthContext";
@@ -26,6 +28,7 @@ export default function MCPServerDetail() {
   const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set());
   const [currentToolPage, setCurrentToolPage] = useState(1);
   const toolsPerPage = 3;
+  const [isConfigCopied, setIsConfigCopied] = useState(false);
 
   const toggleToolExpansion = (index: number) => {
     const newExpanded = new Set(expandedTools);
@@ -46,6 +49,28 @@ export default function MCPServerDetail() {
   const handleToolPageChange = (page: number) => {
     setCurrentToolPage(page);
     setExpandedTools(new Set()); // 페이지 변경 시 모든 도구 접기
+  };
+
+  const handleCopyConfig = async () => {
+    if (!mcp?.config) return;
+    
+    try {
+      const configString = JSON.stringify(mcp.config, null, 2);
+      await navigator.clipboard.writeText(configString);
+      setIsConfigCopied(true);
+      setTimeout(() => setIsConfigCopied(false), 2000); // 2초 후 복사 상태 초기화
+    } catch (error) {
+      console.error('Failed to copy config:', error);
+      // 클립보드 API가 지원되지 않는 경우 fallback
+      const textArea = document.createElement('textarea');
+      textArea.value = JSON.stringify(mcp.config, null, 2);
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setIsConfigCopied(true);
+      setTimeout(() => setIsConfigCopied(false), 2000);
+    }
   };
 
   useEffect(() => {
@@ -363,11 +388,34 @@ export default function MCPServerDetail() {
           {/* Config (Right) */}
           <div>
             <div className="bg-white rounded-lg shadow-sm p-8">
-              <div className="flex items-center gap-2 mb-6">
-                <WrenchScrewdriverIcon className="h-6 w-6 text-blue-500" />
-                <h2 className="text-2xl font-bold text-gray-900">
-                  Server Config
-                </h2>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <WrenchScrewdriverIcon className="h-6 w-6 text-blue-500" />
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Server Config
+                  </h2>
+                </div>
+                <button
+                  onClick={handleCopyConfig}
+                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${
+                    isConfigCopied
+                      ? 'bg-green-100 text-green-800 border border-green-300'
+                      : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                  }`}
+                  title="Copy server config to clipboard"
+                >
+                  {isConfigCopied ? (
+                    <>
+                      <CheckIcon className="h-4 w-4" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <ClipboardDocumentIcon className="h-4 w-4" />
+                      Copy
+                    </>
+                  )}
+                </button>
               </div>
               <pre className="bg-gray-100 rounded p-4 text-xs overflow-x-auto">
                 {JSON.stringify(mcp.config, null, 2)}
