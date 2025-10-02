@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 export function Navbar() {
   const [open, setOpen] = React.useState(false);
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
+  const [showSignInModal, setShowSignInModal] = React.useState(false);
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
 
@@ -22,8 +23,7 @@ export function Navbar() {
   const handleDeployClick = (e: React.MouseEvent) => {
     e.preventDefault();
     if (!isAuthenticated) {
-      alert('Sign in required.');
-      router.push('/login');
+      setShowSignInModal(true);
       return;
     }
     router.push("/submit");
@@ -44,6 +44,15 @@ export function Navbar() {
   const handleMyPageClick = () => {
     router.push('/mypage');
     setUserMenuOpen(false);
+  };
+
+  const handleSignInModalClose = () => {
+    setShowSignInModal(false);
+  };
+
+  const handleSignInModalConfirm = () => {
+    setShowSignInModal(false);
+    router.push('/login');
   };
 
   React.useEffect(() => {
@@ -175,6 +184,41 @@ export function Navbar() {
           </div>
         )}
       </nav>
+
+      {/* Sign In Required Modal */}
+      {showSignInModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-blue-100 rounded-full">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
+                Sign In Required
+              </h3>
+              <p className="text-gray-600 text-center mb-6">
+                You need to sign in to deploy a new MCP server.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleSignInModalClose}
+                  className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSignInModalConfirm}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors"
+                >
+                  Sign In
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -60,7 +60,6 @@ export function BlogPostCard({
     e.stopPropagation();
     
     if (!isAuthenticated) {
-      alert('로그인이 필요합니다.');
       router.push('/login');
       return;
     }
