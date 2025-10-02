@@ -211,11 +211,16 @@ class HttpStreamTransport(Transport):
                     
                     if not self.session_id:
                         print(f"[HttpStreamTransport] 세션 ID를 찾을 수 없음 (처리된 라인: {line_count})")
+                elif response.status == 404:
+                    print(f"[HttpStreamTransport] /stream 엔드포인트 없음 (404), POST 모드로 전환")
+                    return  # 세션 모드 실패, POST 모드로 fallback
                 else:
                     response_text = await response.text()
                     print(f"[HttpStreamTransport] 스트림 요청 실패: status={response.status}, body={response_text}")
+                    return  # 세션 모드 실패, POST 모드로 fallback
         except Exception as e:
             print(f"[HttpStreamTransport] 세션 모드 예외: {e}")
+            print(f"[HttpStreamTransport] 세션 모드 실패, POST 모드로 전환")
             # 세션 모드 실패 시 POST 모드로 fallback
     
     async def _post_stream_mode(self, payload: Dict[str, Any]) -> None:
@@ -263,7 +268,9 @@ class HttpStreamTransport(Transport):
                 
                 # 기타 오류
                 response_text = await response.text()
-                print(f"[HttpStreamTransport] POST 요청 실패: status={response.status}, body={response_text}")
+                print(f"[HttpStreamTransport] POST 요청 실패: status={response.status}")
+                print(f"[HttpStreamTransport] 에러 응답 본문: {response_text}")
+                print(f"[HttpStreamTransport] 응답 헤더: {dict(response.headers)}")
                 error_data = {
                     "error": {
                         "code": response.status,
