@@ -437,7 +437,7 @@ export default function SubmitMCPPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center py-12">
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center">
       {/* Success Modal */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -475,7 +475,7 @@ export default function SubmitMCPPage() {
         </div>
       )}
 
-      <div className="w-full max-w-4xl p-8 bg-white shadow-lg rounded-lg">
+      <div className="w-full max-w-4xl p-8 bg-white shadow-lg rounded-lg my-8">
         <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">
           Deploy a New MCP Server
         </h1>

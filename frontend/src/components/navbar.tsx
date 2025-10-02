@@ -68,7 +68,7 @@ export function Navbar() {
 
   return (
     <>
-      <nav className="border-0 sticky top-0 z-50 bg-gradient-to-b from-gray-100 to-gray-50 shadow-md border-b border-gray-300">
+      <nav className="sticky top-0 z-50 bg-blue-50 shadow-lg">
         <div className="container mx-auto flex items-center justify-between px-4 py-3">
           <a
             href="/"
@@ -136,7 +136,7 @@ export function Navbar() {
           </button>
         </div>
         {open && (
-          <div className="lg:hidden border-t border-gray-300 bg-gradient-to-b from-gray-50 to-gray-100">
+          <div className="lg:hidden bg-blue-50">
             <div className="container mx-auto px-4 py-4">
               <div className="mt-4 space-y-2">
                 <button 

@@ -3,8 +3,8 @@ const LINKS = ["Company", "About Us", "Team", "Products", "Blog"];
 
 export function Footer() {
   return (
-    <footer className="pb-5 p-10 md:pt-10 bg-gradient-to-b from-gray-100 to-gray-200 border-t border-gray-300 mt-16">
-      <div className="container flex flex-col mx-auto">
+    <footer className="bg-blue-50">
+      <div className="container flex flex-col mx-auto p-10">
         <div className="flex flex-col md:flex-row items-center !justify-between">
           <a
             href="https://www.material-tailwind.com"

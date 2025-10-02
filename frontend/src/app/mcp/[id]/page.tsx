@@ -145,8 +145,8 @@ export default function MCPServerDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="container mx-auto px-4 max-w-6xl">
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto px-4 max-w-6xl py-8">
         {/* Header Section */}
         <div className="bg-white rounded-lg shadow-sm p-8 mb-8">
           <div className="flex items-start justify-between mb-6">
