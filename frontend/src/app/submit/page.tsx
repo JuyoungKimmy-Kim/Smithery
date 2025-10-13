@@ -6,6 +6,7 @@ import { MCPServer, ProtocolType, MCPServerTool, MCPServerProperty } from "../..
 import { MCP_CATEGORIES } from "@/constants/categories";
 import { useAuth } from "@/contexts/AuthContext";
 import { PlusIcon, TrashIcon, PencilIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
+import TagSelector from "@/components/tag-selector";
 
 export default function SubmitMCPPage() {
   const router = useRouter();
@@ -20,6 +21,9 @@ export default function SubmitMCPPage() {
     url: "",
     config: ""
   });
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [allTags, setAllTags] = useState<string[]>([]);
+  const [tagCounts, setTagCounts] = useState<{[key: string]: number}>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
@@ -50,6 +54,66 @@ export default function SubmitMCPPage() {
       router.push('/login');
     }
   }, [isAuthenticated, router]);
+
+  // 모든 태그 가져오기
+  useEffect(() => {
+    const fetchAllTags = async () => {
+      try {
+        const response = await fetch('/api/posts');
+        if (response.ok) {
+          const data = await response.json();
+          
+          // 태그 추출 및 사용 빈도 계산
+          const tagCountMap: {[key: string]: number} = {};
+          data.forEach((post: any) => {
+            if (post.tags) {
+              let tagArray: string[] = [];
+              try {
+                const parsed = JSON.parse(post.tags);
+                tagArray = Array.isArray(parsed) ? parsed : [parsed];
+              } catch {
+                if (typeof post.tags === 'string') {
+                  if (post.tags.startsWith('[') && post.tags.endsWith(']')) {
+                    const cleanTags = post.tags.slice(1, -1);
+                    tagArray = cleanTags.split(',').map(tag => 
+                      tag.trim().replace(/['"]/g, '')
+                    ).filter(tag => tag.length > 0);
+                  } else {
+                    tagArray = post.tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+                  }
+                }
+              }
+              tagArray.forEach(tag => {
+                tagCountMap[tag] = (tagCountMap[tag] || 0) + 1;
+              });
+            }
+          });
+          
+          const sortedTags = Object.keys(tagCountMap).sort((a, b) => tagCountMap[b] - tagCountMap[a]);
+          setTagCounts(tagCountMap);
+          setAllTags(sortedTags);
+        }
+      } catch (error) {
+        console.error('Error fetching tags:', error);
+      }
+    };
+
+    fetchAllTags();
+  }, []);
+
+  const handleNewTagAdded = (newTag: string) => {
+    // 새 태그를 allTags에 추가하고 정렬
+    if (!allTags.includes(newTag)) {
+      const updatedTags = [...allTags, newTag].sort();
+      setAllTags(updatedTags);
+    }
+    
+    // 새 태그의 카운트를 0으로 설정
+    setTagCounts(prev => ({
+      ...prev,
+      [newTag]: 0
+    }));
+  };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -376,7 +440,7 @@ export default function SubmitMCPPage() {
         category: formData.category.trim(),
         github_link: formData.github_link.trim(),
         description: formData.description.trim(),
-        tags: formData.tags.trim(),
+        tags: selectedTags.join(', '),
         protocol: formData.protocol.trim(),
         config: config,
         tools: tools
@@ -573,18 +637,13 @@ export default function SubmitMCPPage() {
           </div>
 
           {/* Tags */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Tags (comma-separated)
-            </label>
-            <input
-              type="text"
-              value={formData.tags}
-              onChange={(e) => handleInputChange('tags', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="python, mcp, automation"
-            />
-          </div>
+          <TagSelector
+            selectedTags={selectedTags}
+            onTagsChange={setSelectedTags}
+            allTags={allTags}
+            tagCounts={tagCounts}
+            onNewTagAdded={handleNewTagAdded}
+          />
 
           {/* Protocol */}
           <div>
