@@ -14,6 +14,7 @@ interface BlogPostCardProps {
   date: string;
   id?: string; // MCP 서버 ID 추가
   onFavoriteChange?: () => void; // 즐겨찾기 상태 변경 콜백
+  onTagClick?: (tag: string) => void; // 태그 클릭 콜백
 }
 
 export function BlogPostCard({
@@ -25,6 +26,7 @@ export function BlogPostCard({
   date,
   id,
   onFavoriteChange,
+  onTagClick,
 }: BlogPostCardProps) {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
@@ -153,7 +155,7 @@ export function BlogPostCard({
           {desc}
         </p>
         <div className="mb-4">
-          <TagList tags={tags} maxTags={4} />
+          <TagList tags={tags} maxTags={4} onTagClick={onTagClick} />
         </div>
         <div 
           className="flex items-center gap-4 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors mt-auto"
