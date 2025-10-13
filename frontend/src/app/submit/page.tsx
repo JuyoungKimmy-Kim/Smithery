@@ -73,15 +73,15 @@ export default function SubmitMCPPage() {
                 if (typeof post.tags === 'string') {
                   if (post.tags.startsWith('[') && post.tags.endsWith(']')) {
                     const cleanTags = post.tags.slice(1, -1);
-                    tagArray = cleanTags.split(',').map(tag => 
+                    tagArray = cleanTags.split(',').map((tag: string) => 
                       tag.trim().replace(/['"]/g, '')
-                    ).filter(tag => tag.length > 0);
+                    ).filter((tag: string) => tag.length > 0);
                   } else {
-                    tagArray = post.tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+                    tagArray = post.tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0);
                   }
                 }
               }
-              tagArray.forEach(tag => {
+              tagArray.forEach((tag: string) => {
                 tagCountMap[tag] = (tagCountMap[tag] || 0) + 1;
               });
             }
@@ -717,7 +717,7 @@ export default function SubmitMCPPage() {
                 </button>
               </div>
               <div className="space-y-3">
-                {previewTools.map((tool, index) => (
+                {previewTools.map((tool: any, index: number) => (
                   <div key={index} className="bg-white rounded-lg p-3 border border-green-200">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -793,7 +793,7 @@ export default function SubmitMCPPage() {
 
             {tools.length > 0 && (
               <div className="space-y-3 mb-4">
-                {tools.map((tool, index) => (
+                {tools.map((tool: MCPServerTool, index: number) => (
                   <div key={index} className="border border-gray-200 rounded-lg p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -803,7 +803,7 @@ export default function SubmitMCPPage() {
                           <div className="mt-2">
                             <p className="text-xs font-medium text-gray-700 mb-1">Parameters:</p>
                             <div className="space-y-1">
-                              {tool.parameters.map((param, paramIndex) => (
+                              {tool.parameters.map((param: MCPServerProperty, paramIndex: number) => (
                                 <div key={paramIndex} className="text-xs text-gray-600">
                                   • {param.name} 
                                   {param.type && <span className="text-blue-600"> ({param.type})</span>}
@@ -903,7 +903,7 @@ export default function SubmitMCPPage() {
                       
                       {toolForm.parameters.length > 0 && (
                         <div className="space-y-2 mb-2">
-                          {toolForm.parameters.map((param, index) => (
+                          {toolForm.parameters.map((param: MCPServerProperty, index: number) => (
                             <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
                               <span className="text-sm font-medium">{param.name}</span>
                               {param.type && <span className="text-xs text-blue-600">({param.type})</span>}
