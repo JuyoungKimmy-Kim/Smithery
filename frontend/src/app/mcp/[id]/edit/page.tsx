@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { MCPServer, ProtocolType, MCPServerTool, MCPServerProperty } from "../../../../types/mcp";
-import { MCP_CATEGORIES } from "@/constants/categories";
 import { useAuth } from "@/contexts/AuthContext";
 import { PlusIcon, TrashIcon, PencilIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import TagSelector from "@/components/tag-selector";
@@ -15,7 +14,6 @@ export default function EditMCPServerPage() {
   const [mcp, setMcp] = useState<MCPServer | null>(null);
   const [formData, setFormData] = useState({
     name: "",
-    category: "",
     github_link: "",
     description: "",
     tags: "",
@@ -139,7 +137,6 @@ export default function EditMCPServerPage() {
           
           setFormData({
             name: data.name || "",
-            category: data.category || "",
             github_link: data.github_link || "",
             description: data.description || "",
             tags: formatTagsToString(data.tags),
@@ -322,9 +319,6 @@ export default function EditMCPServerPage() {
   const validateForm = () => {
     const errors: {[key: string]: string} = {};
     
-    if (!formData.category.trim()) {
-      errors.category = "Category는 필수입니다.";
-    }
     
     if (!formData.description.trim()) {
       errors.description = "Description은 필수입니다.";
@@ -370,7 +364,6 @@ export default function EditMCPServerPage() {
 
       const updateData = {
         description: formData.description.trim(),
-        category: formData.category.trim(),
         protocol: formData.protocol.trim(),
         tags: selectedTags.join(', '),
         config: config,
@@ -536,30 +529,6 @@ export default function EditMCPServerPage() {
             )}
           </div>
           
-           {/* Category */}
-           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Category *
-            </label>
-            <select
-              required
-              value={formData.category}
-              onChange={(e) => handleInputChange('category', e.target.value)}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                validationErrors.category ? 'border-red-500' : 'border-gray-300'
-              }`}
-            >
-              <option value="">카테고리를 선택하세요</option>
-              {MCP_CATEGORIES.map((category) => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
-            </select>
-            {validationErrors.category && (
-              <p className="mt-1 text-sm text-red-600">{validationErrors.category}</p>
-            )}
-          </div>
 
           {/* Tags */}
           <TagSelector

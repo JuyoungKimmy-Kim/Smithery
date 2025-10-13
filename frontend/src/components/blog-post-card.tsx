@@ -122,7 +122,7 @@ export function BlogPostCard({
 
   return (
     <div 
-      className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 cursor-pointer relative h-80 flex flex-col"
+      className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 cursor-pointer relative h-80 flex flex-col border border-gray-200"
       onClick={handleClick}
     >
       {/* 즐겨찾기 버튼 */}
@@ -145,9 +145,6 @@ export function BlogPostCard({
       </div>
 
       <div className="p-6 flex flex-col h-full">
-        <span className="text-sm font-medium text-blue-600 mb-2 block">
-          {category}
-        </span>
         <h3 className="text-xl font-semibold text-gray-900 mb-2 normal-case transition-colors hover:text-gray-700 cursor-pointer line-clamp-2">
           {title}
         </h3>

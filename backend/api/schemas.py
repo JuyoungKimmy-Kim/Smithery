@@ -2,7 +2,6 @@ from pydantic import BaseModel, HttpUrl
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
-# User 관련 스키마
 class UserCreate(BaseModel):
     username: str
     email: str
@@ -27,11 +26,10 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# Tool 관련 스키마
 class MCPServerPropertyCreate(BaseModel):
     name: str
     description: Optional[str] = None
-    type: Optional[str] = None  # type 필드 추가
+    type: Optional[str] = None
     required: bool = False
 
 class MCPServerToolCreate(BaseModel):
@@ -39,25 +37,24 @@ class MCPServerToolCreate(BaseModel):
     description: str
     parameters: List[MCPServerPropertyCreate] = []
 
-# MCP Server 관련 스키마
 class MCPServerCreate(BaseModel):
     name: str
     github_link: str
     description: str
-    category: str
-    protocol: str  # 프로토콜 타입 추가
-    tags: Optional[str] = None  # 콤마로 구분된 태그 문자열
+    category: Optional[str] = None
+    protocol: str
+    tags: Optional[str] = None
     config: Optional[Dict[str, Any]] = None
-    tools: Optional[List[MCPServerToolCreate]] = []  # tools 추가
+    tools: Optional[List[MCPServerToolCreate]] = []
 
 class MCPServerUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     category: Optional[str] = None
-    protocol: Optional[str] = None  # 프로토콜 타입 추가
+    protocol: Optional[str] = None
     tags: Optional[str] = None
     config: Optional[Dict[str, Any]] = None
-    tools: Optional[List[MCPServerToolCreate]] = []  # tools 추가
+    tools: Optional[List[MCPServerToolCreate]] = []
 
 class MCPServerToolResponse(BaseModel):
     id: int
@@ -72,7 +69,7 @@ class MCPServerPropertyResponse(BaseModel):
     id: int
     name: str
     description: Optional[str] = None
-    type: Optional[str] = None  # type 필드 추가
+    type: Optional[str] = None
     required: bool = False
     
     class Config:
@@ -83,9 +80,9 @@ class MCPServerResponse(BaseModel):
     name: str
     github_link: str
     description: str
-    category: str
+    category: Optional[str] = None
     status: str
-    protocol: str  # 프로토콜 타입 추가
+    protocol: str
     config: Optional[Dict[str, Any]] = None
     owner_id: int
     created_at: datetime
@@ -104,7 +101,6 @@ class TagResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# 검색 관련 스키마
 class SearchRequest(BaseModel):
     keyword: str
     category: Optional[str] = None
@@ -114,7 +110,6 @@ class SearchResponse(BaseModel):
     mcp_servers: List[MCPServerResponse]
     total_count: int
 
-# 즐겨찾기 관련 스키마
 class FavoriteRequest(BaseModel):
     mcp_server_id: int
 
@@ -122,15 +117,13 @@ class FavoriteResponse(BaseModel):
     success: bool
     message: str
 
-# 관리자 승인 관련 스키마
 class AdminApprovalRequest(BaseModel):
     mcp_server_id: int
-    action: str  # 'approve' 또는 'reject'
+    action: str
 
-# MCP Tools 미리보기 관련 스키마
 class PreviewToolsRequest(BaseModel):
     url: str
-    protocol: str  # 'http', 'http-stream', 'websocket', 'stdio'
+    protocol: str
 
 class PreviewToolResponse(BaseModel):
     name: str

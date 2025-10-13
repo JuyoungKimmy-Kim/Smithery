@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { MCPServer, ProtocolType, MCPServerTool, MCPServerProperty } from "../../types/mcp";
-import { MCP_CATEGORIES } from "@/constants/categories";
 import { useAuth } from "@/contexts/AuthContext";
 import { PlusIcon, TrashIcon, PencilIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import TagSelector from "@/components/tag-selector";
@@ -13,7 +12,6 @@ export default function SubmitMCPPage() {
   const { token, isAuthenticated } = useAuth();
   const [formData, setFormData] = useState({
     name: "",
-    category: "",
     github_link: "",
     description: "",
     tags: "",
@@ -371,9 +369,6 @@ export default function SubmitMCPPage() {
       errors.name = "Server Name은 필수입니다.";
     }
     
-    if (!formData.category.trim()) {
-      errors.category = "Category는 필수입니다.";
-    }
     
     if (!formData.github_link.trim()) {
       errors.github_link = "GitHub Link는 필수입니다.";
@@ -437,7 +432,6 @@ export default function SubmitMCPPage() {
 
       const mcpServerData = {
         name: formData.name.trim(),
-        category: formData.category.trim(),
         github_link: formData.github_link.trim(),
         description: formData.description.trim(),
         tags: selectedTags.join(', '),
@@ -571,30 +565,6 @@ export default function SubmitMCPPage() {
             )}
           </div>
           
-          {/* Category */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Category *
-            </label>
-            <select
-              required
-              value={formData.category}
-              onChange={(e) => handleInputChange('category', e.target.value)}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                validationErrors.category ? 'border-red-500' : 'border-gray-300'
-              }`}
-            >
-              <option value="">Select a category</option>
-              {MCP_CATEGORIES.map((category) => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
-            </select>
-            {validationErrors.category && (
-              <p className="mt-1 text-sm text-red-600">{validationErrors.category}</p>
-            )}
-          </div>
 
           {/* GitHub Link */}
           <div>
