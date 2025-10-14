@@ -9,7 +9,6 @@ class MCPServerDAO:
     
     def create_mcp_server(self, mcp_server_data: Dict[str, Any], owner_id: int, tags: List[str] = None) -> MCPServer:
         """새 MCP 서버를 생성합니다."""
-        # 태그 처리
         tag_objects = []
         if tags:
             for tag_name in tags:
@@ -24,9 +23,9 @@ class MCPServerDAO:
             name=mcp_server_data['name'],
             github_link=mcp_server_data['github_link'],
             description=mcp_server_data['description'],
-            category=mcp_server_data['category'],
-            status='pending',  # 승인 대기 상태로 생성
-            protocol=mcp_server_data.get('protocol', 'http'),  # 기본값은 http
+            category=mcp_server_data.get('category'),
+            status='pending',
+            protocol=mcp_server_data.get('protocol', 'http'),
             config=mcp_server_data.get('config'),
             owner_id=owner_id,
             tags=tag_objects
@@ -88,21 +87,17 @@ class MCPServerDAO:
         if not mcp_server:
             return None
         
-        # 기본 필드 업데이트
         for field in ['name', 'description', 'category', 'protocol', 'config']:
             if field in mcp_server_data and mcp_server_data[field] is not None:
                 setattr(mcp_server, field, mcp_server_data[field])
         
-        # 태그 업데이트
         if 'tags' in mcp_server_data and mcp_server_data['tags'] is not None:
             tags = mcp_server_data['tags']
             if isinstance(tags, str):
                 tags = [tag.strip() for tag in tags.split(',') if tag.strip()]
             
-            # 기존 태그 제거
             mcp_server.tags.clear()
             
-            # 새 태그 추가
             for tag_name in tags:
                 tag = self.db.query(Tag).filter(Tag.name == tag_name).first()
                 if not tag:
@@ -119,10 +114,8 @@ class MCPServerDAO:
         """MCP 서버를 삭제합니다."""
         mcp_server = self.get_mcp_server_by_id(mcp_server_id)
         if mcp_server:
-            # 먼저 관련된 즐겨찾기 데이터 삭제
             self.db.query(UserFavorite).filter(UserFavorite.mcp_server_id == mcp_server_id).delete()
             
-            # MCP 서버 삭제
             self.db.delete(mcp_server)
             self.db.commit()
             return True
@@ -143,12 +136,11 @@ class MCPServerDAO:
             self.db.add(tool)
             self.db.flush()
             
-            # 파라미터 추가
             for param_data in tool_data.get('parameters', []):
                 param = MCPServerProperty(
                     name=param_data['name'],
                     description=param_data.get('description'),
-                    type=param_data.get('type'),  # type 필드 추가
+                    type=param_data.get('type'),
                     required=param_data.get('required', False),
                     tool_id=tool.id
                 )

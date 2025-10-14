@@ -4,9 +4,10 @@ import Tag from "./tag";
 interface TagListProps {
   tags: string | undefined | null;
   maxTags?: number;
+  onTagClick?: (tag: string) => void;
 }
 
-export function TagList({ tags, maxTags = 5 }: TagListProps) {
+export function TagList({ tags, maxTags = 5, onTagClick }: TagListProps) {
   // tags가 undefined, null, 또는 빈 문자열인 경우 빈 배열 반환
   if (!tags || (typeof tags === 'string' && tags.trim() === '')) {
     return <div className="flex flex-wrap gap-2"></div>;
@@ -59,6 +60,7 @@ export function TagList({ tags, maxTags = 5 }: TagListProps) {
           text={tag}
           color={tagColors[index % tagColors.length] as any}
           size="sm"
+          onClick={onTagClick}
         />
       ))}
       {remainingCount > 0 && (

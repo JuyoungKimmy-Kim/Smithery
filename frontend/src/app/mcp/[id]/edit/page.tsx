@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { MCPServer, ProtocolType, MCPServerTool, MCPServerProperty } from "../../../../types/mcp";
-import { MCP_CATEGORIES } from "@/constants/categories";
 import { useAuth } from "@/contexts/AuthContext";
 import { PlusIcon, TrashIcon, PencilIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
+import TagSelector from "@/components/tag-selector";
 
 export default function EditMCPServerPage() {
   const params = useParams();
@@ -14,7 +14,6 @@ export default function EditMCPServerPage() {
   const [mcp, setMcp] = useState<MCPServer | null>(null);
   const [formData, setFormData] = useState({
     name: "",
-    category: "",
     github_link: "",
     description: "",
     tags: "",
@@ -22,6 +21,9 @@ export default function EditMCPServerPage() {
     url: "",
     config: ""
   });
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [allTags, setAllTags] = useState<string[]>([]);
+  const [tagCounts, setTagCounts] = useState<{[key: string]: number}>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -65,6 +67,66 @@ export default function EditMCPServerPage() {
     }
   }, [isAuthenticated, router]);
 
+  // 모든 태그 가져오기
+  useEffect(() => {
+    const fetchAllTags = async () => {
+      try {
+        const response = await fetch('/api/posts');
+        if (response.ok) {
+          const data = await response.json();
+          
+          // 태그 추출 및 사용 빈도 계산
+          const tagCountMap: {[key: string]: number} = {};
+          data.forEach((post: any) => {
+            if (post.tags) {
+              let tagArray: string[] = [];
+              try {
+                const parsed = JSON.parse(post.tags);
+                tagArray = Array.isArray(parsed) ? parsed : [parsed];
+              } catch {
+                if (typeof post.tags === 'string') {
+                  if (post.tags.startsWith('[') && post.tags.endsWith(']')) {
+                    const cleanTags = post.tags.slice(1, -1);
+                    tagArray = cleanTags.split(',').map((tag: string) => 
+                      tag.trim().replace(/['"]/g, '')
+                    ).filter((tag: string) => tag.length > 0);
+                  } else {
+                    tagArray = post.tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0);
+                  }
+                }
+              }
+              tagArray.forEach((tag: string) => {
+                tagCountMap[tag] = (tagCountMap[tag] || 0) + 1;
+              });
+            }
+          });
+          
+          const sortedTags = Object.keys(tagCountMap).sort((a, b) => tagCountMap[b] - tagCountMap[a]);
+          setTagCounts(tagCountMap);
+          setAllTags(sortedTags);
+        }
+      } catch (error) {
+        console.error('Error fetching tags:', error);
+      }
+    };
+
+    fetchAllTags();
+  }, []);
+
+  const handleNewTagAdded = (newTag: string) => {
+    // 새 태그를 allTags에 추가하고 정렬
+    if (!allTags.includes(newTag)) {
+      const updatedTags = [...allTags, newTag].sort();
+      setAllTags(updatedTags);
+    }
+    
+    // 새 태그의 카운트를 0으로 설정
+    setTagCounts(prev => ({
+      ...prev,
+      [newTag]: 0
+    }));
+  };
+
   useEffect(() => {
     const fetchMCP = async () => {
       try {
@@ -75,7 +137,6 @@ export default function EditMCPServerPage() {
           
           setFormData({
             name: data.name || "",
-            category: data.category || "",
             github_link: data.github_link || "",
             description: data.description || "",
             tags: formatTagsToString(data.tags),
@@ -83,6 +144,13 @@ export default function EditMCPServerPage() {
             url: data.config?.url || "",
             config: data.config ? JSON.stringify(data.config, null, 2) : ""
           });
+
+          // 기존 태그를 선택된 태그로 설정
+          const existingTags = formatTagsToString(data.tags);
+          if (existingTags) {
+            const tagArray = existingTags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0);
+            setSelectedTags(tagArray);
+          }
           
           setTools(data.tools || []);
         } else {
@@ -251,9 +319,6 @@ export default function EditMCPServerPage() {
   const validateForm = () => {
     const errors: {[key: string]: string} = {};
     
-    if (!formData.category.trim()) {
-      errors.category = "Category는 필수입니다.";
-    }
     
     if (!formData.description.trim()) {
       errors.description = "Description은 필수입니다.";
@@ -299,9 +364,8 @@ export default function EditMCPServerPage() {
 
       const updateData = {
         description: formData.description.trim(),
-        category: formData.category.trim(),
         protocol: formData.protocol.trim(),
-        tags: formData.tags.trim(),
+        tags: selectedTags.join(', '),
         config: config,
         tools: tools
       };
@@ -465,44 +529,15 @@ export default function EditMCPServerPage() {
             )}
           </div>
           
-           {/* Category */}
-           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Category *
-            </label>
-            <select
-              required
-              value={formData.category}
-              onChange={(e) => handleInputChange('category', e.target.value)}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                validationErrors.category ? 'border-red-500' : 'border-gray-300'
-              }`}
-            >
-              <option value="">카테고리를 선택하세요</option>
-              {MCP_CATEGORIES.map((category) => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
-            </select>
-            {validationErrors.category && (
-              <p className="mt-1 text-sm text-red-600">{validationErrors.category}</p>
-            )}
-          </div>
 
           {/* Tags */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Tags (comma separated)
-            </label>
-            <input
-              type="text"
-              value={formData.tags}
-              onChange={(e) => handleInputChange('tags', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="github, code, api, test"
-            />
-          </div>
+          <TagSelector
+            selectedTags={selectedTags}
+            onTagsChange={setSelectedTags}
+            allTags={allTags}
+            tagCounts={tagCounts}
+            onNewTagAdded={handleNewTagAdded}
+          />
           
           {/* Protocol */}
           <div>
@@ -599,7 +634,7 @@ export default function EditMCPServerPage() {
 
             {tools.length > 0 && (
               <div className="space-y-3 mb-4">
-                {tools.map((tool, index) => (
+                {tools.map((tool: MCPServerTool, index: number) => (
                   <div key={index} className="border border-gray-200 rounded-lg p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -609,7 +644,7 @@ export default function EditMCPServerPage() {
                           <div className="mt-2">
                             <p className="text-xs font-medium text-gray-700 mb-1">Parameters:</p>
                             <div className="space-y-1">
-                              {tool.parameters.map((param, paramIndex) => (
+                              {tool.parameters.map((param: MCPServerProperty, paramIndex: number) => (
                                 <div key={paramIndex} className="text-xs text-gray-600">
                                   • {param.name} 
                                   {param.type && <span className="text-blue-600"> ({param.type})</span>}
@@ -695,7 +730,7 @@ export default function EditMCPServerPage() {
                       
                       {toolForm.parameters.length > 0 && (
                         <div className="space-y-2 mb-2">
-                          {toolForm.parameters.map((param, index) => (
+                          {toolForm.parameters.map((param: MCPServerProperty, index: number) => (
                             <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
                               <span className="text-sm font-medium">{param.name}</span>
                               {param.type && <span className="text-xs text-blue-600">({param.type})</span>}

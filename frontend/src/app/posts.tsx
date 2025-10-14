@@ -1,10 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ArrowSmallDownIcon } from "@heroicons/react/24/solid";
+import { ArrowSmallDownIcon, CheckIcon, PlusIcon } from "@heroicons/react/24/solid";
 import BlogPostCard from "@/components/blog-post-card";
 import { MCPServer } from "@/types/mcp";
-import { MCP_CATEGORIES } from "@/constants/categories";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface Post {
@@ -29,7 +28,9 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [allPosts, setAllPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("All");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [allTags, setAllTags] = useState<string[]>([]);
+  const [tagCounts, setTagCounts] = useState<{[key: string]: number}>({});
   const [visibleCount, setVisibleCount] = useState(6); // 초기 6개 카드만 보이도록
   const [refreshKey, setRefreshKey] = useState(0); // 즐겨찾기 상태 변경 시 리프레시용
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm); // 검색어 상태 추가
@@ -57,6 +58,39 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
           
           setAllPosts(data);
           setPosts(data);
+          
+          // 모든 태그 추출 및 사용 빈도 계산
+          const tagCountMap: {[key: string]: number} = {};
+          data.forEach((post: Post) => {
+            if (post.tags) {
+              // 태그 파싱 (JSON, 배열 형태, 쉼표 구분 문자열 등 처리)
+              let tagArray: string[] = [];
+              try {
+                const parsed = JSON.parse(post.tags);
+                tagArray = Array.isArray(parsed) ? parsed : [parsed];
+              } catch {
+                if (typeof post.tags === 'string') {
+                  if (post.tags.startsWith('[') && post.tags.endsWith(']')) {
+                    const cleanTags = post.tags.slice(1, -1);
+                    tagArray = cleanTags.split(',').map(tag => 
+                      tag.trim().replace(/['"]/g, '')
+                    ).filter(tag => tag.length > 0);
+                  } else {
+                    tagArray = post.tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+                  }
+                }
+              }
+              tagArray.forEach(tag => {
+                tagCountMap[tag] = (tagCountMap[tag] || 0) + 1;
+              });
+            }
+          });
+          
+          // 사용 빈도순으로 정렬 (많이 사용된 순서)
+          const sortedTags = Object.keys(tagCountMap).sort((a, b) => tagCountMap[b] - tagCountMap[a]);
+          
+          setTagCounts(tagCountMap);
+          setAllTags(sortedTags);
         } else {
           console.error('Failed to fetch posts, status:', response.status);
           const errorText = await response.text();
@@ -75,7 +109,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
   // 검색 기능 추가
   const handleSearch = (searchTerm: string) => {
     setSearchTerm(searchTerm);
-    setActiveTab("All"); // 검색 시 All 탭으로 리셋
+    setSelectedTags([]); // 검색 시 태그 선택 리셋
     setVisibleCount(6); // 검색 시 초기 6개로 리셋
     
     if (!searchTerm.trim()) {
@@ -96,13 +130,47 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
     setPosts(filteredPosts);
   };
 
-  // 탭 변경 시 필터링
-  const handleTabChange = (category: string) => {
-    setActiveTab(category);
-    setVisibleCount(6); // 탭 변경 시 초기 6개로 리셋
+  // 태그 토글 핸들러 (선택/해제)
+  const handleTagToggle = (tag: string) => {
+    setVisibleCount(6); // 태그 변경 시 초기 6개로 리셋
     
-    if (category === "All") {
-      // 검색어가 있으면 검색 결과를 유지, 없으면 전체 표시
+    setSelectedTags(prev => {
+      const newSelectedTags = prev.includes(tag)
+        ? prev.filter(t => t !== tag) // 이미 선택된 태그면 제거
+        : [...prev, tag]; // 선택되지 않은 태그면 추가
+      
+      // 필터링 적용
+      applyTagFilter(newSelectedTags);
+      return newSelectedTags;
+    });
+  };
+
+  // 모든 태그 선택 해제
+  const handleClearTags = () => {
+    setSelectedTags([]);
+    setVisibleCount(6);
+    
+    // 검색어가 있으면 검색 결과를 유지, 없으면 전체 표시
+    if (searchTerm.trim()) {
+      const filteredPosts = allPosts.filter(post => {
+        const searchLower = searchTerm.toLowerCase();
+        return (
+          post.title.toLowerCase().includes(searchLower) ||
+          post.desc.toLowerCase().includes(searchLower) ||
+          post.tags.toLowerCase().includes(searchLower) ||
+          post.category.toLowerCase().includes(searchLower)
+        );
+      });
+      setPosts(filteredPosts);
+    } else {
+      setPosts(allPosts);
+    }
+  };
+
+  // 태그 필터 적용
+  const applyTagFilter = (tagsToFilter: string[]) => {
+    if (tagsToFilter.length === 0) {
+      // 선택된 태그가 없으면 검색어 필터만 적용
       if (searchTerm.trim()) {
         const filteredPosts = allPosts.filter(post => {
           const searchLower = searchTerm.toLowerCase();
@@ -118,9 +186,33 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
         setPosts(allPosts);
       }
     } else {
-      // 카테고리 필터링 + 검색어 필터링
-      let filteredPosts = allPosts.filter(post => post.category === category);
+      // 선택된 태그 중 하나라도 포함하는 포스트 필터링
+      let filteredPosts = allPosts.filter(post => {
+        if (!post.tags) return false;
+        
+        // 태그 파싱
+        let tagArray: string[] = [];
+        try {
+          const parsed = JSON.parse(post.tags);
+          tagArray = Array.isArray(parsed) ? parsed : [parsed];
+        } catch {
+          if (typeof post.tags === 'string') {
+            if (post.tags.startsWith('[') && post.tags.endsWith(']')) {
+              const cleanTags = post.tags.slice(1, -1);
+              tagArray = cleanTags.split(',').map(t => 
+                t.trim().replace(/['"]/g, '')
+              ).filter(t => t.length > 0);
+            } else {
+              tagArray = post.tags.split(',').map(t => t.trim()).filter(t => t.length > 0);
+            }
+          }
+        }
+        
+        // 선택된 태그 중 하나라도 포함하는지 확인 (OR 조건)
+        return tagsToFilter.some(selectedTag => tagArray.includes(selectedTag));
+      });
       
+      // 검색어 필터링 추가
       if (searchTerm.trim()) {
         filteredPosts = filteredPosts.filter(post => {
           const searchLower = searchTerm.toLowerCase();
@@ -135,6 +227,11 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
       
       setPosts(filteredPosts);
     }
+  };
+
+  // 태그 클릭 핸들러
+  const handleTagClick = (tag: string) => {
+    handleTagToggle(tag);
   };
 
   // VIEW MORE 버튼 클릭 시 더 많은 카드 표시
@@ -163,34 +260,32 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
           </div>
         )}
 
-        {/* 카테고리 탭 영역 */}
-        <div className="w-full flex mb-8 flex-col items-center">
-          <div className="h-10 w-full md:w-[50rem] border border-gray-300 rounded-lg bg-white bg-opacity-90 flex">
-            <button
-              onClick={() => handleTabChange("All")}
-              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors rounded-l-lg ${
-                activeTab === "All"
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              All
-            </button>
-            {MCP_CATEGORIES.map((category) => (
-              <button
-                key={category}
-                onClick={() => handleTabChange(category)}
-                className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                  activeTab === category
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-700 hover:bg-gray-100'
-                } ${category === MCP_CATEGORIES[MCP_CATEGORIES.length - 1] ? 'rounded-r-lg' : ''}`}
-              >
-                {category}
-              </button>
-            ))}
+        {/* 태그 선택 영역 */}
+        {allTags.length > 0 && (
+          <div className="w-full flex mb-8 flex-col items-center">
+            <div className="flex flex-wrap gap-2 justify-center max-w-5xl">
+              {allTags.map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() => handleTagToggle(tag)}
+                  className={`px-4 py-2 text-sm font-medium transition-all duration-200 rounded-full flex items-center gap-2 ${
+                    selectedTags.includes(tag)
+                      ? 'bg-blue-500 text-white shadow-md scale-105'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <span>{tag}</span>
+                  <span className="text-xs opacity-75">({tagCounts[tag]})</span>
+                  {selectedTags.includes(tag) ? (
+                    <CheckIcon className="h-4 w-4" />
+                  ) : (
+                    <PlusIcon className="h-4 w-4" />
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* 카드 영역 */}
         {loading ? (
@@ -204,7 +299,9 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
             <h3 className="text-lg text-gray-600">
               {searchTerm 
                 ? `"${searchTerm}"에 대한 검색 결과가 없습니다.`
-                : `No MCP servers found in ${activeTab} category.`
+                : selectedTags.length > 0
+                ? `선택한 태그에 해당하는 MCP 서버가 없습니다.`
+                : `등록된 MCP 서버가 없습니다.`
               }
             </h3>
           </div>
@@ -225,6 +322,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                   }}
                   id={id}
                   onFavoriteChange={handleFavoriteChange}
+                  onTagClick={handleTagClick}
                 />
               ))}
             </div>
