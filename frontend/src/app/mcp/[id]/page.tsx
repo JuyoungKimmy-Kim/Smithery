@@ -16,6 +16,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { MCPServer } from "@/types/mcp";
 import { useAuth } from "@/contexts/AuthContext";
+import Comments from "@/components/comments";
 
 export default function MCPServerDetail() {
   const params = useParams();
@@ -508,6 +509,11 @@ export default function MCPServerDetail() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* 댓글 섹션 */}
+        <div className="mt-8">
+          <Comments mcpServerId={mcp.id} />
         </div>
       </div>
     </div>
