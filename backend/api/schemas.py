@@ -19,6 +19,7 @@ class UserResponse(BaseModel):
     id: int
     username: str
     email: str
+    nickname: str
     is_admin: str
     avatar_url: Optional[str] = None
     created_at: datetime

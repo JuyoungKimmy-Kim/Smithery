@@ -7,7 +7,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.database import init_database
-from backend.api import auth_router, mcp_servers_router
+from backend.api import auth_router, mcp_servers_router, comments_router
 
 # FastAPI 앱 생성
 app = FastAPI(
@@ -28,6 +28,7 @@ app.add_middleware(
 # 라우터 등록
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(mcp_servers_router, prefix="/api/v1")
+app.include_router(comments_router, prefix="/api/v1")
 
 @app.on_event("startup")
 async def startup_event():
