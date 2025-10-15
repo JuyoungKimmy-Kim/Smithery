@@ -99,6 +99,13 @@ def get_mcp_servers(
     else:
         return mcp_service.get_approved_mcp_servers(limit, offset)
 
+@router.get("/{mcp_server_id}/favorites/count")
+def get_mcp_server_favorites_count(mcp_server_id: int, db: Session = Depends(get_db)):
+    """특정 MCP 서버의 즐겨찾기 수를 조회합니다."""
+    mcp_service = MCPServerService(db)
+    count = mcp_service.get_mcp_server_favorites_count(mcp_server_id)
+    return {"mcp_server_id": mcp_server_id, "favorites_count": count}
+
 @router.get("/{mcp_server_id}", response_model=MCPServerResponse)
 def get_mcp_server(mcp_server_id: int, db: Session = Depends(get_db)):
     """특정 MCP 서버의 상세 정보를 조회합니다."""

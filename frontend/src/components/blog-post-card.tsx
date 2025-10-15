@@ -32,13 +32,29 @@ export function BlogPostCard({
   const { isAuthenticated } = useAuth();
   const [isFavorite, setIsFavorite] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [favoritesCount, setFavoritesCount] = useState(0);
 
-  // 즐겨찾기 상태 확인
+  // 즐겨찾기 상태 및 수 확인
   useEffect(() => {
-    if (isAuthenticated && id) {
-      checkFavoriteStatus();
+    if (id) {
+      fetchFavoritesCount();
+      if (isAuthenticated) {
+        checkFavoriteStatus();
+      }
     }
   }, [isAuthenticated, id]);
+
+  const fetchFavoritesCount = async () => {
+    try {
+      const response = await fetch(`/api/mcp-servers/${id}/favorites/count`);
+      if (response.ok) {
+        const data = await response.json();
+        setFavoritesCount(data.favorites_count);
+      }
+    } catch (error) {
+      console.error('Error fetching favorites count:', error);
+    }
+  };
 
   const checkFavoriteStatus = async () => {
     try {
@@ -84,6 +100,8 @@ export function BlogPostCard({
         const data = await response.json();
         console.log('Favorite toggle response:', data);
         setIsFavorite(!isFavorite);
+        // 즐겨찾기 수 새로고침
+        await fetchFavoritesCount();
         // 부모 컴포넌트에 즐겨찾기 상태 변경 알림
         if (onFavoriteChange) {
           onFavoriteChange();
@@ -125,22 +143,23 @@ export function BlogPostCard({
       className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 cursor-pointer relative h-71 flex flex-col border border-gray-200"
       onClick={handleClick}
     >
-      {/* 즐겨찾기 버튼 */}
+      {/* GitHub 스타일 스타 버튼 */}
       <div className="absolute top-4 right-4 z-10">
         <button
           onClick={handleFavoriteClick}
           disabled={isLoading}
-          className={`p-2 rounded-full transition-all duration-200 ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm font-medium transition-all duration-200 ${
             isFavorite 
-              ? 'text-yellow-500 hover:text-yellow-600' 
-              : 'text-gray-400 hover:text-yellow-500'
-          } ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110'}`}
+              ? 'bg-yellow-50 border-yellow-300 text-yellow-700 hover:bg-yellow-100' 
+              : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+          } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           {isFavorite ? (
-            <StarIconSolid className="h-5 w-5" />
+            <StarIconSolid className="h-4 w-4" />
           ) : (
-            <StarIcon className="h-5 w-5" />
+            <StarIcon className="h-4 w-4" />
           )}
+          <span>{favoritesCount}</span>
         </button>
       </div>
 

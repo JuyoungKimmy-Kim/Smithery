@@ -154,3 +154,9 @@ class MCPServerDAO:
         return self.db.query(MCPServer).options(
             joinedload(MCPServer.tools).joinedload(MCPServerTool.parameters)
         ).filter(MCPServer.id == mcp_server_id).first()
+    
+    def get_mcp_server_favorites_count(self, mcp_server_id: int) -> int:
+        """특정 MCP 서버의 즐겨찾기 수를 조회합니다."""
+        return self.db.query(UserFavorite).filter(
+            UserFavorite.mcp_server_id == mcp_server_id
+        ).count()
