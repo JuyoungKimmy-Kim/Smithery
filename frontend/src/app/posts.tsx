@@ -57,10 +57,24 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
           console.log('Number of posts:', data.length); // 포스트 개수 확인
           console.log('First post structure:', data[0]); // 첫 번째 포스트 구조 확인
           
+          // favorites_count 확인
+          console.log('Posts with favorites_count:', data.map((p: Post) => ({ 
+            title: p.title, 
+            favorites_count: p.favorites_count 
+          })));
+          
           // favorites_count 기준으로 정렬 (내림차순)
-          const sortedData = [...data].sort((a: Post, b: Post) => 
-            (b.favorites_count || 0) - (a.favorites_count || 0)
-          );
+          const sortedData = [...data].sort((a: Post, b: Post) => {
+            const aCount = a.favorites_count || 0;
+            const bCount = b.favorites_count || 0;
+            console.log(`Comparing: ${a.title} (${aCount}) vs ${b.title} (${bCount})`);
+            return bCount - aCount;
+          });
+          
+          console.log('Sorted posts:', sortedData.map((p: Post) => ({ 
+            title: p.title, 
+            favorites_count: p.favorites_count 
+          })));
           
           setAllPosts(sortedData);
           setPosts(sortedData);

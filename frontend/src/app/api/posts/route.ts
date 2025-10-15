@@ -20,7 +20,7 @@ export async function GET() {
     console.log('Backend MCPs data length:', Array.isArray(mcps) ? mcps.length : 'not array');
     
     // MCP 서버 데이터를 포스트 형식으로 변환
-    const posts = await Promise.all(mcps.map(async (mcp: any) => {
+    const posts = mcps.map((mcp: any) => {
       let formattedDate = "Unknown date";
       try {
         if (mcp.created_at) {
@@ -30,18 +30,6 @@ export async function GET() {
         console.error('Date parsing error:', error);
       }
 
-      // 즐겨찾기 수 가져오기
-      let favoritesCount = 0;
-      try {
-        const favResponse = await fetch(`${BACKEND_URL}/api/v1/mcp-servers/${mcp.id}/favorites/count`);
-        if (favResponse.ok) {
-          const favData = await favResponse.json();
-          favoritesCount = favData.favorites_count || 0;
-        }
-      } catch (error) {
-        console.error('Error fetching favorites count for MCP', mcp.id, error);
-      }
-
       return {
         id: mcp.id,
         category: mcp.category || "Unknown",
@@ -49,16 +37,17 @@ export async function GET() {
         title: mcp.name,
         desc: mcp.description || "No description available.",
         date: formattedDate,
-        favorites_count: favoritesCount,
+        favorites_count: mcp.favorites_count || 0,
         author: {
           img: mcp.owner?.avatar_url || "/image/avatar1.jpg",
           name: mcp.owner ? mcp.owner.username : "Unknown User",
         },
       };
-    }));
+    });
 
     console.log('Transformed posts data length:', posts.length);
     console.log('First post:', posts[0]);
+    console.log('Posts favorites_count:', posts.map(p => ({ title: p.title, favorites_count: p.favorites_count })));
     return NextResponse.json(posts);
   } catch (error) {
     console.error('Posts API error:', error);
