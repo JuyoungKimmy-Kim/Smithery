@@ -170,7 +170,7 @@ export function BlogPostCard({
         <p className="text-gray-600 mb-4 cursor-pointer line-clamp-3 flex-grow break-words overflow-hidden min-h-[4.5rem]">
           {desc}
         </p>
-        <div className="mb-4">
+        <div className="mb-4 min-h-[2rem] flex items-start">
           <TagList tags={tags} maxTags={4} onTagClick={onTagClick} />
         </div>
         <div 
