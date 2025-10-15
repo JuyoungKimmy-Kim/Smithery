@@ -1,21 +1,40 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 from backend.database import get_db
 from backend.database.model import User, Comment
 from backend.database.dao.comment_dao import CommentDAO
 from backend.api.auth import get_current_user
+from backend.utils.rate_limiter import rate_limiter
 
 router = APIRouter(prefix="/comments", tags=["comments"])
 
 # Pydantic 스키마
 class CommentCreate(BaseModel):
-    content: str
+    content: str = Field(..., min_length=1, max_length=500, description="댓글 내용 (최대 500자)")
+    
+    @field_validator('content')
+    @classmethod
+    def validate_content(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError('댓글 내용을 입력해주세요.')
+        if len(v) > 500:
+            raise ValueError('댓글은 500자를 초과할 수 없습니다.')
+        return v.strip()
 
 class CommentUpdate(BaseModel):
-    content: str
+    content: str = Field(..., min_length=1, max_length=500, description="댓글 내용 (최대 500자)")
+    
+    @field_validator('content')
+    @classmethod
+    def validate_content(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError('댓글 내용을 입력해주세요.')
+        if len(v) > 500:
+            raise ValueError('댓글은 500자를 초과할 수 없습니다.')
+        return v.strip()
 
 class CommentResponse(BaseModel):
     id: int
@@ -37,6 +56,13 @@ async def create_comment(
     db: Session = Depends(get_db)
 ):
     """MCP 서버에 댓글을 생성합니다."""
+    # Rate Limiting: 1분당 최대 5개 댓글 생성 가능
+    rate_limiter.check_rate_limit(
+        user_id=current_user.id,
+        max_requests=5,
+        window_seconds=60
+    )
+    
     comment_dao = CommentDAO(db)
     
     # 댓글 생성
@@ -93,6 +119,13 @@ async def update_comment(
     db: Session = Depends(get_db)
 ):
     """댓글을 수정합니다. (작성자만 수정 가능)"""
+    # Rate Limiting: 1분당 최대 10개 댓글 수정 가능
+    rate_limiter.check_rate_limit(
+        user_id=current_user.id,
+        max_requests=10,
+        window_seconds=60
+    )
+    
     comment_dao = CommentDAO(db)
     
     # 댓글 수정
@@ -125,6 +158,13 @@ async def delete_comment(
     db: Session = Depends(get_db)
 ):
     """댓글을 삭제합니다. (작성자만 삭제 가능)"""
+    # Rate Limiting: 1분당 최대 10개 댓글 삭제 가능
+    rate_limiter.check_rate_limit(
+        user_id=current_user.id,
+        max_requests=10,
+        window_seconds=60
+    )
+    
     comment_dao = CommentDAO(db)
     
     # 댓글 삭제
