@@ -10,6 +10,7 @@ class User(Base):
     username = Column(String(100), unique=True, nullable=False)
     email = Column(String(255), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
+    nickname = Column(String(50), unique=True, nullable=False)
     is_admin = Column(String(10), default='user')  # 'user' 또는 'admin'
     avatar_url = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
