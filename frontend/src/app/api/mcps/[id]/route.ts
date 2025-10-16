@@ -66,15 +66,10 @@ export async function PUT(
     
     console.log(`Backend response status: ${response.status}`);  // 디버깅 로그
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Backend error response: ${errorText}`);  // 디버깅 로그
-      throw new Error(`Backend API error: ${response.status}`);
-    }
-    
+    // 백엔드의 실제 응답을 그대로 전달 (401 포함)
     const result = await response.json();
     console.log(`Backend response data:`, result);  // 디버깅 로그
-    return NextResponse.json(result);
+    return NextResponse.json(result, { status: response.status });
   } catch (error) {
     console.error('API error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -108,15 +103,10 @@ export async function DELETE(
     
     console.log(`Backend DELETE response status: ${response.status}`);  // 디버깅 로그
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Backend DELETE error response: ${errorText}`);  // 디버깅 로그
-      throw new Error(`Backend API error: ${response.status}, message: ${errorText}`);
-    }
-    
+    // 백엔드의 실제 응답을 그대로 전달 (401 포함)
     const result = await response.json();
     console.log(`Backend DELETE response data:`, result);  // 디버깅 로그
-    return NextResponse.json(result);
+    return NextResponse.json(result, { status: response.status });
   } catch (error) {
     console.error('DELETE API error:', error);
     return NextResponse.json({ error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });

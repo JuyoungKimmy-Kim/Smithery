@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api-client";
 import {
   ChatBubbleLeftIcon,
   PencilIcon,
@@ -75,12 +76,12 @@ export default function Comments({ mcpServerId }: CommentsProps) {
 
     setSubmitting(true);
     try {
-      const response = await fetch(`/api/comments/mcp-servers/${mcpServerId}`, {
+      const response = await apiFetch(`/api/comments/mcp-servers/${mcpServerId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
+        requiresAuth: true,
         body: JSON.stringify({ content: newComment.trim() }),
       });
 
@@ -105,12 +106,12 @@ export default function Comments({ mcpServerId }: CommentsProps) {
     if (!editingContent.trim()) return;
 
     try {
-      const response = await fetch(`/api/comments/${commentId}`, {
+      const response = await apiFetch(`/api/comments/${commentId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
+        requiresAuth: true,
         body: JSON.stringify({ content: editingContent.trim() }),
       });
 
@@ -133,11 +134,9 @@ export default function Comments({ mcpServerId }: CommentsProps) {
     if (!confirm("댓글을 삭제하시겠습니까?")) return;
 
     try {
-      const response = await fetch(`/api/comments/${commentId}`, {
+      const response = await apiFetch(`/api/comments/${commentId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        requiresAuth: true,
       });
 
       if (response.ok) {

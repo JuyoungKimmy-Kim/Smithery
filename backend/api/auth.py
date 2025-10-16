@@ -12,7 +12,7 @@ from backend.service import UserService
 # JWT 설정
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 1440  # 24시간 (개발용)
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 security = HTTPBearer()
 
