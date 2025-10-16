@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
@@ -48,8 +48,14 @@ export default function LoginPage() {
       // AuthContext를 통해 로그인 처리
       login(result.access_token, result.user);
       
-      // 메인 페이지로 이동
-      router.push('/');
+      // 세션 만료로 인한 로그인이면 원래 페이지로, 아니면 메인 페이지로 이동
+      const redirectUrl = sessionStorage.getItem('redirectAfterLogin');
+      if (redirectUrl) {
+        sessionStorage.removeItem('redirectAfterLogin');
+        router.push(redirectUrl);
+      } else {
+        router.push('/');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
     } finally {
@@ -166,4 +172,4 @@ export default function LoginPage() {
       </div>
     </div>
   );
-} 
+}

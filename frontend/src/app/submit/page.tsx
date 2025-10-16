@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { MCPServer, ProtocolType, MCPServerTool, MCPServerProperty } from "../../types/mcp";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,6 +12,7 @@ export default function SubmitMCPPage() {
   const router = useRouter();
   const { token, isAuthenticated } = useAuth();
   const AUTOSAVE_KEY = 'mcp_submit_autosave';
+  const hasRedirectedRef = useRef(false);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -51,6 +52,7 @@ export default function SubmitMCPPage() {
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showSessionExpiredModal, setShowSessionExpiredModal] = useState(false);
 
   // 폼에 내용이 있는지 확인하는 함수
   const hasFormContent = (): boolean => {
@@ -142,12 +144,14 @@ export default function SubmitMCPPage() {
     return () => clearTimeout(timeoutId);
   }, [formData, selectedTags, tools, isDataLoaded]);
 
+  // 초기 인증 체크 (한 번만 실행)
   useEffect(() => {
-    if (!isAuthenticated) {
-      alert('Sign in required.');
+    // 데이터 로드 완료 후, 인증되지 않았고, 아직 리다이렉트하지 않았고, 모달이 표시 중이 아니면
+    if (isDataLoaded && !isAuthenticated && !hasRedirectedRef.current && !showSessionExpiredModal) {
+      hasRedirectedRef.current = true;
       router.push('/login');
     }
-  }, [isAuthenticated, router]);
+  }, [isDataLoaded, isAuthenticated, showSessionExpiredModal, router]);
 
   // 페이지 이탈 방지 (브라우저 닫기/새로고침)
   useEffect(() => {
@@ -238,6 +242,19 @@ export default function SubmitMCPPage() {
       document.removeEventListener('click', handleLinkClick, true);
     };
   }, [hasUnsavedChanges, isSubmitting, router]);
+
+  // 세션 만료 이벤트 리스너
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      console.log('Session expired event received, showing modal...');
+      setShowSessionExpiredModal(true);
+    };
+
+    window.addEventListener('session-expired', handleSessionExpired);
+    return () => {
+      window.removeEventListener('session-expired', handleSessionExpired);
+    };
+  }, []);
 
   // 모든 태그 가져오기
   useEffect(() => {
@@ -627,22 +644,14 @@ export default function SubmitMCPPage() {
       };
 
 
-      let response;
-      
-      try {
-        response = await apiFetch('/api/mcps', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          requiresAuth: true,
-          body: JSON.stringify(mcpServerData),
-        });
-      } catch (fetchError) {
-        // apiFetch에서 발생한 에러 (401 등)
-        console.error('apiFetch error:', fetchError);
-        throw fetchError;
-      }
+      const response = await apiFetch('/api/mcps', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        requiresAuth: true,
+        body: JSON.stringify(mcpServerData),
+      });
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -659,12 +668,6 @@ export default function SubmitMCPPage() {
       
       setShowSuccessModal(true);
     } catch (err) {
-      // 세션 만료 에러인 경우 별도 처리 (이미 리다이렉트 중)
-      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
-        console.log('Session expired, redirecting to login...');
-        return; // 에러 메시지 표시하지 않고 리다이렉트만 진행
-      }
-      
       if (err instanceof Error && err.message.includes('JSON')) {
         setError('Server Config JSON 형식이 올바르지 않습니다.');
       } else {
@@ -690,7 +693,8 @@ export default function SubmitMCPPage() {
     router.push('/mypage');
   };
 
-  if (!isAuthenticated) {
+  // 세션 만료 모달이 표시 중이 아니면서 인증되지 않은 경우에만 로딩 표시
+  if (!isAuthenticated && !showSessionExpiredModal) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
         <div className="text-center">
@@ -703,6 +707,37 @@ export default function SubmitMCPPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center submit-page-content">
+      {/* Session Expired Modal */}
+      {showSessionExpiredModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 transform transition-all">
+            <div className="p-8 text-center">
+              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-yellow-100 mb-6">
+                <svg className="h-8 w-8 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                Session Expired
+              </h3>
+              
+              <div className="text-gray-600 mb-6 space-y-2">
+                <p>Draft saved automatically.</p>
+                <p>Log in again to continue.</p>
+              </div>
+              
+              <button
+                onClick={() => router.push('/login')}
+                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors font-medium"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Success Modal */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

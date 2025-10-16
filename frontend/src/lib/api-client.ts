@@ -50,14 +50,19 @@ export async function apiFetch(url: string, options: FetchOptions = {}): Promise
       logoutCallback();
     }
     
-    // 로그인 페이지로 리다이렉트 (클라이언트 사이드)
+    // /submit 페이지에서만 리다이렉트 URL 저장 및 이벤트 발생 (모달은 submit 페이지에서 처리)
     if (typeof window !== 'undefined') {
-      alert('인증이 만료되었습니다.\n작성 중이던 내용은 자동 저장되었습니다.\n다시 로그인해주세요.');
-      window.location.href = '/login?session_expired=true';
+      const currentPath = window.location.pathname;
+      
+      if (currentPath === '/submit') {
+        // submit 페이지로 돌아올 수 있도록 URL 저장
+        sessionStorage.setItem('redirectAfterLogin', currentPath);
+        // submit 페이지에 세션 만료를 알리는 custom event 발생
+        window.dispatchEvent(new CustomEvent('session-expired'));
+      }
     }
-    
-    // 에러를 throw하여 호출하는 쪽에서도 처리할 수 있도록 함
-    throw new Error('SESSION_EXPIRED');
+    // 다른 페이지에서는 조용히 로그아웃만 하고 401 응답 반환
+    return response;
   }
   
   return response;
