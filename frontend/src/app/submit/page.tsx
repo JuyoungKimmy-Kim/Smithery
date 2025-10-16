@@ -10,7 +10,7 @@ import { apiFetch } from "@/lib/api-client";
 
 export default function SubmitMCPPage() {
   const router = useRouter();
-  const { token, isAuthenticated } = useAuth();
+  const { token, isAuthenticated, user } = useAuth();
   const AUTOSAVE_KEY = 'mcp_submit_autosave';
   const hasRedirectedRef = useRef(false);
   
@@ -76,8 +76,10 @@ export default function SubmitMCPPage() {
         const now = new Date().getTime();
         const hoursSinceAutosave = (now - savedTime) / (1000 * 60 * 60);
         
-        // 24시간 이내에 저장된 데이터만 복원
-        if (hoursSinceAutosave < 24) {
+        // 24시간 이내 + 동일한 사용자가 저장한 데이터만 복원
+        const isSameUser = user && parsed.userId === user.id;
+        
+        if (hoursSinceAutosave < 24 && isSameUser) {
           // 사용자에게 먼저 물어보고 복원
           if (confirm('이전에 작성하던 내용이 있습니다. 복원하시겠습니까?')) {
             // 복원
@@ -93,8 +95,9 @@ export default function SubmitMCPPage() {
             // 이번 세션에서 물어봤다는 플래그 설정
             sessionStorage.setItem('hasAskedRestore', 'true');
           }
-        } else {
-          // 24시간이 지난 데이터는 삭제
+        } else if (!isSameUser || hoursSinceAutosave >= 24) {
+          // 다른 사용자이거나 24시간이 지난 데이터는 삭제
+          console.log('다른 사용자의 데이터이거나 만료된 데이터입니다. 삭제합니다.');
           localStorage.removeItem(AUTOSAVE_KEY);
         }
       } else if (savedData && hasAskedRestore) {
@@ -103,11 +106,14 @@ export default function SubmitMCPPage() {
         const savedTime = new Date(parsed.savedAt).getTime();
         const now = new Date().getTime();
         const hoursSinceAutosave = (now - savedTime) / (1000 * 60 * 60);
+        const isSameUser = user && parsed.userId === user.id;
         
-        if (hoursSinceAutosave < 24) {
+        if (hoursSinceAutosave < 24 && isSameUser) {
           setFormData(parsed.formData || formData);
           setSelectedTags(parsed.selectedTags || []);
           setTools(parsed.tools || []);
+        } else if (!isSameUser || hoursSinceAutosave >= 24) {
+          localStorage.removeItem(AUTOSAVE_KEY);
         }
       }
     } catch (error) {
@@ -115,11 +121,11 @@ export default function SubmitMCPPage() {
       localStorage.removeItem(AUTOSAVE_KEY);
     }
     setIsDataLoaded(true);
-  }, []);
+  }, [user]);
 
   // 폼 데이터 변경 시 자동 저장 및 미저장 변경사항 플래그 설정
   useEffect(() => {
-    if (!isDataLoaded) return; // 초기 로드 시에는 저장하지 않음
+    if (!isDataLoaded || !user) return; // 초기 로드 시에는 저장하지 않음
     
     // 내용이 있으면 미저장 변경사항 플래그 설정
     setHasUnsavedChanges(hasFormContent());
@@ -128,6 +134,7 @@ export default function SubmitMCPPage() {
       try {
         const now = new Date();
         const dataToSave = {
+          userId: user.id, // 현재 로그인한 사용자 ID 저장
           formData,
           selectedTags,
           tools,
@@ -142,7 +149,7 @@ export default function SubmitMCPPage() {
     }, 2000); // 2초 디바운스
 
     return () => clearTimeout(timeoutId);
-  }, [formData, selectedTags, tools, isDataLoaded]);
+  }, [formData, selectedTags, tools, isDataLoaded, user]);
 
   // 초기 인증 체크 (한 번만 실행)
   useEffect(() => {

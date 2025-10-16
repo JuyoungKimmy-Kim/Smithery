@@ -11,7 +11,7 @@ import { apiFetch } from "@/lib/api-client";
 export default function EditMCPServerPage() {
   const params = useParams();
   const router = useRouter();
-  const { token, isAuthenticated } = useAuth();
+  const { token, isAuthenticated, user } = useAuth();
   const AUTOSAVE_KEY = `mcp_edit_autosave_${params.id}`;
   const hasRedirectedRef = useRef(false);
   
@@ -87,8 +87,8 @@ export default function EditMCPServerPage() {
 
   // 자동 저장된 데이터 복원 (MCP 데이터 로드 후)
   useEffect(() => {
-    // MCP 데이터가 로드되지 않았으면 복원하지 않음
-    if (!mcp || !isDataLoaded) return;
+    // MCP 데이터가 로드되지 않았거나 사용자 정보가 없으면 복원하지 않음
+    if (!mcp || !isDataLoaded || !user) return;
     
     try {
       const hasAskedRestore = sessionStorage.getItem(`hasAskedRestore_${params.id}`);
@@ -100,7 +100,10 @@ export default function EditMCPServerPage() {
         const now = new Date().getTime();
         const hoursSinceAutosave = (now - savedTime) / (1000 * 60 * 60);
         
-        if (hoursSinceAutosave < 24) {
+        // 24시간 이내 + 동일한 사용자가 저장한 데이터만 복원
+        const isSameUser = user && parsed.userId === user.id;
+        
+        if (hoursSinceAutosave < 24 && isSameUser) {
           if (confirm('이전에 수정하던 내용이 있습니다. 복원하시겠습니까?')) {
             setFormData(parsed.formData || formData);
             setSelectedTags(parsed.selectedTags || []);
@@ -111,7 +114,9 @@ export default function EditMCPServerPage() {
             localStorage.removeItem(AUTOSAVE_KEY);
             sessionStorage.setItem(`hasAskedRestore_${params.id}`, 'true');
           }
-        } else {
+        } else if (!isSameUser || hoursSinceAutosave >= 24) {
+          // 다른 사용자이거나 24시간이 지난 데이터는 삭제
+          console.log('다른 사용자의 데이터이거나 만료된 데이터입니다. 삭제합니다.');
           localStorage.removeItem(AUTOSAVE_KEY);
         }
       } else if (savedData && hasAskedRestore) {
@@ -120,23 +125,26 @@ export default function EditMCPServerPage() {
         const savedTime = new Date(parsed.savedAt).getTime();
         const now = new Date().getTime();
         const hoursSinceAutosave = (now - savedTime) / (1000 * 60 * 60);
+        const isSameUser = user && parsed.userId === user.id;
         
-        if (hoursSinceAutosave < 24) {
+        if (hoursSinceAutosave < 24 && isSameUser) {
           setFormData(parsed.formData || formData);
           setSelectedTags(parsed.selectedTags || []);
           setTools(parsed.tools || []);
           console.log('자동 저장된 수정 내용을 조용히 복원했습니다.');
+        } else if (!isSameUser || hoursSinceAutosave >= 24) {
+          localStorage.removeItem(AUTOSAVE_KEY);
         }
       }
     } catch (error) {
       console.error('자동 저장 데이터 복원 실패:', error);
       localStorage.removeItem(AUTOSAVE_KEY);
     }
-  }, [mcp, isDataLoaded, params.id]); // MCP 데이터 로드 후 실행
+  }, [mcp, isDataLoaded, params.id, user]); // MCP 데이터 로드 후 실행
 
   // 폼 데이터 변경 시 자동 저장
   useEffect(() => {
-    if (!isDataLoaded || !mcp) return; // 데이터 로드 완료 후에만 저장
+    if (!isDataLoaded || !mcp || !user) return; // 데이터 로드 완료 후에만 저장
     
     setHasUnsavedChanges(hasFormContent());
     
@@ -144,6 +152,7 @@ export default function EditMCPServerPage() {
       try {
         const now = new Date();
         const dataToSave = {
+          userId: user.id, // 현재 로그인한 사용자 ID 저장
           formData,
           selectedTags,
           tools,
@@ -158,7 +167,7 @@ export default function EditMCPServerPage() {
     }, 5000);
 
     return () => clearTimeout(timeoutId);
-  }, [formData, selectedTags, tools, isDataLoaded, mcp]);
+  }, [formData, selectedTags, tools, isDataLoaded, mcp, user]);
 
   // 페이지 이탈 방지 (브라우저 닫기/새로고침)
   useEffect(() => {
