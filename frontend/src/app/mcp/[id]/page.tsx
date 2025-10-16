@@ -17,6 +17,7 @@ import {
 import { MCPServer } from "@/types/mcp";
 import { useAuth } from "@/contexts/AuthContext";
 import Comments from "@/components/comments";
+import { apiFetch } from "@/lib/api-client";
 
 export default function MCPServerDetail() {
   const params = useParams();
@@ -128,11 +129,9 @@ export default function MCPServerDetail() {
     setIsDeleting(true);
     
     try {
-      const response = await fetch(`/api/mcps/${mcp.id}`, {
+      const response = await apiFetch(`/api/mcps/${mcp.id}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        requiresAuth: true,
       });
       
       if (response.ok) {

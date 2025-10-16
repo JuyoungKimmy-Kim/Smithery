@@ -6,6 +6,7 @@ import { MCPServer, ProtocolType, MCPServerTool, MCPServerProperty } from "../..
 import { useAuth } from "@/contexts/AuthContext";
 import { PlusIcon, TrashIcon, PencilIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import TagSelector from "@/components/tag-selector";
+import { apiFetch } from "@/lib/api-client";
 
 export default function SubmitMCPPage() {
   const router = useRouter();
@@ -441,12 +442,12 @@ export default function SubmitMCPPage() {
       };
 
 
-      const response = await fetch('/api/mcps', {
+      const response = await apiFetch('/api/mcps', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
+        requiresAuth: true,
         body: JSON.stringify(mcpServerData),
       });
 

@@ -6,6 +6,7 @@ import { MCPServer, ProtocolType, MCPServerTool, MCPServerProperty } from "../..
 import { useAuth } from "@/contexts/AuthContext";
 import { PlusIcon, TrashIcon, PencilIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import TagSelector from "@/components/tag-selector";
+import { apiFetch } from "@/lib/api-client";
 
 export default function EditMCPServerPage() {
   const params = useParams();
@@ -370,12 +371,12 @@ export default function EditMCPServerPage() {
         tools: tools
       };
 
-      const response = await fetch(`/api/mcps/${params.id}`, {
+      const response = await apiFetch(`/api/mcps/${params.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
+        requiresAuth: true,
         body: JSON.stringify(updateData),
       });
 

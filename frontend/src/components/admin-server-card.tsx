@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import TagList from "./tag-list";
+import { apiFetch } from "@/lib/api-client";
 
 interface AdminServerCardProps {
   category: string;
@@ -41,12 +42,12 @@ export function AdminServerCard({
 
     setIsLoading(true);
     try {
-      const response = await fetch('/api/mcp-servers/admin/approve', {
+      const response = await apiFetch('/api/mcp-servers/admin/approve', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
+        requiresAuth: true,
         body: JSON.stringify({
           mcp_server_id: parseInt(id),
           action: 'approve'
@@ -82,12 +83,12 @@ export function AdminServerCard({
 
     setIsLoading(true);
     try {
-      const response = await fetch('/api/mcp-servers/admin/approve', {
+      const response = await apiFetch('/api/mcp-servers/admin/approve', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
+        requiresAuth: true,
         body: JSON.stringify({
           mcp_server_id: parseInt(id),
           action: 'reject'

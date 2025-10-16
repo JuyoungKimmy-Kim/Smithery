@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import BlogPostCard from "@/components/blog-post-card";
 import AdminServerCard from "@/components/admin-server-card";
+import { apiFetch } from "@/lib/api-client";
 
 interface Post {
   category: string;
@@ -56,12 +57,12 @@ export default function MyPage() {
     try {
       console.log('Starting bulk approve for', pendingServers.length, 'servers');
       
-      const response = await fetch('/api/mcp-servers/admin/approve-all', {
+      const response = await apiFetch('/api/mcp-servers/admin/approve-all', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
+        },
+        requiresAuth: true
       });
 
       const responseData = await response.json();
@@ -98,10 +99,8 @@ export default function MyPage() {
         }
         
         // 내가 등록한 서버 가져오기
-        const myServersResponse = await fetch('/api/mcp-servers/user/my-servers', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+        const myServersResponse = await apiFetch('/api/mcp-servers/user/my-servers', {
+          requiresAuth: true
         });
         
         console.log('My servers response status:', myServersResponse.status);
@@ -110,21 +109,14 @@ export default function MyPage() {
           const myServersData = await myServersResponse.json();
           console.log('My servers data:', myServersData);
           setMyServers(myServersData);
-        } else if (myServersResponse.status === 401) {
-          console.error('Token expired, redirecting to login');
-          localStorage.removeItem('token');
-          router.push('/login');
-          return;
         } else {
           const errorText = await myServersResponse.text();
           console.error('My servers error:', errorText);
         }
 
         // 즐겨찾기한 서버 가져오기
-        const favoritesResponse = await fetch('/api/mcp-servers/user/favorites', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+        const favoritesResponse = await apiFetch('/api/mcp-servers/user/favorites', {
+          requiresAuth: true
         });
         
         console.log('Favorites response status:', favoritesResponse.status);
@@ -133,11 +125,6 @@ export default function MyPage() {
           const favoritesData = await favoritesResponse.json();
           console.log('Favorites data:', favoritesData);
           setFavorites(favoritesData);
-        } else if (favoritesResponse.status === 401) {
-          console.error('Token expired, redirecting to login');
-          localStorage.removeItem('token');
-          router.push('/login');
-          return;
         } else {
           const errorText = await favoritesResponse.text();
           console.error('Favorites error:', errorText);
@@ -145,10 +132,8 @@ export default function MyPage() {
 
         // Admin인 경우 승인 대기중인 서버 가져오기
         if (isAdmin) {
-          const pendingResponse = await fetch('/api/mcp-servers/admin/pending', {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
+          const pendingResponse = await apiFetch('/api/mcp-servers/admin/pending', {
+            requiresAuth: true
           });
           
           console.log('Pending servers response status:', pendingResponse.status);
@@ -157,11 +142,6 @@ export default function MyPage() {
             const pendingData = await pendingResponse.json();
             console.log('Pending servers data:', pendingData);
             setPendingServers(pendingData);
-          } else if (pendingResponse.status === 401) {
-            console.error('Token expired, redirecting to login');
-            localStorage.removeItem('token');
-            router.push('/login');
-            return;
           } else {
             const errorText = await pendingResponse.text();
             console.error('Pending servers error:', errorText);

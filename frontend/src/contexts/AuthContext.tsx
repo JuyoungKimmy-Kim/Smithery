@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { setLogoutCallback } from '@/lib/api-client';
 
 interface User {
   id: number;
@@ -23,9 +24,40 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// JWT 토큰의 만료 여부를 확인하는 함수
+function isTokenExpired(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const exp = payload.exp;
+    
+    if (!exp) {
+      return true;
+    }
+    
+    // exp는 초 단위이므로 밀리초로 변환하여 비교
+    const currentTime = Date.now() / 1000;
+    return exp < currentTime;
+  } catch (error) {
+    console.error('Failed to decode token:', error);
+    return true;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
+
+  const logout = () => {
+    setToken(null);
+    setUser(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+  };
+
+  useEffect(() => {
+    // API 클라이언트에 로그아웃 콜백 등록
+    setLogoutCallback(logout);
+  }, []);
 
   useEffect(() => {
     // 페이지 로드 시 localStorage에서 인증 정보 복원
@@ -34,6 +66,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     if (storedToken && storedUser) {
       try {
+        // 토큰 만료 확인
+        if (isTokenExpired(storedToken)) {
+          console.log('Token has expired, clearing authentication');
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          return;
+        }
+        
         const userData = JSON.parse(storedUser);
         setToken(storedToken);
         setUser(userData);
@@ -52,14 +92,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('user', JSON.stringify(userData));
   };
 
-  const logout = () => {
-    setToken(null);
-    setUser(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-  };
-
-  const isAuthenticated = !!token && !!user;
+  // 토큰이 있고 사용자 정보가 있으며, 토큰이 만료되지 않았을 때만 인증됨
+  const isAuthenticated = !!token && !!user && !isTokenExpired(token);
   const isAdmin = user?.is_admin === 'admin';
 
   return (

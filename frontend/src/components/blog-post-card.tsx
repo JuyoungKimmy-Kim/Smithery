@@ -4,6 +4,7 @@ import { StarIcon } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import TagList from "./tag-list";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api-client";
 
 interface BlogPostCardProps {
   category: string;
@@ -58,10 +59,8 @@ export function BlogPostCard({
 
   const checkFavoriteStatus = async () => {
     try {
-      const response = await fetch(`/api/mcp-servers/user/favorites`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+      const response = await apiFetch(`/api/mcp-servers/user/favorites`, {
+        requiresAuth: true
       });
       
       if (response.ok) {
@@ -89,11 +88,9 @@ export function BlogPostCard({
       const url = `/api/mcp-servers/${id}/favorite`;
       const method = isFavorite ? 'DELETE' : 'POST';
       
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method,
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        requiresAuth: true
       });
 
       if (response.ok) {
