@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 import {
   RectangleStackIcon,
   UserCircleIcon,
@@ -79,12 +80,13 @@ export function Navbar() {
     <>
       <nav className="sticky top-0 z-50 bg-blue-50 shadow-lg">
         <div className="container mx-auto flex items-center justify-between px-4 py-3">
-          <a
+          <Link
             href="/"
-            className="text-lg font-bold text-blue-gray-900"
+            className="text-lg font-bold text-blue-gray-900 nav-link"
+            data-nav-link="true"
           >
             MCP Server Hub
-          </a>
+          </Link>
 
           <div className="hidden items-center gap-4 lg:flex">
             <button 

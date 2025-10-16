@@ -50,12 +50,25 @@ export default function SubmitMCPPage() {
   });
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // 폼에 내용이 있는지 확인하는 함수
+  const hasFormContent = (): boolean => {
+    return !!(formData.name || 
+              formData.github_link || 
+              formData.description || 
+              selectedTags.length > 0 || 
+              tools.length > 0);
+  };
 
   // 페이지 로드 시 자동 저장된 데이터 복원
   useEffect(() => {
     try {
+      // 이미 이번 세션에서 복원 여부를 물어봤는지 확인
+      const hasAskedRestore = sessionStorage.getItem('hasAskedRestore');
+      
       const savedData = localStorage.getItem(AUTOSAVE_KEY);
-      if (savedData) {
+      if (savedData && !hasAskedRestore) {
         const parsed = JSON.parse(savedData);
         const savedTime = new Date(parsed.savedAt).getTime();
         const now = new Date().getTime();
@@ -63,32 +76,36 @@ export default function SubmitMCPPage() {
         
         // 24시간 이내에 저장된 데이터만 복원
         if (hoursSinceAutosave < 24) {
-          setFormData(parsed.formData || formData);
-          setSelectedTags(parsed.selectedTags || []);
-          setTools(parsed.tools || []);
-          console.log('자동 저장된 데이터를 복원했습니다.');
-          
-          // 사용자에게 알림
+          // 사용자에게 먼저 물어보고 복원
           if (confirm('이전에 작성하던 내용이 있습니다. 복원하시겠습니까?')) {
-            // 이미 복원됨
+            // 복원
+            setFormData(parsed.formData || formData);
+            setSelectedTags(parsed.selectedTags || []);
+            setTools(parsed.tools || []);
+            console.log('자동 저장된 데이터를 복원했습니다.');
+            // 이번 세션에서 복원했다는 플래그 설정
+            sessionStorage.setItem('hasAskedRestore', 'true');
           } else {
-            // 사용자가 거부하면 초기화
+            // 사용자가 거부하면 localStorage에서 삭제
             localStorage.removeItem(AUTOSAVE_KEY);
-            setFormData({
-              name: "",
-              github_link: "",
-              description: "",
-              tags: "",
-              protocol: "",
-              url: "",
-              config: ""
-            });
-            setSelectedTags([]);
-            setTools([]);
+            // 이번 세션에서 물어봤다는 플래그 설정
+            sessionStorage.setItem('hasAskedRestore', 'true');
           }
         } else {
           // 24시간이 지난 데이터는 삭제
           localStorage.removeItem(AUTOSAVE_KEY);
+        }
+      } else if (savedData && hasAskedRestore) {
+        // 이미 복원 여부를 물어봤으면 조용히 복원 (confirm 없이)
+        const parsed = JSON.parse(savedData);
+        const savedTime = new Date(parsed.savedAt).getTime();
+        const now = new Date().getTime();
+        const hoursSinceAutosave = (now - savedTime) / (1000 * 60 * 60);
+        
+        if (hoursSinceAutosave < 24) {
+          setFormData(parsed.formData || formData);
+          setSelectedTags(parsed.selectedTags || []);
+          setTools(parsed.tools || []);
         }
       }
     } catch (error) {
@@ -98,9 +115,12 @@ export default function SubmitMCPPage() {
     setIsDataLoaded(true);
   }, []);
 
-  // 폼 데이터 변경 시 자동 저장
+  // 폼 데이터 변경 시 자동 저장 및 미저장 변경사항 플래그 설정
   useEffect(() => {
     if (!isDataLoaded) return; // 초기 로드 시에는 저장하지 않음
+    
+    // 내용이 있으면 미저장 변경사항 플래그 설정
+    setHasUnsavedChanges(hasFormContent());
     
     const timeoutId = setTimeout(() => {
       try {
@@ -117,7 +137,7 @@ export default function SubmitMCPPage() {
       } catch (error) {
         console.error('자동 저장 실패:', error);
       }
-    }, 5000); // 5초 디바운스
+    }, 2000); // 2초 디바운스
 
     return () => clearTimeout(timeoutId);
   }, [formData, selectedTags, tools, isDataLoaded]);
@@ -128,6 +148,96 @@ export default function SubmitMCPPage() {
       router.push('/login');
     }
   }, [isAuthenticated, router]);
+
+  // 페이지 이탈 방지 (브라우저 닫기/새로고침)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges && !isSubmitting) {
+        e.preventDefault();
+        e.returnValue = ''; // Chrome에서 필요
+        return '작성 중인 내용이 있습니다. 정말 페이지를 벗어나시겠습니까?';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges, isSubmitting]);
+
+  // 페이지 이탈 방지 (뒤로가기 버튼)
+  useEffect(() => {
+    // 페이지 진입 시 히스토리에 현재 상태 추가
+    if (hasUnsavedChanges) {
+      window.history.pushState({ page: 'submit' }, '');
+    }
+
+    const handlePopState = (e: PopStateEvent) => {
+      if (hasUnsavedChanges && !isSubmitting) {
+        const confirmLeave = window.confirm(
+          '작성 중인 내용이 자동 저장되었습니다.\n페이지를 벗어나시겠습니까?'
+        );
+        
+        if (!confirmLeave) {
+          // 사용자가 취소하면 다시 현재 페이지로 이동
+          window.history.pushState({ page: 'submit' }, '');
+        } else {
+          // 사용자가 확인하면 뒤로가기 진행 (변경사항 플래그 해제)
+          setHasUnsavedChanges(false);
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [hasUnsavedChanges, isSubmitting]);
+
+  // 페이지 이탈 방지 (내부 링크 클릭 - 홈 버튼 등)
+  useEffect(() => {
+    const handleLinkClick = (e: MouseEvent) => {
+      if (!hasUnsavedChanges || isSubmitting) return;
+      
+      const target = e.target as HTMLElement;
+      
+      // navbar 또는 외부 링크만 감지 (submit 페이지 내부 요소 제외)
+      const isNavbarLink = target.closest('nav a, nav button');
+      const linkElement = target.closest('a');
+      
+      if (isNavbarLink || (linkElement && !linkElement.closest('.submit-page-content'))) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const confirmLeave = window.confirm(
+          '작성 중인 내용이 자동 저장되었습니다.\n페이지를 벗어나시겠습니까?'
+        );
+        
+        if (confirmLeave) {
+          setHasUnsavedChanges(false);
+          // 확인 후 링크 이동
+          if (linkElement instanceof HTMLAnchorElement) {
+            const href = linkElement.getAttribute('href');
+            if (href) {
+              // setTimeout으로 상태 업데이트 후 이동
+              setTimeout(() => {
+                router.push(href);
+              }, 0);
+            }
+          } else if (isNavbarLink instanceof HTMLButtonElement) {
+            // Deploy 버튼 등의 onClick 다시 실행
+            setTimeout(() => {
+              (isNavbarLink as HTMLButtonElement).click();
+            }, 0);
+          }
+        }
+      }
+    };
+
+    // capture phase에서 이벤트를 먼저 잡음
+    document.addEventListener('click', handleLinkClick, true);
+    return () => {
+      document.removeEventListener('click', handleLinkClick, true);
+    };
+  }, [hasUnsavedChanges, isSubmitting, router]);
 
   // 모든 태그 가져오기
   useEffect(() => {
@@ -541,8 +651,10 @@ export default function SubmitMCPPage() {
 
       const result = await response.json();
       
-      // 제출 성공 시 자동 저장 데이터 삭제
+      // 제출 성공 시 자동 저장 데이터 삭제 및 플래그 해제
       localStorage.removeItem(AUTOSAVE_KEY);
+      sessionStorage.removeItem('hasAskedRestore'); // 세션 플래그도 삭제
+      setHasUnsavedChanges(false);
       console.log('제출 완료. 자동 저장 데이터를 삭제했습니다.');
       
       setShowSuccessModal(true);
@@ -590,7 +702,7 @@ export default function SubmitMCPPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center">
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center submit-page-content">
       {/* Success Modal */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
