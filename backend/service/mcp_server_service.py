@@ -186,3 +186,7 @@ class MCPServerService:
         """모든 카테고리 목록을 조회합니다."""
         categories = self.db.query(MCPServer.category).distinct().all()
         return [cat[0] for cat in categories if cat[0]]
+    
+    def get_mcp_server_favorites_count(self, mcp_server_id: int) -> int:
+        """특정 MCP 서버의 즐겨찾기 수를 조회합니다."""
+        return self.mcp_server_dao.get_mcp_server_favorites_count(mcp_server_id)

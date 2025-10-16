@@ -93,11 +93,25 @@ def get_mcp_servers(
     mcp_service = MCPServerService(db)
     
     if status == "approved":
-        return mcp_service.get_approved_mcp_servers(limit, offset)
+        mcps = mcp_service.get_approved_mcp_servers(limit, offset)
     elif status == "pending":
-        return mcp_service.get_pending_mcp_servers()
+        mcps = mcp_service.get_pending_mcp_servers()
     else:
-        return mcp_service.get_approved_mcp_servers(limit, offset)
+        mcps = mcp_service.get_approved_mcp_servers(limit, offset)
+    
+    # 각 MCP 서버에 favorites_count 추가
+    for mcp in mcps:
+        mcp.favorites_count = mcp_service.get_mcp_server_favorites_count(mcp.id)
+        print(f"MCP {mcp.id} ({mcp.name}): favorites_count = {mcp.favorites_count}")
+    
+    return mcps
+
+@router.get("/{mcp_server_id}/favorites/count")
+def get_mcp_server_favorites_count(mcp_server_id: int, db: Session = Depends(get_db)):
+    """특정 MCP 서버의 즐겨찾기 수를 조회합니다."""
+    mcp_service = MCPServerService(db)
+    count = mcp_service.get_mcp_server_favorites_count(mcp_server_id)
+    return {"mcp_server_id": mcp_server_id, "favorites_count": count}
 
 @router.get("/{mcp_server_id}", response_model=MCPServerResponse)
 def get_mcp_server(mcp_server_id: int, db: Session = Depends(get_db)):

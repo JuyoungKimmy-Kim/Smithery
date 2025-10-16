@@ -17,6 +17,7 @@ interface Post {
     name: string;
   };
   id?: string;
+  favorites_count?: number;
 }
 
 interface PostsProps {
@@ -56,8 +57,27 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
           console.log('Number of posts:', data.length); // 포스트 개수 확인
           console.log('First post structure:', data[0]); // 첫 번째 포스트 구조 확인
           
-          setAllPosts(data);
-          setPosts(data);
+          // favorites_count 확인
+          console.log('Posts with favorites_count:', data.map((p: Post) => ({ 
+            title: p.title, 
+            favorites_count: p.favorites_count 
+          })));
+          
+          // favorites_count 기준으로 정렬 (내림차순)
+          const sortedData = [...data].sort((a: Post, b: Post) => {
+            const aCount = a.favorites_count || 0;
+            const bCount = b.favorites_count || 0;
+            console.log(`Comparing: ${a.title} (${aCount}) vs ${b.title} (${bCount})`);
+            return bCount - aCount;
+          });
+          
+          console.log('Sorted posts:', sortedData.map((p: Post) => ({ 
+            title: p.title, 
+            favorites_count: p.favorites_count 
+          })));
+          
+          setAllPosts(sortedData);
+          setPosts(sortedData);
           
           // 모든 태그 추출 및 사용 빈도 계산
           const tagCountMap: {[key: string]: number} = {};
@@ -127,7 +147,12 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
       );
     });
     
-    setPosts(filteredPosts);
+    // favorites_count 기준으로 정렬 (내림차순)
+    const sortedFilteredPosts = [...filteredPosts].sort((a: Post, b: Post) => 
+      (b.favorites_count || 0) - (a.favorites_count || 0)
+    );
+    
+    setPosts(sortedFilteredPosts);
   };
 
   // 태그 토글 핸들러 (선택/해제)
@@ -161,7 +186,11 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
           post.category.toLowerCase().includes(searchLower)
         );
       });
-      setPosts(filteredPosts);
+      // favorites_count 기준으로 정렬 (내림차순)
+      const sortedFilteredPosts = [...filteredPosts].sort((a: Post, b: Post) => 
+        (b.favorites_count || 0) - (a.favorites_count || 0)
+      );
+      setPosts(sortedFilteredPosts);
     } else {
       setPosts(allPosts);
     }
@@ -181,7 +210,11 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
             post.category.toLowerCase().includes(searchLower)
           );
         });
-        setPosts(filteredPosts);
+        // favorites_count 기준으로 정렬 (내림차순)
+        const sortedFilteredPosts = [...filteredPosts].sort((a: Post, b: Post) => 
+          (b.favorites_count || 0) - (a.favorites_count || 0)
+        );
+        setPosts(sortedFilteredPosts);
       } else {
         setPosts(allPosts);
       }
@@ -225,7 +258,12 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
         });
       }
       
-      setPosts(filteredPosts);
+      // favorites_count 기준으로 정렬 (내림차순)
+      const sortedFilteredPosts = [...filteredPosts].sort((a: Post, b: Post) => 
+        (b.favorites_count || 0) - (a.favorites_count || 0)
+      );
+      
+      setPosts(sortedFilteredPosts);
     }
   };
 
@@ -244,9 +282,13 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
     setRefreshKey(prev => prev + 1);
   };
 
-  // 현재 보여줄 카드들
-  const visiblePosts = posts.slice(0, visibleCount);
-  const hasMorePosts = visibleCount < posts.length;
+  // 상위 3개와 나머지 분리
+  const topPosts = posts.slice(0, 3);
+  const remainingPosts = posts.slice(3);
+  
+  // 현재 보여줄 나머지 카드들
+  const visibleRemainingPosts = remainingPosts.slice(0, visibleCount);
+  const hasMorePosts = visibleCount < remainingPosts.length;
 
   return (
     <section className="min-h-screen p-8">
@@ -307,25 +349,95 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
           </div>
         ) : (
           <div className="w-full">
-            <div className="grid grid-cols-1 gap-x-8 gap-y-16 items-start lg:grid-cols-3">
-              {visiblePosts.map(({ category, tags, title, desc, date, author, id }) => (
-                <BlogPostCard
-                  key={`${id || title}-${refreshKey}`} // refreshKey를 포함하여 리렌더링 보장
-                  category={category}
-                  tags={tags}
-                  title={title}
-                  desc={desc}
-                  date={date}
-                  author={{
-                    img: author?.img || '/default-avatar.png', // 기본 아바타 이미지
-                    name: author?.name || 'Unknown Author', // 기본 작성자명
-                  }}
-                  id={id}
-                  onFavoriteChange={handleFavoriteChange}
-                  onTagClick={handleTagClick}
-                />
-              ))}
-            </div>
+            {/* Top 3 MCP Servers */}
+            {topPosts.length > 0 && (
+              <div className="mb-16">
+                {/* 헤더 섹션 */}
+                <div className="relative flex justify-center">
+                  <span className="bg-white px-6 py-2 text-sm text-gray-500 font-medium rounded-full border border-gray-200">
+                    Top 3 MCP Servers
+                  </span>
+                </div>
+                <br></br>
+
+                {/* 카드 그리드 */}
+                <div className="grid grid-cols-1 gap-x-8 gap-y-8 items-start lg:grid-cols-3 mb-8">
+                  {topPosts.map(({ category, tags, title, desc, date, author, id }, index) => (
+                    <div key={`top-${id || title}-${refreshKey}`} className="relative">
+                      {/* 순위 배지 */}
+                      <div className={`absolute -top-3 -left-3 z-20 w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-base shadow-lg ${
+                        index === 0 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600' :
+                        index === 1 ? 'bg-gradient-to-br from-gray-300 to-gray-500' :
+                        'bg-gradient-to-br from-amber-600 to-amber-800'
+                      }`}>
+                        {index + 1}
+                      </div>
+                      
+                      {/* 특별한 테두리 효과 */}
+                      <div className={`absolute inset-0 rounded-lg ${
+                        index === 0 ? 'bg-gradient-to-r from-yellow-400 via-yellow-500 to-amber-500' :
+                        index === 1 ? 'bg-gradient-to-r from-gray-300 via-gray-400 to-gray-500' :
+                        'bg-gradient-to-r from-amber-600 via-amber-700 to-amber-800'
+                      } opacity-20 blur-xl`}></div>
+                      
+                      <div className="relative">
+                        <BlogPostCard
+                          category={category}
+                          tags={tags}
+                          title={title}
+                          desc={desc}
+                          date={date}
+                          author={{
+                            img: author?.img || '/default-avatar.png',
+                            name: author?.name || 'Unknown Author',
+                          }}
+                          id={id}
+                          onFavoriteChange={handleFavoriteChange}
+                          onTagClick={handleTagClick}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* 구분선 */}
+                <div className="relative my-12">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t-2 border-gray-200"></div>
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="bg-white px-6 py-2 text-sm text-gray-500 font-medium rounded-full border border-gray-200">
+                      More MCP Servers ({remainingPosts.length})
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* View All MCP Servers */}
+            {remainingPosts.length > 0 && (
+              <div>
+                <div className="grid grid-cols-1 gap-x-8 gap-y-16 items-start lg:grid-cols-3">
+                  {visibleRemainingPosts.map(({ category, tags, title, desc, date, author, id }) => (
+                    <BlogPostCard
+                      key={`${id || title}-${refreshKey}`}
+                      category={category}
+                      tags={tags}
+                      title={title}
+                      desc={desc}
+                      date={date}
+                      author={{
+                        img: author?.img || '/default-avatar.png',
+                        name: author?.name || 'Unknown Author',
+                      }}
+                      id={id}
+                      onFavoriteChange={handleFavoriteChange}
+                      onTagClick={handleTagClick}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

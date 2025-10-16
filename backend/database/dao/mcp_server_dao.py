@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_, and_
+from sqlalchemy import or_, and_, func, desc
 from typing import Optional, List, Dict, Any
 from backend.database.model import MCPServer, MCPServerTool, MCPServerProperty, Tag, User, UserFavorite
 
@@ -41,10 +41,25 @@ class MCPServerDAO:
         return self.db.query(MCPServer).filter(MCPServer.id == mcp_server_id).first()
     
     def get_approved_mcp_servers(self, limit: int = None, offset: int = 0) -> List[MCPServer]:
-        """승인된 MCP 서버 목록을 조회합니다."""
+        """승인된 MCP 서버 목록을 조회합니다. (즐겨찾기 수 내림차순)"""
+        # 서브쿼리로 각 MCP 서버의 즐겨찾기 수 계산
+        favorites_subquery = self.db.query(
+            UserFavorite.mcp_server_id,
+            func.count(UserFavorite.id).label('favorites_count')
+        ).group_by(UserFavorite.mcp_server_id).subquery()
+        
+        # 메인 쿼리에서 조인하고 정렬
         query = self.db.query(MCPServer).options(
             joinedload(MCPServer.owner)
-        ).filter(MCPServer.status == 'approved').order_by(MCPServer.created_at.desc())
+        ).outerjoin(
+            favorites_subquery, MCPServer.id == favorites_subquery.c.mcp_server_id
+        ).filter(
+            MCPServer.status == 'approved'
+        ).order_by(
+            desc(favorites_subquery.c.favorites_count),
+            MCPServer.created_at.desc()
+        )
+        
         if limit:
             query = query.limit(limit).offset(offset)
         return query.all()
@@ -154,3 +169,9 @@ class MCPServerDAO:
         return self.db.query(MCPServer).options(
             joinedload(MCPServer.tools).joinedload(MCPServerTool.parameters)
         ).filter(MCPServer.id == mcp_server_id).first()
+    
+    def get_mcp_server_favorites_count(self, mcp_server_id: int) -> int:
+        """특정 MCP 서버의 즐겨찾기 수를 조회합니다."""
+        return self.db.query(UserFavorite).filter(
+            UserFavorite.mcp_server_id == mcp_server_id
+        ).count()

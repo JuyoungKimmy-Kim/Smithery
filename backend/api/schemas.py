@@ -91,6 +91,7 @@ class MCPServerResponse(BaseModel):
     tools: List[MCPServerToolResponse] = []
     tags: List['TagResponse'] = []
     owner: Optional[UserResponse] = None
+    favorites_count: int = 0
     
     class Config:
         from_attributes = True
