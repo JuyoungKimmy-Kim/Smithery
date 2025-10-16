@@ -134,7 +134,6 @@ export default function EditMCPServerPage() {
           console.log('자동 저장된 수정 내용을 조용히 복원했습니다.');
         } else if (!isSameUser || hoursSinceAutosave >= 24) {
           localStorage.removeItem(AUTOSAVE_KEY);
-        }
       }
     } catch (error) {
       console.error('자동 저장 데이터 복원 실패:', error);
