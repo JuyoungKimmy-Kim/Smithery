@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { MCPServer, ProtocolType, MCPServerTool, MCPServerProperty } from "../../../../types/mcp";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,6 +12,9 @@ export default function EditMCPServerPage() {
   const params = useParams();
   const router = useRouter();
   const { token, isAuthenticated } = useAuth();
+  const AUTOSAVE_KEY = `mcp_edit_autosave_${params.id}`;
+  const hasRedirectedRef = useRef(false);
+  
   const [mcp, setMcp] = useState<MCPServer | null>(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -30,6 +33,10 @@ export default function EditMCPServerPage() {
   const [error, setError] = useState("");
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showSessionExpiredModal, setShowSessionExpiredModal] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
 
   const [tools, setTools] = useState<MCPServerTool[]>([]);
   const [showAddTool, setShowAddTool] = useState(false);
@@ -48,6 +55,15 @@ export default function EditMCPServerPage() {
   });
   const [editingParameterIndex, setEditingParameterIndex] = useState<number | null>(null);
 
+  // 폼에 내용이 있는지 확인하는 함수
+  const hasFormContent = (): boolean => {
+    return !!(formData.name || 
+              formData.github_link || 
+              formData.description || 
+              selectedTags.length > 0 || 
+              tools.length > 0);
+  };
+
   const formatTagsToString = (tags: any): string => {
     if (!tags) return "";
     if (typeof tags === 'string') return tags;
@@ -61,12 +77,172 @@ export default function EditMCPServerPage() {
     return "";
   };
 
+  // 초기 인증 체크 (한 번만 실행)
   useEffect(() => {
-    if (!isAuthenticated) {
-      alert('Sign in required.');
+    if (isDataLoaded && !isAuthenticated && !hasRedirectedRef.current && !showSessionExpiredModal) {
+      hasRedirectedRef.current = true;
       router.push('/login');
     }
-  }, [isAuthenticated, router]);
+  }, [isDataLoaded, isAuthenticated, showSessionExpiredModal, router]);
+
+  // 자동 저장된 데이터 복원 (MCP 데이터 로드 후)
+  useEffect(() => {
+    // MCP 데이터가 로드되지 않았으면 복원하지 않음
+    if (!mcp || !isDataLoaded) return;
+    
+    try {
+      const hasAskedRestore = sessionStorage.getItem(`hasAskedRestore_${params.id}`);
+      const savedData = localStorage.getItem(AUTOSAVE_KEY);
+      
+      if (savedData && !hasAskedRestore) {
+        const parsed = JSON.parse(savedData);
+        const savedTime = new Date(parsed.savedAt).getTime();
+        const now = new Date().getTime();
+        const hoursSinceAutosave = (now - savedTime) / (1000 * 60 * 60);
+        
+        if (hoursSinceAutosave < 24) {
+          if (confirm('이전에 수정하던 내용이 있습니다. 복원하시겠습니까?')) {
+            setFormData(parsed.formData || formData);
+            setSelectedTags(parsed.selectedTags || []);
+            setTools(parsed.tools || []);
+            sessionStorage.setItem(`hasAskedRestore_${params.id}`, 'true');
+            console.log('자동 저장된 수정 내용을 복원했습니다.');
+          } else {
+            localStorage.removeItem(AUTOSAVE_KEY);
+            sessionStorage.setItem(`hasAskedRestore_${params.id}`, 'true');
+          }
+        } else {
+          localStorage.removeItem(AUTOSAVE_KEY);
+        }
+      } else if (savedData && hasAskedRestore) {
+        // 이미 복원 여부를 물어봤으면 조용히 복원
+        const parsed = JSON.parse(savedData);
+        const savedTime = new Date(parsed.savedAt).getTime();
+        const now = new Date().getTime();
+        const hoursSinceAutosave = (now - savedTime) / (1000 * 60 * 60);
+        
+        if (hoursSinceAutosave < 24) {
+          setFormData(parsed.formData || formData);
+          setSelectedTags(parsed.selectedTags || []);
+          setTools(parsed.tools || []);
+          console.log('자동 저장된 수정 내용을 조용히 복원했습니다.');
+        }
+      }
+    } catch (error) {
+      console.error('자동 저장 데이터 복원 실패:', error);
+      localStorage.removeItem(AUTOSAVE_KEY);
+    }
+  }, [mcp, isDataLoaded, params.id]); // MCP 데이터 로드 후 실행
+
+  // 폼 데이터 변경 시 자동 저장
+  useEffect(() => {
+    if (!isDataLoaded || !mcp) return; // 데이터 로드 완료 후에만 저장
+    
+    setHasUnsavedChanges(hasFormContent());
+    
+    const timeoutId = setTimeout(() => {
+      try {
+        const now = new Date();
+        const dataToSave = {
+          formData,
+          selectedTags,
+          tools,
+          savedAt: now.toISOString()
+        };
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(dataToSave));
+        setLastSavedTime(now);
+        console.log('수정 중인 내용이 자동 저장되었습니다.');
+      } catch (error) {
+        console.error('자동 저장 실패:', error);
+      }
+    }, 5000);
+
+    return () => clearTimeout(timeoutId);
+  }, [formData, selectedTags, tools, isDataLoaded, mcp]);
+
+  // 페이지 이탈 방지 (브라우저 닫기/새로고침)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges && !isSubmitting) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '작성 중인 내용이 있습니다. 정말 페이지를 벗어나시겠습니까?';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges, isSubmitting]);
+
+  // 페이지 이탈 방지 (뒤로가기 버튼)
+  useEffect(() => {
+    if (hasUnsavedChanges) {
+      window.history.pushState({ page: 'edit' }, '');
+    }
+
+    const handlePopState = (e: PopStateEvent) => {
+      if (hasUnsavedChanges && !isSubmitting) {
+        const confirmLeave = window.confirm(
+          '수정 중인 내용이 자동 저장되었습니다.\n페이지를 벗어나시겠습니까?'
+        );
+        
+        if (!confirmLeave) {
+          window.history.pushState({ page: 'edit' }, '');
+        } else {
+          setHasUnsavedChanges(false);
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [hasUnsavedChanges, isSubmitting]);
+
+  // 페이지 이탈 방지 (내부 링크 클릭)
+  useEffect(() => {
+    const handleLinkClick = (e: MouseEvent) => {
+      if (!hasUnsavedChanges || isSubmitting) return;
+      
+      const target = e.target as HTMLElement;
+      const isNavbarLink = target.closest('nav a, nav button');
+      const linkElement = target.closest('a');
+      
+      if (isNavbarLink || (linkElement && !linkElement.closest('.edit-page-content'))) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const confirmLeave = window.confirm(
+          '수정 중인 내용이 자동 저장되었습니다.\n페이지를 벗어나시겠습니까?'
+        );
+        
+        if (confirmLeave) {
+          setHasUnsavedChanges(false);
+          if (linkElement instanceof HTMLAnchorElement) {
+            const href = linkElement.getAttribute('href');
+            if (href) {
+              setTimeout(() => router.push(href), 0);
+            }
+          } else if (isNavbarLink instanceof HTMLButtonElement) {
+            setTimeout(() => (isNavbarLink as HTMLButtonElement).click(), 0);
+          }
+        }
+      }
+    };
+
+    document.addEventListener('click', handleLinkClick, true);
+    return () => document.removeEventListener('click', handleLinkClick, true);
+  }, [hasUnsavedChanges, isSubmitting, router]);
+
+  // 세션 만료 이벤트 리스너
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      console.log('Session expired event received, showing modal...');
+      setShowSessionExpiredModal(true);
+    };
+
+    window.addEventListener('session-expired', handleSessionExpired);
+    return () => window.removeEventListener('session-expired', handleSessionExpired);
+  }, []);
 
   // 모든 태그 가져오기
   useEffect(() => {
@@ -161,6 +337,7 @@ export default function EditMCPServerPage() {
         setError("Failed to fetch MCP server");
       } finally {
         setIsLoading(false);
+        setIsDataLoaded(true); // 데이터 로드 완료 플래그
       }
     };
 
@@ -386,8 +563,22 @@ export default function EditMCPServerPage() {
       }
 
       const result = await response.json();
+      
+      // 수정 성공 시 자동 저장 데이터 삭제 및 플래그 해제
+      localStorage.removeItem(AUTOSAVE_KEY);
+      sessionStorage.removeItem(`hasAskedRestore_${params.id}`);
+      setHasUnsavedChanges(false);
+      console.log('수정 완료. 자동 저장 데이터를 삭제했습니다.');
+      
       setShowSuccessModal(true);
     } catch (err) {
+      // 세션 만료 에러인 경우 모달 표시
+      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+        console.log('Session expired, showing modal...');
+        setShowSessionExpiredModal(true);
+        return;
+      }
+      
       if (err instanceof Error && err.message.includes('JSON')) {
         setError('Server Config JSON 형식이 올바르지 않습니다.');
       } else {
@@ -413,7 +604,7 @@ export default function EditMCPServerPage() {
     router.push('/mypage');
   };
 
-  if (isLoading) {
+  if (isLoading || (!isDataLoaded && !showSessionExpiredModal)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <h2 className="text-xl text-gray-600">
@@ -434,7 +625,38 @@ export default function EditMCPServerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center">
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center edit-page-content">
+      {/* Session Expired Modal */}
+      {showSessionExpiredModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 transform transition-all">
+            <div className="p-8 text-center">
+              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-yellow-100 mb-6">
+                <svg className="h-8 w-8 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                Session Expired
+              </h3>
+              
+              <div className="text-gray-600 mb-6 space-y-2">
+                <p>Draft saved automatically.</p>
+                <p>Log in again to continue.</p>
+              </div>
+              
+              <button
+                onClick={() => router.push('/login')}
+                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors font-medium"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Success Modal */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -473,9 +695,16 @@ export default function EditMCPServerPage() {
       )}
 
       <div className="w-full max-w-4xl p-8 bg-white shadow-lg rounded-lg my-8">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">
-          Edit MCP Server
-        </h1>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-800 text-center">
+            Edit MCP Server
+          </h1>
+          {lastSavedTime && (
+            <p className="text-xs text-gray-500 text-center mt-2">
+              💾 자동 저장됨: {lastSavedTime.toLocaleTimeString('ko-KR')}
+            </p>
+          )}
+        </div>
         
         {error && (
           <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">

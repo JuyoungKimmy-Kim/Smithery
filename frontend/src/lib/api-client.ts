@@ -50,15 +50,18 @@ export async function apiFetch(url: string, options: FetchOptions = {}): Promise
       logoutCallback();
     }
     
-    // /submit 페이지에서만 리다이렉트 URL 저장 및 이벤트 발생 (모달은 submit 페이지에서 처리)
+    // /submit 또는 /edit 페이지에서만 리다이렉트 URL 저장 및 이벤트 발생 (모달 처리)
     if (typeof window !== 'undefined') {
       const currentPath = window.location.pathname;
       
-      if (currentPath === '/submit') {
-        // submit 페이지로 돌아올 수 있도록 URL 저장
+      // submit 페이지 또는 edit 페이지인지 확인
+      if (currentPath === '/submit' || currentPath.includes('/edit')) {
+        // 원래 페이지로 돌아올 수 있도록 URL 저장
         sessionStorage.setItem('redirectAfterLogin', currentPath);
-        // submit 페이지에 세션 만료를 알리는 custom event 발생
+        // 세션 만료를 알리는 custom event 발생
         window.dispatchEvent(new CustomEvent('session-expired'));
+        // SESSION_EXPIRED 에러를 throw하여 handleSubmit에서 catch할 수 있도록 함
+        throw new Error('SESSION_EXPIRED');
       }
     }
     // 다른 페이지에서는 조용히 로그아웃만 하고 401 응답 반환
