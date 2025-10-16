@@ -11,6 +11,8 @@ import { apiFetch } from "@/lib/api-client";
 export default function SubmitMCPPage() {
   const router = useRouter();
   const { token, isAuthenticated } = useAuth();
+  const AUTOSAVE_KEY = 'mcp_submit_autosave';
+  
   const [formData, setFormData] = useState({
     name: "",
     github_link: "",
@@ -46,6 +48,79 @@ export default function SubmitMCPPage() {
     type: "",
     required: false
   });
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null);
+
+  // 페이지 로드 시 자동 저장된 데이터 복원
+  useEffect(() => {
+    try {
+      const savedData = localStorage.getItem(AUTOSAVE_KEY);
+      if (savedData) {
+        const parsed = JSON.parse(savedData);
+        const savedTime = new Date(parsed.savedAt).getTime();
+        const now = new Date().getTime();
+        const hoursSinceAutosave = (now - savedTime) / (1000 * 60 * 60);
+        
+        // 24시간 이내에 저장된 데이터만 복원
+        if (hoursSinceAutosave < 24) {
+          setFormData(parsed.formData || formData);
+          setSelectedTags(parsed.selectedTags || []);
+          setTools(parsed.tools || []);
+          console.log('자동 저장된 데이터를 복원했습니다.');
+          
+          // 사용자에게 알림
+          if (confirm('이전에 작성하던 내용이 있습니다. 복원하시겠습니까?')) {
+            // 이미 복원됨
+          } else {
+            // 사용자가 거부하면 초기화
+            localStorage.removeItem(AUTOSAVE_KEY);
+            setFormData({
+              name: "",
+              github_link: "",
+              description: "",
+              tags: "",
+              protocol: "",
+              url: "",
+              config: ""
+            });
+            setSelectedTags([]);
+            setTools([]);
+          }
+        } else {
+          // 24시간이 지난 데이터는 삭제
+          localStorage.removeItem(AUTOSAVE_KEY);
+        }
+      }
+    } catch (error) {
+      console.error('자동 저장 데이터 복원 실패:', error);
+      localStorage.removeItem(AUTOSAVE_KEY);
+    }
+    setIsDataLoaded(true);
+  }, []);
+
+  // 폼 데이터 변경 시 자동 저장
+  useEffect(() => {
+    if (!isDataLoaded) return; // 초기 로드 시에는 저장하지 않음
+    
+    const timeoutId = setTimeout(() => {
+      try {
+        const now = new Date();
+        const dataToSave = {
+          formData,
+          selectedTags,
+          tools,
+          savedAt: now.toISOString()
+        };
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(dataToSave));
+        setLastSavedTime(now);
+        console.log('작성 중인 내용이 자동 저장되었습니다.');
+      } catch (error) {
+        console.error('자동 저장 실패:', error);
+      }
+    }, 5000); // 5초 디바운스
+
+    return () => clearTimeout(timeoutId);
+  }, [formData, selectedTags, tools, isDataLoaded]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -442,14 +517,22 @@ export default function SubmitMCPPage() {
       };
 
 
-      const response = await apiFetch('/api/mcps', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        requiresAuth: true,
-        body: JSON.stringify(mcpServerData),
-      });
+      let response;
+      
+      try {
+        response = await apiFetch('/api/mcps', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          requiresAuth: true,
+          body: JSON.stringify(mcpServerData),
+        });
+      } catch (fetchError) {
+        // apiFetch에서 발생한 에러 (401 등)
+        console.error('apiFetch error:', fetchError);
+        throw fetchError;
+      }
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -457,8 +540,19 @@ export default function SubmitMCPPage() {
       }
 
       const result = await response.json();
+      
+      // 제출 성공 시 자동 저장 데이터 삭제
+      localStorage.removeItem(AUTOSAVE_KEY);
+      console.log('제출 완료. 자동 저장 데이터를 삭제했습니다.');
+      
       setShowSuccessModal(true);
     } catch (err) {
+      // 세션 만료 에러인 경우 별도 처리 (이미 리다이렉트 중)
+      if (err instanceof Error && err.message === 'SESSION_EXPIRED') {
+        console.log('Session expired, redirecting to login...');
+        return; // 에러 메시지 표시하지 않고 리다이렉트만 진행
+      }
+      
       if (err instanceof Error && err.message.includes('JSON')) {
         setError('Server Config JSON 형식이 올바르지 않습니다.');
       } else {
@@ -535,9 +629,16 @@ export default function SubmitMCPPage() {
       )}
 
       <div className="w-full max-w-4xl p-8 bg-white shadow-lg rounded-lg my-8">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">
-          Deploy a New MCP Server
-        </h1>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-800 text-center">
+            Deploy a New MCP Server
+          </h1>
+          {lastSavedTime && (
+            <p className="text-xs text-gray-500 text-center mt-2">
+              💾 자동 저장됨: {lastSavedTime.toLocaleTimeString('ko-KR')}
+            </p>
+          )}
+        </div>
         
         {error && (
           <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">

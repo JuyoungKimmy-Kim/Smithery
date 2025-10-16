@@ -35,35 +35,32 @@ export async function apiFetch(url: string, options: FetchOptions = {}): Promise
     }
   }
 
-  try {
-    const response = await fetch(url, fetchOptions);
+  const response = await fetch(url, fetchOptions);
+  
+  // 401 에러 발생 시 자동 로그아웃
+  if (response.status === 401) {
+    console.log('Received 401 error, logging out...');
     
-    // 401 에러 발생 시 자동 로그아웃
-    if (response.status === 401) {
-      console.log('Received 401 error, logging out...');
-      
-      // localStorage 초기화
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      
-      // 로그아웃 콜백 실행
-      if (logoutCallback) {
-        logoutCallback();
-      }
-      
-      // 로그인 페이지로 리다이렉트 (클라이언트 사이드)
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login?session_expired=true';
-      }
-      
-      throw new Error('Session expired. Please login again.');
+    // localStorage 초기화
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    
+    // 로그아웃 콜백 실행
+    if (logoutCallback) {
+      logoutCallback();
     }
     
-    return response;
-  } catch (error) {
-    // 네트워크 에러 등 fetch 자체가 실패한 경우
-    throw error;
+    // 로그인 페이지로 리다이렉트 (클라이언트 사이드)
+    if (typeof window !== 'undefined') {
+      alert('인증이 만료되었습니다.\n작성 중이던 내용은 자동 저장되었습니다.\n다시 로그인해주세요.');
+      window.location.href = '/login?session_expired=true';
+    }
+    
+    // 에러를 throw하여 호출하는 쪽에서도 처리할 수 있도록 함
+    throw new Error('SESSION_EXPIRED');
   }
+  
+  return response;
 }
 
 /**

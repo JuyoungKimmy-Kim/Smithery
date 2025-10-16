@@ -47,12 +47,9 @@ export async function POST(request: Request) {
         body: JSON.stringify(body),
       });
       
-      if (!response.ok) {
-        throw new Error(`Backend API error: ${response.status}`);
-      }
-      
+      // 백엔드의 실제 응답을 그대로 전달 (401 포함)
       const result = await response.json();
-      return NextResponse.json(result);
+      return NextResponse.json(result, { status: response.status });
     } else {
       // 일반 MCP 서버 생성 API 호출
       const response = await fetch(`${BACKEND_URL}/api/v1/mcp-servers/`, {
@@ -61,12 +58,9 @@ export async function POST(request: Request) {
         body: JSON.stringify(body),
       });
       
-      if (!response.ok) {
-        throw new Error(`Backend API error: ${response.status}`);
-      }
-      
+      // 백엔드의 실제 응답을 그대로 전달 (401 포함)
       const result = await response.json();
-      return NextResponse.json(result);
+      return NextResponse.json(result, { status: response.status });
     }
   } catch (error) {
     console.error('API error:', error);
