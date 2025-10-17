@@ -13,7 +13,7 @@ interface Post {
   date: string;
   author: {
     img: string;
-    name: string;
+    nickname: string;
     username?: string;
   };
   id?: string;
@@ -41,8 +41,8 @@ export default function UserServersPage() {
           const data = await response.json();
           setPosts(data);
           // 첫 번째 포스트가 있으면 해당 사용자의 nickname 가져오기
-          if (data.length > 0 && data[0].author?.name) {
-            setNickname(data[0].author.name);
+          if (data.length > 0 && data[0].author?.nickname) {
+            setNickname(data[0].author.nickname);
           }
         } else if (response.status === 404) {
           setError('사용자를 찾을 수 없습니다.');
@@ -143,7 +143,7 @@ export default function UserServersPage() {
                   date={date}
                   author={{
                     img: author?.img || '/default-avatar.png',
-                    name: author?.name || 'Unknown Author',
+                    nickname: author?.nickname || 'Unknown Author',
                     username: author?.username || 'Unknown',
                   }}
                   id={id}

@@ -11,7 +11,7 @@ interface BlogPostCardProps {
   tags: string;
   title: string;
   desc: string;
-  author: { name: string; img: string; username?: string };
+  author: { nickname: string; img: string; username?: string };
   date: string;
   id?: string; // MCP 서버 ID 추가
   onFavoriteChange?: () => void; // 즐겨찾기 상태 변경 콜백
@@ -130,7 +130,7 @@ export function BlogPostCard({
 
   const handleAuthorClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // 카드 클릭 이벤트 방지
-    const userIdentifier = author?.username || author?.name;
+    const userIdentifier = author?.username || author?.nickname;
     if (userIdentifier && userIdentifier !== 'Unknown') {
       router.push(`/user/${userIdentifier}`);
     }
@@ -177,12 +177,12 @@ export function BlogPostCard({
         >
           <img
             src={author?.img || '/image/avatar1.jpg'}
-            alt={author?.name || 'Unknown'}
+            alt={author?.nickname || 'Unknown'}
             className="w-8 h-8 rounded-full"
           />
           <div>
             <p className="text-sm font-medium text-gray-900 mb-0.5 hover:text-blue-600 transition-colors">
-              {author?.name || 'Unknown'}
+              {author?.nickname || 'Unknown'}
             </p>
             <p className="text-xs text-gray-500">
               {date}

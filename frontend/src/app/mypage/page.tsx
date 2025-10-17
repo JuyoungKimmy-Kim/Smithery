@@ -15,7 +15,7 @@ interface Post {
   date: string;
   author: {
     img: string;
-    name: string;
+    nickname: string;
     username?: string;
   };
   id?: string;

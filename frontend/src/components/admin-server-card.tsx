@@ -9,7 +9,7 @@ interface AdminServerCardProps {
   tags: string;
   title: string;
   desc: string;
-  author: { name: string; img: string; username?: string };
+  author: { nickname: string; img: string; username?: string };
   date: string;
   id?: string;
   onApprove?: (id: string) => void;
@@ -164,12 +164,12 @@ export function AdminServerCard({
         <div className="flex items-center gap-4">
           <img
             src={author?.img || '/image/avatar1.jpg'}
-            alt={author?.name || 'Unknown'}
+            alt={author?.nickname || 'Unknown'}
             className="w-8 h-8 rounded-full"
           />
           <div>
             <p className="text-sm font-medium text-gray-900 mb-0.5">
-              {author?.name || 'Unknown'}
+              {author?.nickname || 'Unknown'}
             </p>
             <p className="text-xs text-gray-500">
               {date}

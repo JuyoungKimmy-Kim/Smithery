@@ -50,7 +50,7 @@ export async function GET(
       date: new Date(server.created_at).toLocaleDateString(),
       author: {
         img: server.owner?.avatar_url || '/image/avatar1.jpg',
-        name: server.owner?.nickname || 'Unknown',
+        nickname: server.owner?.nickname || 'Unknown',
         username: server.owner?.username || 'Unknown'
       }
     })) : [];

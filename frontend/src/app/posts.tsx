@@ -14,7 +14,7 @@ interface Post {
   date: string;
   author: {
     img: string;
-    name: string;
+    nickname: string;
     username?: string;
   };
   id?: string;
@@ -390,7 +390,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                           date={date}
                           author={{
                             img: author?.img || '/default-avatar.png',
-                            name: author?.name || 'Unknown Author',
+                            nickname: author?.nickname || 'Unknown Author',
                             username: author?.username || 'Unknown',
                           }}
                           id={id}
@@ -430,7 +430,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                       date={date}
                       author={{
                         img: author?.img || '/default-avatar.png',
-                        name: author?.name || 'Unknown Author',
+                        nickname: author?.nickname || 'Unknown Author',
                         username: author?.username || 'Unknown',
                       }}
                       id={id}
