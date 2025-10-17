@@ -31,16 +31,16 @@ export async function GET() {
       }
 
       return {
-        id: mcp.id,
-        category: mcp.category || "Unknown",
+        id: String(mcp.id || ''),
+        category: String(mcp.category || "Unknown"),
         tags: mcp.tags ? mcp.tags.map((tag: any) => typeof tag === 'string' ? tag : tag.name).join(', ') : "[]",
-        title: mcp.name,
-        desc: mcp.description || "No description available.",
+        title: String(mcp.name || ''),
+        desc: String(mcp.description || "No description available."),
         date: formattedDate,
-        favorites_count: mcp.favorites_count || 0,
+        favorites_count: Number(mcp.favorites_count || 0),
         author: {
-          img: mcp.owner?.avatar_url || "/image/avatar1.jpg",
-          name: mcp.owner?.username || "Unknown User",
+          img: String(mcp.owner?.avatar_url || "/image/avatar1.jpg"),
+          name: String(mcp.owner?.username || "Unknown User"),
         },
       };
     });

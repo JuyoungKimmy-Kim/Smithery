@@ -288,13 +288,13 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
   // MCP 상세 페이지로 이동
   const handleViewMCP = (id: string | undefined) => {
     if (id) {
-      router.push(`/mcp/${id}`);
+      router.push(`/mcp/${String(id)}`);
     }
   };
 
   // 사용자 페이지로 이동
   const handleViewUser = (username: string) => {
-    router.push(`/user/${username}`);
+    router.push(`/user/${String(username)}`);
   };
 
   // 상위 3개와 나머지 분리
@@ -323,12 +323,12 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
       // 해당 사용자의 첫 번째 MCP 서버 정보 가져오기
       const userPost = posts.find(post => String(post.author?.name || 'Unknown Author') === username);
       return {
-        username,
+        username: String(username), // 명시적으로 문자열 변환
         count,
         post: userPost
       };
     })
-    .filter(item => item.post); // post가 있는 것만 필터링
+    .filter((item): item is { username: string; count: number; post: Post } => item.post !== undefined); // 타입 가드로 명시
   
   // More MCP Servers에는 모든 MCP 서버 표시
   const allMCPPosts = posts;
@@ -337,10 +337,8 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
   const visibleRemainingPosts = allMCPPosts.slice(0, visibleCount);
   const hasMorePosts = visibleCount < allMCPPosts.length;
   
-  // 현재 선택된 탭에 따른 랭킹 데이터
-  const currentRankingPosts = rankingTab === 'top3' ? topPosts : 
-                             rankingTab === 'latest' ? latestPosts : 
-                             topUsers.map(item => item.post!);
+  // 현재 선택된 탭에 따른 랭킹 데이터 (topUsers는 제외, 별도 렌더링)
+  const currentRankingPosts = rankingTab === 'top3' ? topPosts : latestPosts;
 
   return (
     <section className="min-h-screen p-8">
@@ -402,7 +400,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
         ) : (
           <div className="w-full">
             {/* Top 3 MCP Servers / 최신 등록 */}
-            {currentRankingPosts.length > 0 && (
+            {(rankingTab === 'topUsers' ? topUsers.length > 0 : currentRankingPosts.length > 0) && (
               <div className="mb-16">
                 {/* 탭 헤더 */}
                 <div className="flex justify-center mb-8">
@@ -445,7 +443,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                   {rankingTab === 'topUsers' ? (
                     // Top Users 탭
                     topUsers.map(({ username, count, post }, index) => (
-                      <div key={`user-${username}-${refreshKey}`} className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-md transition-shadow">
+                      <div key={`user-${String(username)}-${index}-${refreshKey}`} className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-md transition-shadow">
                         <div className="flex items-center gap-3">
                           {/* 순위 */}
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${
