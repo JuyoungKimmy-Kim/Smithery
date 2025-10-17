@@ -181,7 +181,7 @@ export function BlogPostCard({
           />
           <div>
             <p className="text-sm font-medium text-gray-900 mb-0.5 hover:text-blue-600 transition-colors">
-              {author?.name || 'Unknown'}
+              {String(author?.name || 'Unknown')}
             </p>
             <p className="text-xs text-gray-500">
               {date}
