@@ -14,6 +14,7 @@ interface BlogPostCardProps {
   author: { name: string; img: string };
   date: string;
   id?: string; // MCP 서버 ID 추가
+  favoritesCount?: number; // 즐겨찾기 수 (초기값)
   onFavoriteChange?: () => void; // 즐겨찾기 상태 변경 콜백
   onTagClick?: (tag: string) => void; // 태그 클릭 콜백
 }
@@ -26,6 +27,7 @@ export function BlogPostCard({
   author,
   date,
   id,
+  favoritesCount: initialFavoritesCount = 0,
   onFavoriteChange,
   onTagClick,
 }: BlogPostCardProps) {
@@ -33,17 +35,20 @@ export function BlogPostCard({
   const { isAuthenticated } = useAuth();
   const [isFavorite, setIsFavorite] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [favoritesCount, setFavoritesCount] = useState(0);
+  const [favoritesCount, setFavoritesCount] = useState(initialFavoritesCount);
 
   // 즐겨찾기 상태 및 수 확인
   useEffect(() => {
+    // 초기값 설정
+    setFavoritesCount(initialFavoritesCount);
+
     if (id) {
       fetchFavoritesCount();
       if (isAuthenticated) {
         checkFavoriteStatus();
       }
     }
-  }, [isAuthenticated, id]);
+  }, [isAuthenticated, id, initialFavoritesCount]);
 
   const fetchFavoritesCount = async () => {
     try {

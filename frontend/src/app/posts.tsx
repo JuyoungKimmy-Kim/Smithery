@@ -614,7 +614,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
             {allMCPPosts.length > 0 && (
               <div>
                 <div className="grid grid-cols-1 gap-x-8 gap-y-16 items-start lg:grid-cols-3">
-                  {visibleRemainingPosts.map(({ category, tags, title, desc, date, author, id }) => (
+                  {visibleRemainingPosts.map(({ category, tags, title, desc, date, author, id, favorites_count }) => (
                     <BlogPostCard
                       key={`${id || title}-${refreshKey}`}
                       category={category}
@@ -627,6 +627,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                         name: String(author?.name || 'Unknown Author'),
                       }}
                       id={id}
+                      favoritesCount={favorites_count || 0}
                       onFavoriteChange={handleFavoriteChange}
                       onTagClick={handleTagClick}
                     />
