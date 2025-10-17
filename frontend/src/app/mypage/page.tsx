@@ -16,6 +16,7 @@ interface Post {
   author: {
     img: string;
     name: string;
+    username?: string;
   };
   id?: string;
 }
@@ -170,7 +171,7 @@ export default function MyPage() {
             My Page
           </h1>
           <p className="text-gray-600">
-            안녕하세요, {user?.username}님! 등록한 서버와 즐겨찾기를 관리하세요.
+            안녕하세요, {user?.nickname}님! 등록한 서버와 즐겨찾기를 관리하세요.
           </p>
         </div>
 

@@ -40,7 +40,8 @@ export async function GET() {
         favorites_count: mcp.favorites_count || 0,
         author: {
           img: mcp.owner?.avatar_url || "/image/avatar1.jpg",
-          name: mcp.owner ? mcp.owner.username : "Unknown User",
+          name: mcp.owner ? mcp.owner.nickname : "Unknown User",
+          username: mcp.owner ? mcp.owner.username : "Unknown",
         },
       };
     });

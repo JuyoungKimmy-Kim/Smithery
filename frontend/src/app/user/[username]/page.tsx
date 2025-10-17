@@ -14,6 +14,7 @@ interface Post {
   author: {
     img: string;
     name: string;
+    username?: string;
   };
   id?: string;
 }
@@ -26,6 +27,7 @@ export default function UserServersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(6);
+  const [nickname, setNickname] = useState<string>('');
 
   useEffect(() => {
     const fetchUserServers = async () => {
@@ -38,6 +40,10 @@ export default function UserServersPage() {
         if (response.ok) {
           const data = await response.json();
           setPosts(data);
+          // 첫 번째 포스트가 있으면 해당 사용자의 nickname 가져오기
+          if (data.length > 0 && data[0].author?.name) {
+            setNickname(data[0].author.name);
+          }
         } else if (response.status === 404) {
           setError('사용자를 찾을 수 없습니다.');
         } else {
@@ -73,7 +79,7 @@ export default function UserServersPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h3 className="text-lg text-gray-600 mb-4">
-            {username}의 서버 목록을 불러오는 중...
+            서버 목록을 불러오는 중...
           </h3>
         </div>
       </div>
@@ -102,7 +108,7 @@ export default function UserServersPage() {
         {/* 헤더 영역 */}
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">
-            {username}의 MCP 서버
+            {nickname || username}의 MCP 서버
           </h1>
           <p className="text-gray-600">
             총 {posts.length}개의 서버가 등록되어 있습니다.
@@ -138,6 +144,7 @@ export default function UserServersPage() {
                   author={{
                     img: author?.img || '/default-avatar.png',
                     name: author?.name || 'Unknown Author',
+                    username: author?.username || 'Unknown',
                   }}
                   id={id}
                   onFavoriteChange={handleFavoriteChange}

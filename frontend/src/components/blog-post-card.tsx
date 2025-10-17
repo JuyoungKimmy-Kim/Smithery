@@ -11,7 +11,7 @@ interface BlogPostCardProps {
   tags: string;
   title: string;
   desc: string;
-  author: { name: string; img: string };
+  author: { name: string; img: string; username?: string };
   date: string;
   id?: string; // MCP 서버 ID 추가
   onFavoriteChange?: () => void; // 즐겨찾기 상태 변경 콜백
@@ -130,8 +130,9 @@ export function BlogPostCard({
 
   const handleAuthorClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // 카드 클릭 이벤트 방지
-    if (author?.name && author.name !== 'Unknown') {
-      router.push(`/user/${author.name}`);
+    const userIdentifier = author?.username || author?.name;
+    if (userIdentifier && userIdentifier !== 'Unknown') {
+      router.push(`/user/${userIdentifier}`);
     }
   };
 

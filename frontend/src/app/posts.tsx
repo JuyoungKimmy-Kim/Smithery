@@ -15,6 +15,7 @@ interface Post {
   author: {
     img: string;
     name: string;
+    username?: string;
   };
   id?: string;
   favorites_count?: number;
@@ -390,6 +391,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                           author={{
                             img: author?.img || '/default-avatar.png',
                             name: author?.name || 'Unknown Author',
+                            username: author?.username || 'Unknown',
                           }}
                           id={id}
                           onFavoriteChange={handleFavoriteChange}
@@ -429,6 +431,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                       author={{
                         img: author?.img || '/default-avatar.png',
                         name: author?.name || 'Unknown Author',
+                        username: author?.username || 'Unknown',
                       }}
                       id={id}
                       onFavoriteChange={handleFavoriteChange}

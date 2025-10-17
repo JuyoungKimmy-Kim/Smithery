@@ -13,7 +13,8 @@ export async function GET() {
     // 각 MCP 서버에 사용자 정보와 통일된 아바타 추가
     const mcpsWithUserInfo = mcps.map((mcp: any) => ({
       ...mcp,
-      author: mcp.owner ? mcp.owner.username : 'Unknown User',
+      author: mcp.owner ? mcp.owner.nickname : 'Unknown User',
+      authorUsername: mcp.owner ? mcp.owner.username : 'Unknown',
       avatar: '/images/avatar1.jpg' // 통일된 아바타 이미지
     }));
     

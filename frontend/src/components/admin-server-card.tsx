@@ -9,7 +9,7 @@ interface AdminServerCardProps {
   tags: string;
   title: string;
   desc: string;
-  author: { name: string; img: string };
+  author: { name: string; img: string; username?: string };
   date: string;
   id?: string;
   onApprove?: (id: string) => void;

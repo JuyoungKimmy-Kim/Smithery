@@ -103,7 +103,7 @@ export function Navbar() {
                   className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:text-gray-900 transition-colors rounded-lg hover:bg-gray-100"
                 >
                   <UserCircleIcon className="h-5 w-5" />
-                  <span className="text-sm font-medium">{user?.username}</span>
+                  <span className="text-sm font-medium">{user?.nickname}</span>
                   <ChevronDownIcon className="h-4 w-4" />
                 </button>
                 
