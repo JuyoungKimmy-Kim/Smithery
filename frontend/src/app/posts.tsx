@@ -37,6 +37,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
   const [visibleCount, setVisibleCount] = useState(6); // 초기 6개 카드만 보이도록
   const [refreshKey, setRefreshKey] = useState(0); // 즐겨찾기 상태 변경 시 리프레시용
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm); // 검색어 상태 추가
+  const [rankingTab, setRankingTab] = useState<'top3' | 'latest'>('top3'); // 랭킹 탭 상태
 
   // 외부에서 전달된 검색어가 변경될 때 처리
   useEffect(() => {
@@ -295,13 +296,15 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
   const topPosts = posts.slice(0, 3);
   const remainingPosts = posts.slice(3);
   
-  // 디버깅: topPosts의 author 구조 확인
-  console.log('Top posts authors:', topPosts.map(p => ({
-    title: p.title,
-    author: p.author,
-    authorName: p.author?.name,
-    authorNameType: typeof p.author?.name
-  })));
+  // 최신 등록된 포스트 (날짜 기준으로 정렬)
+  const latestPosts = [...posts].sort((a, b) => {
+    const dateA = new Date(a.date).getTime();
+    const dateB = new Date(b.date).getTime();
+    return dateB - dateA; // 최신순
+  }).slice(0, 3);
+  
+  // 현재 선택된 탭에 따른 랭킹 데이터
+  const currentRankingPosts = rankingTab === 'top3' ? topPosts : latestPosts;
   
   // 현재 보여줄 나머지 카드들
   const visibleRemainingPosts = remainingPosts.slice(0, visibleCount);
@@ -366,23 +369,38 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
           </div>
         ) : (
           <div className="w-full">
-            {/* Top 3 MCP Servers */}
-            {topPosts.length > 0 && (
+            {/* Top 3 MCP Servers / 최신 등록 */}
+            {currentRankingPosts.length > 0 && (
               <div className="mb-16">
-                {/* 헤더 섹션 */}
+                {/* 탭 헤더 */}
                 <div className="flex justify-center mb-8">
                   <div className="bg-gray-100 p-1 rounded-lg flex">
                     <button
-                      className="px-6 py-2 text-sm font-medium rounded-md transition-all duration-200 bg-white text-blue-600 shadow-sm"
+                      onClick={() => setRankingTab('top3')}
+                      className={`px-6 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
+                        rankingTab === 'top3'
+                          ? 'bg-white text-blue-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
                     >
                       Top 3
+                    </button>
+                    <button
+                      onClick={() => setRankingTab('latest')}
+                      className={`px-6 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
+                        rankingTab === 'latest'
+                          ? 'bg-white text-blue-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      최신 등록
                     </button>
                   </div>
                 </div>
 
                 {/* 랭킹 바들 */}
                 <div className="space-y-2 mb-8">
-                  {topPosts.map(({ category, tags, title, desc, date, author, id, favorites_count }, index) => (
+                  {currentRankingPosts.map(({ category, tags, title, desc, date, author, id, favorites_count }, index) => (
                     <div key={`ranking-${id || title}-${refreshKey}`} className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-md transition-shadow">
                       <div className="flex items-center gap-3">
                         {/* 순위 */}
@@ -414,13 +432,20 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                           <p className="text-xs text-gray-600 mb-1 truncate">{String(desc || '')}</p>
                           <div className="flex items-center space-x-3 text-xs text-gray-500">
                             <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs">
-                              {tags ? (() => {
-                                try {
-                                  const parsed = JSON.parse(tags);
-                                  const tagArray = Array.isArray(parsed) ? parsed : [parsed];
-                                  return tagArray[0] || 'MCP';
-                                } catch {
-                                  if (typeof tags === 'string') {
+                              {(() => {
+                                // tags가 배열로 올 경우 처리
+                                if (Array.isArray(tags)) {
+                                  const firstTag = tags[0];
+                                  return typeof firstTag === 'object' ? firstTag.name : (firstTag || 'MCP');
+                                }
+                                // tags가 문자열일 경우 처리
+                                if (typeof tags === 'string' && tags) {
+                                  try {
+                                    const parsed = JSON.parse(tags);
+                                    const tagArray = Array.isArray(parsed) ? parsed : [parsed];
+                                    const firstTag = tagArray[0];
+                                    return typeof firstTag === 'object' ? firstTag.name : (firstTag || 'MCP');
+                                  } catch {
                                     if (tags.startsWith('[') && tags.endsWith(']')) {
                                       const cleanTags = tags.slice(1, -1);
                                       const tagArray = cleanTags.split(',').map(t => 
@@ -432,9 +457,9 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                                       return tagArray[0] || 'MCP';
                                     }
                                   }
-                                  return 'MCP';
                                 }
-                              })() : 'MCP'}
+                                return 'MCP';
+                              })()}
                             </span>
                             <span className="truncate">{String(author?.name || 'Unknown Author')}</span>
                             <span className="flex-shrink-0">{new Date(date).toLocaleDateString()}</span>
@@ -449,11 +474,11 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                                 <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                               </svg>
                               <span className="text-lg font-bold text-gray-900">
-                                {(favorites_count || 0).toLocaleString()}
+                                {rankingTab === 'top3' ? (favorites_count || 0).toLocaleString() : 'NEW'}
                               </span>
                             </div>
                             <div className="text-xs text-gray-500">
-                              favorites
+                              {rankingTab === 'top3' ? 'favorites' : ''}
                             </div>
                           </div>
                           <button 
