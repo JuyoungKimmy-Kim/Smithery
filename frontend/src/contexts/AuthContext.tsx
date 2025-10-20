@@ -60,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // 페이지 로드 시 localStorage에서 인증 정보 복원
+    // 페이지 로드 시 localStorage에서 인증 정보 복원 및 서버에서 최신 정보 조회
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
     
@@ -77,6 +77,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userData = JSON.parse(storedUser);
         setToken(storedToken);
         setUser(userData);
+
+        // 서버에서 최신 사용자 정보 가져오기
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${storedToken}`
+          }
+        })
+        .then(response => {
+          if (response.ok) {
+            return response.json();
+          }
+          throw new Error('Failed to fetch user info');
+        })
+        .then(latestUserData => {
+          // localStorage와 state를 최신 정보로 업데이트
+          setUser(latestUserData);
+          localStorage.setItem('user', JSON.stringify(latestUserData));
+          console.log('User info updated from server:', latestUserData);
+        })
+        .catch(error => {
+          console.error('Failed to fetch latest user info:', error);
+          // 에러가 발생해도 기존 localStorage 데이터는 유지
+        });
       } catch (error) {
         console.error('Failed to parse stored user data:', error);
         localStorage.removeItem('token');
