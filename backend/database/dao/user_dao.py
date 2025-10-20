@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_
 from typing import Optional, List
 from backend.database.model import User, MCPServer, UserFavorite
@@ -58,11 +58,15 @@ class UserDAO:
     
     def get_user_mcp_servers(self, user_id: int) -> List[MCPServer]:
         """사용자가 등록한 MCP 서버 목록을 조회합니다."""
-        return self.db.query(MCPServer).filter(MCPServer.owner_id == user_id).all()
+        return self.db.query(MCPServer).options(
+            joinedload(MCPServer.owner)
+        ).filter(MCPServer.owner_id == user_id).all()
     
     def get_user_favorites(self, user_id: int) -> List[MCPServer]:
         """사용자가 즐겨찾기한 MCP 서버 목록을 조회합니다."""
-        return self.db.query(MCPServer).join(UserFavorite).filter(UserFavorite.user_id == user_id).all()
+        return self.db.query(MCPServer).options(
+            joinedload(MCPServer.owner)
+        ).join(UserFavorite).filter(UserFavorite.user_id == user_id).all()
     
     def add_favorite(self, user_id: int, mcp_server_id: int) -> bool:
         """즐겨찾기를 추가합니다."""
