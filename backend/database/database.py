@@ -16,13 +16,18 @@ engine = create_engine(
     pool_size=10,
     max_overflow=20,
     pool_recycle=3600,
-    pool_pre_ping=False,
+    pool_pre_ping=True,  # 연결 풀에서 세션을 가져올 때 연결 상태 확인
     echo=False,  # SQL 로그 출력 여부
     connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
 )
 
 # 세션 팩토리 생성
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+SessionLocal = sessionmaker(
+    autocommit=False, 
+    autoflush=False, 
+    bind=engine,
+    expire_on_commit=True  # 커밋 후 세션 객체를 만료시켜 최신 데이터 조회
+)
 
 class Database:
     def __init__(self):

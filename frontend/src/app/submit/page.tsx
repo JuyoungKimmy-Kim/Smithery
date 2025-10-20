@@ -227,7 +227,7 @@ export default function SubmitMCPPage() {
               }, 0);
             }
           } else if (isNavbarLink instanceof HTMLButtonElement) {
-            // Deploy 버튼 등의 onClick 다시 실행
+            // Register 버튼 등의 onClick 다시 실행
             setTimeout(() => {
               (isNavbarLink as HTMLButtonElement).click();
             }, 0);
@@ -778,7 +778,7 @@ export default function SubmitMCPPage() {
       <div className="w-full max-w-4xl p-8 bg-white shadow-lg rounded-lg my-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-800 text-center">
-            Deploy a New MCP Server
+            Register a New MCP Server
           </h1>
           {lastSavedTime && (
             <p className="text-xs text-gray-500 text-center mt-2">

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { apiFetch } from "@/lib/api-client";
 import {
   ChatBubbleLeftIcon,
@@ -28,6 +29,7 @@ interface CommentsProps {
 
 export default function Comments({ mcpServerId }: CommentsProps) {
   const { user, isAuthenticated, token } = useAuth();
+  const { t, language } = useLanguage();
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(true);
@@ -91,11 +93,11 @@ export default function Comments({ mcpServerId }: CommentsProps) {
         fetchCommentCount();
       } else {
         const errorData = await response.json();
-        alert(`댓글 작성 실패: ${errorData.detail || "알 수 없는 오류"}`);
+        alert(t('comments.writeError', { error: errorData.detail || t('comments.writeErrorUnknown') }));
       }
     } catch (error) {
       console.error("댓글 작성 오류:", error);
-      alert("댓글 작성 중 오류가 발생했습니다.");
+      alert(t('comments.writeErrorUnknown'));
     } finally {
       setSubmitting(false);
     }
@@ -121,17 +123,17 @@ export default function Comments({ mcpServerId }: CommentsProps) {
         fetchComments();
       } else {
         const errorData = await response.json();
-        alert(`댓글 수정 실패: ${errorData.detail || "알 수 없는 오류"}`);
+        alert(t('comments.editError', { error: errorData.detail || t('comments.editErrorUnknown') }));
       }
     } catch (error) {
       console.error("댓글 수정 오류:", error);
-      alert("댓글 수정 중 오류가 발생했습니다.");
+      alert(t('comments.editErrorUnknown'));
     }
   };
 
   // 댓글 삭제
   const handleDeleteComment = async (commentId: number) => {
-    if (!confirm("댓글을 삭제하시겠습니까?")) return;
+    if (!confirm(t('comments.deleteConfirm'))) return;
 
     try {
       const response = await apiFetch(`/api/comments/${commentId}`, {
@@ -144,11 +146,11 @@ export default function Comments({ mcpServerId }: CommentsProps) {
         fetchCommentCount();
       } else {
         const errorData = await response.json();
-        alert(`댓글 삭제 실패: ${errorData.detail || "알 수 없는 오류"}`);
+        alert(t('comments.deleteError', { error: errorData.detail || t('comments.deleteErrorUnknown') }));
       }
     } catch (error) {
       console.error("댓글 삭제 오류:", error);
-      alert("댓글 삭제 중 오류가 발생했습니다.");
+      alert(t('comments.deleteErrorUnknown'));
     }
   };
 
@@ -171,11 +173,11 @@ export default function Comments({ mcpServerId }: CommentsProps) {
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
     
     if (diffInHours < 1) {
-      return "방금 전";
+      return t('comments.justNow');
     } else if (diffInHours < 24) {
-      return `${diffInHours}시간 전`;
+      return t('comments.hoursAgo', { hours: diffInHours.toString() });
     } else {
-      return date.toLocaleDateString("ko-KR");
+      return date.toLocaleDateString(language === 'ko' ? 'ko-KR' : 'en-US');
     }
   };
 
@@ -183,7 +185,7 @@ export default function Comments({ mcpServerId }: CommentsProps) {
     <div className="bg-white rounded-lg shadow-sm p-8">
       <div className="flex items-center gap-2 mb-6">
         <ChatBubbleLeftIcon className="h-6 w-6 text-blue-500" />
-        <h2 className="text-2xl font-bold text-gray-900">댓글</h2>
+        <h2 className="text-2xl font-bold text-gray-900">{t('comments.title')}</h2>
         <span className="text-sm text-gray-500">({commentCount})</span>
       </div>
 
@@ -195,7 +197,7 @@ export default function Comments({ mcpServerId }: CommentsProps) {
               <textarea
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
-                placeholder="댓글을 작성해주세요..."
+                placeholder={t('comments.writeComment')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                 rows={3}
                 maxLength={500}
@@ -210,11 +212,11 @@ export default function Comments({ mcpServerId }: CommentsProps) {
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {submitting ? (
-                "작성 중..."
+                t('comments.submitting')
               ) : (
                 <>
                   <PaperAirplaneIcon className="h-4 w-4" />
-                  작성
+                  {t('comments.submit')}
                 </>
               )}
             </button>
@@ -222,16 +224,16 @@ export default function Comments({ mcpServerId }: CommentsProps) {
         </form>
       ) : (
         <div className="mb-6 p-4 bg-gray-50 rounded-md text-center text-gray-600">
-          댓글을 작성하려면 로그인해주세요.
+          {t('comments.loginRequired')}
         </div>
       )}
 
       {/* 댓글 목록 */}
       {loading ? (
-        <div className="text-center py-8 text-gray-500">댓글을 불러오는 중...</div>
+        <div className="text-center py-8 text-gray-500">{t('comments.loading')}</div>
       ) : comments.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
-          아직 댓글이 없습니다. 첫 번째 댓글을 작성해보세요!
+          {t('comments.noComments')}
         </div>
       ) : (
         <div className="space-y-4">
@@ -247,7 +249,7 @@ export default function Comments({ mcpServerId }: CommentsProps) {
                       {formatDate(comment.created_at)}
                     </span>
                     {comment.updated_at !== comment.created_at && (
-                      <span className="text-xs text-gray-400">(수정됨)</span>
+                      <span className="text-xs text-gray-400">{t('comments.edited')}</span>
                     )}
                   </div>
                   
@@ -266,14 +268,14 @@ export default function Comments({ mcpServerId }: CommentsProps) {
                           className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 flex items-center gap-1"
                         >
                           <CheckIcon className="h-3 w-3" />
-                          저장
+                          {t('comments.save')}
                         </button>
                         <button
                           onClick={cancelEditing}
                           className="px-3 py-1 bg-gray-500 text-white text-sm rounded-md hover:bg-gray-600 flex items-center gap-1"
                         >
                           <XMarkIcon className="h-3 w-3" />
-                          취소
+                          {t('comments.cancel')}
                         </button>
                       </div>
                     </div>
@@ -294,14 +296,14 @@ export default function Comments({ mcpServerId }: CommentsProps) {
                     <button
                       onClick={() => startEditing(comment)}
                       className="p-1 text-gray-400 hover:text-blue-600"
-                      title="수정"
+                      title={t('comments.edit')}
                     >
                       <PencilIcon className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteComment(comment.id)}
                       className="p-1 text-gray-400 hover:text-red-600"
-                      title="삭제"
+                      title={t('comments.delete')}
                     >
                       <TrashIcon className="h-4 w-4" />
                     </button>
