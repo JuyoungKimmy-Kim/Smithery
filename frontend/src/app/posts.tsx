@@ -295,6 +295,14 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
   const topPosts = posts.slice(0, 3);
   const remainingPosts = posts.slice(3);
   
+  // 디버깅: topPosts의 author 구조 확인
+  console.log('Top posts authors:', topPosts.map(p => ({
+    title: p.title,
+    author: p.author,
+    authorName: p.author?.name,
+    authorNameType: typeof p.author?.name
+  })));
+  
   // 현재 보여줄 나머지 카드들
   const visibleRemainingPosts = remainingPosts.slice(0, visibleCount);
   const hasMorePosts = visibleCount < remainingPosts.length;

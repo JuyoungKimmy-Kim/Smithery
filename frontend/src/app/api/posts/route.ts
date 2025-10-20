@@ -47,7 +47,12 @@ export async function GET() {
 
     console.log('Transformed posts data length:', posts.length);
     console.log('First post:', posts[0]);
-    console.log('Posts favorites_count:', posts.map(p => ({ title: p.title, favorites_count: p.favorites_count })));
+    console.log('First post author:', posts[0]?.author);
+    console.log('All authors check:', posts.map((p: any) => ({ 
+      title: p.title, 
+      authorName: p.author?.name,
+      authorNameType: typeof p.author?.name 
+    })));
     return NextResponse.json(posts);
   } catch (error) {
     console.error('Posts API error:', error);
