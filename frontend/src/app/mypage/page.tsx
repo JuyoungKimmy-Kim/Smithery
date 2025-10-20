@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useRouter } from "next/navigation";
 import BlogPostCard from "@/components/blog-post-card";
 import AdminServerCard from "@/components/admin-server-card";
@@ -22,6 +23,7 @@ interface Post {
 
 export default function MyPage() {
   const { user, isAuthenticated } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("my-servers");
   const [myServers, setMyServers] = useState<Post[]>([]);
@@ -167,10 +169,10 @@ export default function MyPage() {
         {/* 헤더 */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            My Page
+            {t('mypage.title')}
           </h1>
           <p className="text-gray-600">
-            안녕하세요, {user?.username}님! 등록한 서버와 즐겨찾기를 관리하세요.
+            {t('mypage.welcome', { username: user?.username || '' })}
           </p>
         </div>
 
@@ -186,7 +188,7 @@ export default function MyPage() {
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                 }`}
               >
-                내가 등록한 서버 ({myServers.length})
+                {t('mypage.myServers')} ({myServers.length})
               </button>
               <button
                 onClick={() => setActiveTab("favorites")}
@@ -196,7 +198,7 @@ export default function MyPage() {
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                 }`}
               >
-                즐겨찾기 ({favorites.length})
+                {t('mypage.favorites')} ({favorites.length})
               </button>
               {isAdmin && (
                 <button
@@ -207,7 +209,7 @@ export default function MyPage() {
                       : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                   }`}
                 >
-                  승인 대기중 ({pendingServers.length})
+                  {t('mypage.pending')} ({pendingServers.length})
                 </button>
               )}
             </nav>
@@ -217,7 +219,7 @@ export default function MyPage() {
         {/* 콘텐츠 */}
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <div className="text-lg text-gray-600">로딩 중...</div>
+            <div className="text-lg text-gray-600">{t('mypage.loading')}</div>
           </div>
         ) : (
           <div className="space-y-8">
@@ -227,16 +229,16 @@ export default function MyPage() {
                   <div className="text-center py-12">
                     <div className="text-gray-400 text-6xl mb-4">📝</div>
                     <h3 className="text-lg font-medium text-gray-900 mb-2">
-                      등록한 서버가 없습니다
+                      {t('mypage.noServers')}
                     </h3>
                     <p className="text-gray-600 mb-4">
-                      새로운 MCP 서버를 등록해보세요!
+                      {t('mypage.noServersDesc')}
                     </p>
                     <button
                       onClick={() => router.push('/submit')}
                       className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
                     >
-                      서버 등록하기
+                      {t('mypage.registerServer')}
                     </button>
                   </div>
                 ) : (
@@ -264,16 +266,16 @@ export default function MyPage() {
                   <div className="text-center py-12">
                     <div className="text-gray-400 text-6xl mb-4">⭐</div>
                     <h3 className="text-lg font-medium text-gray-900 mb-2">
-                      즐겨찾기한 서버가 없습니다
+                      {t('mypage.noFavorites')}
                     </h3>
                     <p className="text-gray-600 mb-4">
-                      마음에 드는 MCP 서버에 즐겨찾기를 추가해보세요!
+                      {t('mypage.noFavoritesDesc')}
                     </p>
                     <button
                       onClick={() => router.push('/')}
                       className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
                     >
-                      서버 둘러보기
+                      {t('mypage.browse')}
                     </button>
                   </div>
                 ) : (
@@ -301,23 +303,23 @@ export default function MyPage() {
                   <div className="text-center py-12">
                     <div className="text-gray-400 text-6xl mb-4">⏳</div>
                     <h3 className="text-lg font-medium text-gray-900 mb-2">
-                      승인 대기중인 서버가 없습니다
+                      {t('mypage.noPending')}
                     </h3>
                     <p className="text-gray-600 mb-4">
-                      모든 MCP 서버가 승인되었습니다.
+                      {t('mypage.noPendingDesc')}
                     </p>
                   </div>
                 ) : (
                   <div>
                     <div className="mb-6 flex justify-between items-center">
                       <h3 className="text-lg font-medium text-gray-900">
-                        승인 대기중인 서버 ({pendingServers.length}개)
+                        {t('mypage.pendingCount', { count: pendingServers.length.toString() })}
                       </h3>
                       <button
                         onClick={handleBulkApprove}
                         className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                       >
-                        전체 승인
+                        {t('mypage.approveAll')}
                       </button>
                     </div>
                     <div className="grid grid-cols-1 gap-x-8 gap-y-16 items-start lg:grid-cols-3">

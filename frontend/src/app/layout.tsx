@@ -4,6 +4,7 @@ import { Roboto } from "next/font/google";
 import { Navbar, Footer } from "@/components";
 
 import { AuthProvider } from "@/contexts/AuthContext";
+import { LanguageProvider } from "@/contexts/LanguageContext";
 
 const roboto = Roboto({
   subsets: ["latin"],
@@ -35,12 +36,14 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
       </head>
       <body className={roboto.className}>
-        <AuthProvider>
-          <Navbar />
-          {children}
-          <Footer />
-  
-        </AuthProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <Navbar />
+            {children}
+            <Footer />
+    
+          </AuthProvider>
+        </LanguageProvider>
       </body>
     </html>
   );

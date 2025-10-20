@@ -7,9 +7,11 @@ import {
   XMarkIcon,
   Bars3Icon,
   ChevronDownIcon,
+  LanguageIcon,
 } from "@heroicons/react/24/solid";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export function Navbar() {
   const [open, setOpen] = React.useState(false);
@@ -17,6 +19,7 @@ export function Navbar() {
   const [showSignInModal, setShowSignInModal] = React.useState(false);
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
+  const { language, setLanguage, t } = useLanguage();
 
   const handleOpen = () => setOpen((cur) => !cur);
   const handleUserMenuToggle = () => setUserMenuOpen((cur) => !cur);
@@ -56,6 +59,10 @@ export function Navbar() {
     router.push('/login');
   };
 
+  const handleLanguageToggle = () => {
+    setLanguage(language === 'ko' ? 'en' : 'ko');
+  };
+
   React.useEffect(() => {
     window.addEventListener(
       "resize",
@@ -93,7 +100,16 @@ export function Navbar() {
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               onClick={handleRegisterClick}
             >
-              Register
+              {t('nav.register')}
+            </button>
+            
+            <button
+              onClick={handleLanguageToggle}
+              className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:text-gray-900 transition-colors rounded-lg hover:bg-gray-100"
+              title={language === 'ko' ? '한국어' : 'English'}
+            >
+              <LanguageIcon className="h-5 w-5" />
+              <span className="text-sm font-medium">{language === 'ko' ? 'KO' : 'EN'}</span>
             </button>
             
             {isAuthenticated ? (
@@ -114,14 +130,14 @@ export function Navbar() {
                       className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-2"
                     >
                       <UserCircleIcon className="h-4 w-4" />
-                      My Page
+                      {t('nav.mypage')}
                     </button>
                     <hr className="my-1" />
                     <button
                       onClick={handleLogoutClick}
                       className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 transition-colors"
                     >
-                      Sign Out
+                      {t('nav.signout')}
                     </button>
                   </div>
                 )}
@@ -131,7 +147,7 @@ export function Navbar() {
                 onClick={handleLoginClick}
                 className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors"
               >
-                Sign In
+                {t('nav.signin')}
               </button>
             )}
           </div>
@@ -154,7 +170,15 @@ export function Navbar() {
                   className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                   onClick={handleRegisterClick}
                 >
-                  Register
+                  {t('nav.register')}
+                </button>
+                
+                <button
+                  onClick={handleLanguageToggle}
+                  className="w-full px-4 py-2 text-left text-gray-700 hover:text-gray-900 transition-colors flex items-center gap-2"
+                >
+                  <LanguageIcon className="h-5 w-5" />
+                  {language === 'ko' ? '한국어 (KO)' : 'English (EN)'}
                 </button>
                 
                 {isAuthenticated ? (
@@ -164,13 +188,13 @@ export function Navbar() {
                       className="w-full px-4 py-2 text-left text-gray-700 hover:text-gray-900 transition-colors flex items-center gap-2"
                     >
                       <UserCircleIcon className="h-4 w-4" />
-                      My Page
+                      {t('nav.mypage')}
                     </button>
                     <button 
                       onClick={handleLogoutClick}
                       className="w-full px-4 py-2 text-left text-gray-700 hover:text-gray-900 transition-colors"
                     >
-                      Sign Out
+                      {t('nav.signout')}
                     </button>
                   </>
                 ) : (
@@ -178,7 +202,7 @@ export function Navbar() {
                     onClick={handleLoginClick}
                     className="w-full px-4 py-2 text-left text-gray-700 hover:text-gray-900 transition-colors"
                   >
-                    Sign In
+                    {t('nav.signin')}
                   </button>
                 )}
               </div>
@@ -198,23 +222,23 @@ export function Navbar() {
                 </svg>
               </div>
               <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
-                Sign In Required
+                {t('nav.signInRequired')}
               </h3>
               <p className="text-gray-600 text-center mb-6">
-                You need to sign in to register a new MCP server.
+                {t('nav.signInRequiredDesc')}
               </p>
               <div className="flex gap-3">
                 <button
                   onClick={handleSignInModalClose}
                   className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                 >
-                  Cancel
+                  {t('nav.cancel')}
                 </button>
                 <button
                   onClick={handleSignInModalConfirm}
                   className="flex-1 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors"
                 >
-                  Sign In
+                  {t('nav.signin')}
                 </button>
               </div>
             </div>
