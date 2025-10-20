@@ -23,6 +23,10 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.signInRequired': '로그인 필요',
     'nav.signInRequiredDesc': '새로운 MCP 서버를 등록하려면 로그인이 필요합니다.',
     'nav.cancel': '취소',
+    'nav.wiki': 'Wiki',
+    'nav.gettingStarted': 'Getting Started',
+    'nav.howToUse': 'How to Use',
+    'nav.roadmap': 'Roadmap',
     
     // MyPage
     'mypage.title': 'My Page',
@@ -84,6 +88,10 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.signInRequired': 'Sign In Required',
     'nav.signInRequiredDesc': 'You need to sign in to register a new MCP server.',
     'nav.cancel': 'Cancel',
+    'nav.wiki': 'Wiki',
+    'nav.gettingStarted': 'Getting Started',
+    'nav.howToUse': 'How to Use',
+    'nav.roadmap': 'Roadmap',
     
     // MyPage
     'mypage.title': 'My Page',

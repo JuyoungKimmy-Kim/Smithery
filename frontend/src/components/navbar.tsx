@@ -8,6 +8,7 @@ import {
   Bars3Icon,
   ChevronDownIcon,
   LanguageIcon,
+  BookOpenIcon,
 } from "@heroicons/react/24/solid";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,6 +17,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 export function Navbar() {
   const [open, setOpen] = React.useState(false);
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
+  const [wikiMenuOpen, setWikiMenuOpen] = React.useState(false);
   const [showSignInModal, setShowSignInModal] = React.useState(false);
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
@@ -23,6 +25,7 @@ export function Navbar() {
 
   const handleOpen = () => setOpen((cur) => !cur);
   const handleUserMenuToggle = () => setUserMenuOpen((cur) => !cur);
+  const handleWikiMenuToggle = () => setWikiMenuOpen((cur) => !cur);
   
   const handleRegisterClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -63,6 +66,11 @@ export function Navbar() {
     setLanguage(language === 'ko' ? 'en' : 'ko');
   };
 
+  const handleWikiLinkClick = () => {
+    setWikiMenuOpen(false);
+    setOpen(false);
+  };
+
   React.useEffect(() => {
     window.addEventListener(
       "resize",
@@ -75,13 +83,16 @@ export function Navbar() {
       if (userMenuOpen && !(event.target as Element).closest('.user-menu')) {
         setUserMenuOpen(false);
       }
+      if (wikiMenuOpen && !(event.target as Element).closest('.wiki-menu')) {
+        setWikiMenuOpen(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [userMenuOpen]);
+  }, [userMenuOpen, wikiMenuOpen]);
 
   return (
     <>
@@ -96,12 +107,43 @@ export function Navbar() {
           </Link>
 
           <div className="hidden items-center gap-4 lg:flex">
-            <button 
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              onClick={handleRegisterClick}
-            >
-              {t('nav.register')}
-            </button>
+            {/* Wiki Dropdown */}
+            <div className="relative wiki-menu">
+              <button
+                onClick={handleWikiMenuToggle}
+                className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:text-gray-900 transition-colors rounded-lg hover:bg-gray-100"
+              >
+                <BookOpenIcon className="h-5 w-5" />
+                <span className="text-sm font-medium">{t('nav.wiki')}</span>
+                <ChevronDownIcon className="h-4 w-4" />
+              </button>
+              
+              {wikiMenuOpen && (
+                <div className="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                  <Link
+                    href="/wiki/getting-started"
+                    onClick={handleWikiLinkClick}
+                    className="block w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    {t('nav.gettingStarted')}
+                  </Link>
+                  <Link
+                    href="/wiki/how-to-use"
+                    onClick={handleWikiLinkClick}
+                    className="block w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    {t('nav.howToUse')}
+                  </Link>
+                  <Link
+                    href="/wiki/roadmap"
+                    onClick={handleWikiLinkClick}
+                    className="block w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    {t('nav.roadmap')}
+                  </Link>
+                </div>
+              )}
+            </div>
             
             <button
               onClick={handleLanguageToggle}
@@ -150,6 +192,13 @@ export function Navbar() {
                 {t('nav.signin')}
               </button>
             )}
+
+            <button 
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              onClick={handleRegisterClick}
+            >
+              {t('nav.register')}
+            </button>
           </div>
           <button
             onClick={handleOpen}
@@ -166,12 +215,34 @@ export function Navbar() {
           <div className="lg:hidden bg-blue-50">
             <div className="container mx-auto px-4 py-4">
               <div className="mt-4 space-y-2">
-                <button 
-                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  onClick={handleRegisterClick}
-                >
-                  {t('nav.register')}
-                </button>
+                {/* Wiki Section - Mobile */}
+                <div className="border-b border-gray-300 pb-2 mb-2">
+                  <div className="flex items-center gap-2 px-4 py-2 text-gray-900 font-medium">
+                    <BookOpenIcon className="h-5 w-5" />
+                    {t('nav.wiki')}
+                  </div>
+                  <Link
+                    href="/wiki/getting-started"
+                    onClick={handleWikiLinkClick}
+                    className="block w-full px-8 py-2 text-left text-gray-700 hover:text-gray-900 transition-colors"
+                  >
+                    {t('nav.gettingStarted')}
+                  </Link>
+                  <Link
+                    href="/wiki/how-to-use"
+                    onClick={handleWikiLinkClick}
+                    className="block w-full px-8 py-2 text-left text-gray-700 hover:text-gray-900 transition-colors"
+                  >
+                    {t('nav.howToUse')}
+                  </Link>
+                  <Link
+                    href="/wiki/roadmap"
+                    onClick={handleWikiLinkClick}
+                    className="block w-full px-8 py-2 text-left text-gray-700 hover:text-gray-900 transition-colors"
+                  >
+                    {t('nav.roadmap')}
+                  </Link>
+                </div>
                 
                 <button
                   onClick={handleLanguageToggle}
@@ -205,6 +276,13 @@ export function Navbar() {
                     {t('nav.signin')}
                   </button>
                 )}
+
+                <button 
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  onClick={handleRegisterClick}
+                >
+                  {t('nav.register')}
+                </button>
               </div>
             </div>
           </div>
