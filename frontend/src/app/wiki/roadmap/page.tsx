@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { ChevronDownIcon, ChevronUpIcon, CheckCircleIcon, ClockIcon, SparklesIcon } from '@heroicons/react/24/solid';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Feature {
   title: string;
@@ -21,7 +22,7 @@ interface Version {
   bugFixes?: string[];
 }
 
-const roadmapData: Version[] = [
+const roadmapDataKo: Version[] = [
   {
     version: 'v0.5',
     releaseDate: '2025년 8월 14일',
@@ -223,6 +224,208 @@ const roadmapData: Version[] = [
   }
 ];
 
+const roadmapDataEn: Version[] = [
+  {
+    version: 'v0.5',
+    releaseDate: 'August 14, 2025',
+    status: 'released',
+    description: 'The first official version of MCP Hub. Provides basic server registration and search functionality.',
+    features: [
+      {
+        title: 'User Authentication System',
+        description: 'Implemented login and logout functionality. Supports secure password hashing and session management.',
+        status: 'completed'
+      },
+      {
+        title: 'MCP Server Registration',
+        description: 'Users can register new MCP servers. Can input server name, description, repository URL, category, tags, etc.',
+        status: 'completed'
+      },
+      {
+        title: 'Server Search and Filtering',
+        description: 'Search registered servers and filter by category. Supports keyword search and tag-based search.',
+        status: 'completed'
+      },
+      {
+        title: 'Server Detail Page',
+        description: 'A page where you can check detailed information for each server. Provides installation methods, usage examples, repository links, etc.',
+        status: 'completed'
+      },
+      {
+        title: 'Favorites Feature',
+        description: 'Add servers of interest to favorites and manage them in My Page.',
+        status: 'completed'
+      },
+      {
+        title: 'My Page',
+        description: 'A personal page where you can manage your registered servers and favorite servers at a glance.',
+        status: 'completed'
+      },
+      {
+        title: 'User Profile Page',
+        description: 'Check other users\' profiles and view the list of servers they have registered.',
+        status: 'completed'
+      },
+      {
+        title: 'Admin Approval System',
+        description: 'Newly registered servers are published after admin approval. Admins can check and manage pending servers in My Page.',
+        status: 'completed'
+      }
+    ],
+  },
+  {
+    version: 'v1.0',
+    releaseDate: 'September 29, 2025',
+    status: 'released',
+    description: 'A major update with enhanced authentication system and MCP server detailed information management features.',
+    features: [
+      {
+        title: 'Sign-up Feature Implementation',
+        description: 'Added sign-up functionality where users can create their own accounts. Added database fields to store nickname and bio information in user profiles for personalized profile setup.',
+        status: 'completed'
+      },
+      {
+        title: 'AD SSO Login Authentication Integration',
+        description: 'Added AD SSO login authentication to support corporate integrated authentication.',
+        status: 'completed'
+      },
+      {
+        title: 'Automatic Tools Collection and Management System',
+        description: 'Uses Server Config to automatically fetch tools and parameter information by connecting to the actual MCP server. If the server connection is not possible, tools and parameters can be manually entered for flexible server registration.',
+        status: 'completed'
+      }
+    ],
+    bugFixes: [
+      'Fixed time display error by changing Time Zone to Seoul(KST)',
+      'Fixed page refresh issue after logout'
+    ]
+  },
+  {
+    version: 'v1.5',
+    releaseDate: 'October 23, 2025 (Expected)',
+    status: 'in-progress',
+    description: 'An update for community feature enhancement and user experience improvement.',
+    features: [
+      {
+        title: 'Comment System',
+        description: 'You can write comments and communicate on the server detail page. You can edit and delete your own comments.',
+        status: 'completed'
+      },
+      {
+        title: 'Notice Feature',
+        description: 'Users who registered MCP servers can register and manage notices on the server detail page. Can deliver update information or important notifications to users.',
+        status: 'in-progress'
+      },
+      {
+        title: 'Ranking System',
+        description: 'Provides popular MCP server rankings (based on likes) and high-contributing user rankings (based on number of registered servers). You can check popular content at a glance on the main page.',
+        status: 'in-progress'
+      },
+      {
+        title: 'Multi-language Support (Korean/English)',
+        description: 'Supports Korean and English for convenient use by global users. Language can be easily switched in the navbar.',
+        status: 'in-progress'
+      },
+      {
+        title: 'Wiki Section',
+        description: 'Added Getting Started, How to Use, and Roadmap pages to help users easily understand and use the platform.',
+        status: 'completed'
+      }
+    ],
+    improvements: [
+      'GUI improvement: Cleaned up unnecessary links in Footer and simplified design',
+      'Tag-based filtering: Server filtering possible with tags instead of categories',
+      'Temporarily save input information in browser when registering/modifying server',
+      'Simplified Sign In process: Direct access with AD Login'
+    ],
+    bugFixes: [
+      'Fixed favorite count rendering issue'
+    ]
+  },
+  {
+    version: 'v1.7',
+    releaseDate: 'November 7, 2025 (Expected)',
+    status: 'planned',
+    description: 'An update to improve the automatic tools collection feature for all protocols when registering MCP servers.',
+    features: [
+      {
+        title: 'Universal Tools Automatic Collection System',
+        description: 'Solves the problem that current JSON-RPC-based tools automatic collection does not apply to all MCP protocols. Universally improved to automatically fetch tools information according to various MCP protocols and server implementation methods.',
+        implementation: 'Support for various MCP protocols, implementation of customized connection methods for each server, strengthened error handling and fallback mechanisms',
+        status: 'planned'
+      }
+    ],
+    improvements: [
+      'Improved tools collection success rate',
+      'Expanded supported protocols',
+    ],
+    bugFixes: [
+      'Fixed tools collection failure issue on specific MCP servers',
+      'Fixed errors due to protocol-specific connection method differences'
+    ]
+  },
+  {
+    version: 'v2.0',
+    expectedDate: 'November 14, 2025 (Expected)',
+    status: 'planned',
+    description: 'An update introducing data analysis and user behavior tracking systems.',
+    features: [
+      {
+        title: 'Search Keyword Analysis System',
+        description: 'Analyzes and visualizes user search keyword usage and trends in real time. Provides popular search terms, search frequency, search success rate, etc. for use in content optimization.',
+        implementation: 'Matomo Site Search feature + Send search events with trackEvent, optionally save search logs to DB',
+        status: 'planned'
+      },
+      {
+        title: 'MCP Server View Tracking System',
+        description: 'Tracks click count for each MCP server card, detail page view time, bounce rate, etc. Can quantitatively measure server popularity and user interest.',
+        implementation: 'Send Matomo trackEvent when server card is clicked, page views and dwell time are automatically tracked by Matomo, query statistics with Matomo API',
+        status: 'planned'
+      },
+      {
+        title: 'User Behavior Analysis Dashboard',
+        description: 'Provides a dashboard where admins and server registrants can analyze user behavior patterns. Visualizes page views, session time, user journey, etc.',
+        implementation: 'Build custom dashboard using Matomo API or embed Matomo dashboard iframe',
+        status: 'planned'
+      },
+    ],
+    improvements: [
+      'Added Matomo custom event tracking',
+      'Matomo API integration and statistics query function',
+    ]
+  },
+  {
+    version: 'v3.0',
+    expectedDate: 'November 28, 2025 (Expected)',
+    status: 'planned',
+    description: 'An update introducing an AI-based recommendation system and MCP Hub\'s own MCP server.',
+    features: [
+      {
+        title: 'AI Server Recommendations',
+        description: 'Analyzes user interests and usage patterns to recommend customized MCP servers.',
+        status: 'planned'
+      },
+      {
+        title: 'Automatic Documentation Generation',
+        description: 'Analyzes repositories to automatically generate basic descriptions and Server Config.',
+        status: 'planned'
+      },
+      {
+        title: 'MCP Hub MCP Server',
+        description: 'Provides MCP Hub itself as an MCP server so external AI clients can directly query and search MCP server information. MCP Hub data can be used in roocode, etc.',
+        implementation: 'Implement MCP server protocol, provide server search/query API, provide MCP client integration guide',
+        status: 'planned'
+      },
+      {
+        title: 'MCP Server Creation Tool',
+        description: 'When requesting in natural language through MCP Hub\'s MCP server in AI tools like roocode, it can automatically create and deploy an MCP server with the desired functionality.',
+        implementation: 'Provide MCP server template, AI-based automatic code generation, build automatic deployment pipeline',
+        status: 'planned'
+      }
+    ],
+  }
+];
+
 function StatusBadge({ status }: { status: 'released' | 'in-progress' | 'planned' }) {
   const badges = {
     released: { text: 'Released', color: 'bg-green-100 text-green-800', icon: CheckCircleIcon },
@@ -255,6 +458,9 @@ function FeatureStatusIcon({ status }: { status?: 'completed' | 'in-progress' | 
 
 export default function RoadmapPage() {
   const [expandedVersion, setExpandedVersion] = useState<string | null>('v1.5');
+  const { language } = useLanguage();
+  
+  const roadmapData = language === 'en' ? roadmapDataEn : roadmapDataKo;
 
   const toggleVersion = (version: string) => {
     setExpandedVersion(expandedVersion === version ? null : version);
@@ -266,7 +472,9 @@ export default function RoadmapPage() {
         <div className="max-w-5xl mx-auto">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Roadmap</h1>
           <p className="text-lg text-gray-600 mb-12">
-            MCP Server Hub의 개발 계획과 버전별 변경 사항을 확인하세요.
+            {language === 'en' 
+              ? 'Check the development plans and version-specific changes for MCP Server Hub.'
+              : 'MCP Server Hub의 개발 계획과 버전별 변경 사항을 확인하세요.'}
           </p>
 
           <div className="space-y-6">
@@ -311,7 +519,7 @@ export default function RoadmapPage() {
                       <div className="mb-6">
                         <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                           <span className="text-2xl">🎯</span>
-                          주요 기능
+                          {language === 'en' ? 'Key Features' : '주요 기능'}
                         </h3>
                         <div className="space-y-4">
                           {versionData.features.map((feature, idx) => (
@@ -341,7 +549,7 @@ export default function RoadmapPage() {
                         <div className="mb-6">
                           <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                             <span className="text-2xl">✨</span>
-                            개선 사항
+                            {language === 'en' ? 'Improvements' : '개선 사항'}
                           </h3>
                           <ul className="space-y-2">
                             {versionData.improvements.map((improvement, idx) => (
@@ -359,7 +567,7 @@ export default function RoadmapPage() {
                         <div>
                           <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                             <span className="text-2xl">🐛</span>
-                            버그 수정
+                            {language === 'en' ? 'Bug Fixes' : '버그 수정'}
                           </h3>
                           <ul className="space-y-2">
                             {versionData.bugFixes.map((bugFix, idx) => (
@@ -380,18 +588,34 @@ export default function RoadmapPage() {
 
           {/* Footer Note */}
           <div className="mt-12 bg-blue-50 rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-blue-900 mb-4">📝 참고사항</h3>
+            <h3 className="text-lg font-semibold text-blue-900 mb-4">
+              📝 {language === 'en' ? 'Notes' : '참고사항'}
+            </h3>
             <ul className="space-y-2 text-blue-800 text-sm mb-6">
-              <li>• 예정된 출시일은 개발 상황에 따라 변경될 수 있습니다.</li>
-              <li>• 기능 추가 및 개선 사항은 커뮤니티 피드백을 반영하여 조정될 수 있습니다.</li>
-              <li>• 새로운 기능 제안이나 피드백은 언제든 환영합니다!</li>
+              {language === 'en' ? (
+                <>
+                  <li>• Scheduled release dates may change depending on development progress.</li>
+                  <li>• Feature additions and improvements may be adjusted to reflect community feedback.</li>
+                  <li>• New feature suggestions or feedback are always welcome!</li>
+                </>
+              ) : (
+                <>
+                  <li>• 예정된 출시일은 개발 상황에 따라 변경될 수 있습니다.</li>
+                  <li>• 기능 추가 및 개선 사항은 커뮤니티 피드백을 반영하여 조정될 수 있습니다.</li>
+                  <li>• 새로운 기능 제안이나 피드백은 언제든 환영합니다!</li>
+                </>
+              )}
             </ul>
             
             {/* GitHub Issue Link */}
             <div className="bg-white rounded-lg p-4 border border-blue-200">
-              <h4 className="text-md font-semibold text-gray-900 mb-2">💡 피드백 및 제안</h4>
+              <h4 className="text-md font-semibold text-gray-900 mb-2">
+                💡 {language === 'en' ? 'Feedback and Suggestions' : '피드백 및 제안'}
+              </h4>
               <p className="text-gray-600 text-sm mb-4">
-                각 버전에 대한 새로운 기능 제안, 개선 아이디어, 또는 피드백이 있으시다면 GitHub Issue에 등록해주세요.
+                {language === 'en'
+                  ? 'If you have new feature suggestions, improvement ideas, or feedback for each version, please register them on GitHub Issue.'
+                  : '각 버전에 대한 새로운 기능 제안, 개선 아이디어, 또는 피드백이 있으시다면 GitHub Issue에 등록해주세요.'}
               </p>
               <a
                 href="https://github.com/YOUR_REPO/issues/new"
@@ -402,7 +626,7 @@ export default function RoadmapPage() {
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z" clipRule="evenodd" />
                 </svg>
-                GitHub Issue 등록하기
+                {language === 'en' ? 'Register GitHub Issue' : 'GitHub Issue 등록하기'}
               </a>
             </div>
           </div>

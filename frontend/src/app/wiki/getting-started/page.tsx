@@ -3,16 +3,19 @@
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function GettingStartedPage() {
   const [markdown, setMarkdown] = useState('');
+  const { language } = useLanguage();
 
   useEffect(() => {
-    fetch('/content/wiki/getting-started.md')
+    const fileName = language === 'en' ? 'getting-started.en.md' : 'getting-started.md';
+    fetch(`/content/wiki/${fileName}`)
       .then((res) => res.text())
       .then((text) => setMarkdown(text))
       .catch((err) => console.error('Failed to load markdown:', err));
-  }, []);
+  }, [language]);
 
   return (
     <div className="min-h-screen bg-gray-50">
