@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import TagList from "./tag-list";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { apiFetch } from "@/lib/api-client";
 
 interface AdminServerCardProps {
@@ -28,6 +29,7 @@ export function AdminServerCard({
   onReject,
 }: AdminServerCardProps) {
   const router = useRouter();
+  const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleClick = () => {
@@ -149,7 +151,7 @@ export function AdminServerCard({
             {category}
           </span>
           <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
-            승인 대기중
+            {t('mypage.pendingBadge')}
           </span>
         </div>
         <h3 className="text-xl font-semibold text-gray-900 mb-2 normal-case transition-colors hover:text-gray-700 cursor-pointer">

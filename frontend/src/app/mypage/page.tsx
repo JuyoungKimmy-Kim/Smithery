@@ -14,6 +14,7 @@ interface Post {
   title: string;
   desc: string;
   date: string;
+  status?: string; // status 추가
   author: {
     img: string;
     name: string;
@@ -242,19 +243,54 @@ export default function MyPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-x-8 gap-y-16 items-start lg:grid-cols-3">
-                    {myServers.map((server) => (
-                      <BlogPostCard
-                        key={server.id || server.title}
-                        category={server.category}
-                        tags={server.tags}
-                        title={server.title}
-                        desc={server.desc}
-                        date={server.date}
-                        author={server.author}
-                        id={server.id}
-                      />
-                    ))}
+                  <div className="space-y-12">
+                    {/* 승인 대기중인 서버 */}
+                    {myServers.filter(s => s.status === 'pending').length > 0 && (
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-6">
+                          {t('mypage.pendingServers', { count: String(myServers.filter(s => s.status === 'pending').length) })}
+                        </h3>
+                        <div className="grid grid-cols-1 gap-x-8 gap-y-16 items-start lg:grid-cols-3">
+                          {myServers.filter(s => s.status === 'pending').map((server) => (
+                            <BlogPostCard
+                              key={server.id || server.title}
+                              category={server.category}
+                              tags={server.tags}
+                              title={server.title}
+                              desc={server.desc}
+                              date={server.date}
+                              status={server.status}
+                              author={server.author}
+                              id={server.id}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 등록된 서버 (승인된 서버) */}
+                    {myServers.filter(s => s.status !== 'pending').length > 0 && (
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-6">
+                          {t('mypage.approvedServers', { count: String(myServers.filter(s => s.status !== 'pending').length) })}
+                        </h3>
+                        <div className="grid grid-cols-1 gap-x-8 gap-y-16 items-start lg:grid-cols-3">
+                          {myServers.filter(s => s.status !== 'pending').map((server) => (
+                            <BlogPostCard
+                              key={server.id || server.title}
+                              category={server.category}
+                              tags={server.tags}
+                              title={server.title}
+                              desc={server.desc}
+                              date={server.date}
+                              status={server.status}
+                              author={server.author}
+                              id={server.id}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

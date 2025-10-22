@@ -4,6 +4,7 @@ import { StarIcon } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import TagList from "./tag-list";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { apiFetch } from "@/lib/api-client";
 
 interface BlogPostCardProps {
@@ -13,6 +14,7 @@ interface BlogPostCardProps {
   desc: string;
   author: { name: string; img: string };
   date: string;
+  status?: string; // 서버 상태 (pending, approved 등)
   id?: string; // MCP 서버 ID 추가
   favoritesCount?: number; // 즐겨찾기 수 (초기값)
   onFavoriteChange?: () => void; // 즐겨찾기 상태 변경 콜백
@@ -26,6 +28,7 @@ export function BlogPostCard({
   desc,
   author,
   date,
+  status,
   id,
   favoritesCount: initialFavoritesCount = 0,
   onFavoriteChange,
@@ -33,6 +36,7 @@ export function BlogPostCard({
 }: BlogPostCardProps) {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
+  const { t } = useLanguage();
   const [isFavorite, setIsFavorite] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [favoritesCount, setFavoritesCount] = useState(initialFavoritesCount);
@@ -142,7 +146,9 @@ export function BlogPostCard({
 
   return (
     <div 
-      className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 cursor-pointer relative h-71 flex flex-col border border-gray-200"
+      className={`bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 cursor-pointer relative h-71 flex flex-col border border-gray-200 ${
+        status === 'pending' ? 'border-l-4 border-l-yellow-400' : ''
+      }`}
       onClick={handleClick}
     >
       {/* GitHub 스타일 스타 버튼 */}
@@ -166,9 +172,16 @@ export function BlogPostCard({
       </div>
 
       <div className="p-6 flex flex-col h-full">
-        <h3 className="text-xl font-semibold text-gray-900 mb-2 normal-case transition-colors hover:text-gray-700 cursor-pointer line-clamp-2">
-          {title}
-        </h3>
+        <div className="flex items-center gap-2 mb-2">
+          <h3 className="text-xl font-semibold text-gray-900 normal-case transition-colors hover:text-gray-700 cursor-pointer line-clamp-2">
+            {title}
+          </h3>
+          {status === 'pending' && (
+            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full whitespace-nowrap">
+              {t('mypage.pendingBadge')}
+            </span>
+          )}
+        </div>
         <p className="text-gray-600 mb-4 cursor-pointer line-clamp-3 flex-grow break-words overflow-hidden min-h-[4.5rem]">
           {desc}
         </p>
