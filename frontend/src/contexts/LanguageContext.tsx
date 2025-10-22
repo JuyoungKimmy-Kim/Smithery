@@ -48,6 +48,12 @@ const translations: Record<Language, Record<string, string>> = {
     'mypage.noPendingDesc': '모든 MCP 서버가 승인되었습니다.',
     'mypage.pendingCount': '승인 대기중인 서버 ({count}개)',
     'mypage.approveAll': '전체 승인',
+    'mypage.approveConfirm': '정말 승인하시겠습니까?',
+    'mypage.rejectConfirm': '정말로 이 서버를 거부하시겠습니까?',
+    'mypage.approveFailed': '승인에 실패했습니다.',
+    'mypage.approveError': '승인 중 오류가 발생했습니다.',
+    'mypage.rejectFailed': '거부에 실패했습니다.',
+    'mypage.rejectError': '거부 중 오류가 발생했습니다.',
     
     // User Page
     'userpage.loading': '{username}의 서버 목록을 불러오는 중...',
@@ -283,6 +289,12 @@ const translations: Record<Language, Record<string, string>> = {
     'mypage.noPendingDesc': 'All MCP servers have been approved.',
     'mypage.pendingCount': 'Pending Servers ({count})',
     'mypage.approveAll': 'Approve All',
+    'mypage.approveConfirm': 'Are you sure you want to approve this server?',
+    'mypage.rejectConfirm': 'Are you sure you want to reject this server?',
+    'mypage.approveFailed': 'Failed to approve.',
+    'mypage.approveError': 'An error occurred during approval.',
+    'mypage.rejectFailed': 'Failed to reject.',
+    'mypage.rejectError': 'An error occurred during rejection.',
     
     // User Page
     'userpage.loading': 'Loading {username}\'s servers...',
