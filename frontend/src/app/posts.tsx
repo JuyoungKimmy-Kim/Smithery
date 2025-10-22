@@ -441,7 +441,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                 </div>
 
                 {/* 랭킹 바들 */}
-                <div className="space-y-2 mb-8">
+                <div className="space-y-2 mb-8 max-w-4xl mx-auto">
                   {rankingTab === 'topUsers' ? (
                     // Top Users 탭
                     topUsers.map(({ username, count, post }, index) => (
