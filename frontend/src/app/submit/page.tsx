@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { MCPServer, ProtocolType, MCPServerTool, MCPServerProperty } from "../../types/mcp";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { PlusIcon, TrashIcon, PencilIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import TagSelector from "@/components/tag-selector";
 import { apiFetch } from "@/lib/api-client";
@@ -11,6 +12,7 @@ import { apiFetch } from "@/lib/api-client";
 export default function SubmitMCPPage() {
   const router = useRouter();
   const { token, isAuthenticated } = useAuth();
+  const { t } = useLanguage();
   const AUTOSAVE_KEY = 'mcp_submit_autosave';
   const hasRedirectedRef = useRef(false);
   
@@ -79,7 +81,7 @@ export default function SubmitMCPPage() {
         // 24시간 이내에 저장된 데이터만 복원
         if (hoursSinceAutosave < 24) {
           // 사용자에게 먼저 물어보고 복원
-          if (confirm('이전에 작성하던 내용이 있습니다. 복원하시겠습니까?')) {
+          if (confirm(t('submit.restorePrompt'))) {
             // 복원
             setFormData(parsed.formData || formData);
             setSelectedTags(parsed.selectedTags || []);
@@ -135,7 +137,7 @@ export default function SubmitMCPPage() {
         };
         localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(dataToSave));
         setLastSavedTime(now);
-        console.log('작성 중인 내용이 자동 저장되었습니다.');
+        console.log('Auto-saved draft.');
       } catch (error) {
         console.error('자동 저장 실패:', error);
       }
@@ -159,7 +161,7 @@ export default function SubmitMCPPage() {
       if (hasUnsavedChanges && !isSubmitting) {
         e.preventDefault();
         e.returnValue = ''; // Chrome에서 필요
-        return '작성 중인 내용이 있습니다. 정말 페이지를 벗어나시겠습니까?';
+        return t('submit.leaveConfirm');
       }
     };
 
@@ -212,7 +214,7 @@ export default function SubmitMCPPage() {
         e.stopPropagation();
         
         const confirmLeave = window.confirm(
-          '작성 중인 내용이 자동 저장되었습니다.\n페이지를 벗어나시겠습니까?'
+          t('submit.leaveConfirm')
         );
         
         if (confirmLeave) {
@@ -423,7 +425,7 @@ export default function SubmitMCPPage() {
 
   const handleSaveTool = () => {
     if (!toolForm.name.trim() || !toolForm.description.trim()) {
-      alert('Tool name과 description은 필수입니다.');
+      alert(t('submit.toolNameRequired'));
       return;
     }
 
@@ -451,7 +453,7 @@ export default function SubmitMCPPage() {
   };
 
   const handleDeleteTool = (index: number) => {
-    if (window.confirm('이 tool을 삭제하시겠습니까?')) {
+    if (window.confirm(t('submit.deleteToolConfirm'))) {
       const updatedTools = tools.filter((_, i) => i !== index);
       setTools(updatedTools);
     }
@@ -561,7 +563,7 @@ export default function SubmitMCPPage() {
     if (previewTools.length > 0) {
       const convertedTools = convertMCPToolsToMCPServerTools(previewTools);
       setTools(convertedTools);
-      alert(`${convertedTools.length}개의 tools가 추가되었습니다.`);
+      alert(t('submit.toolsAdded', { count: String(convertedTools.length) }));
     }
   };
 
@@ -569,27 +571,27 @@ export default function SubmitMCPPage() {
     const errors: {[key: string]: string} = {};
     
     if (!formData.name.trim()) {
-      errors.name = "Server Name은 필수입니다.";
+              errors.name = t('submit.serverNameRequired');
     }
     
     
     if (!formData.github_link.trim()) {
-      errors.github_link = "GitHub Link는 필수입니다.";
+      errors.github_link = t('submit.githubLinkRequired');
     } else if (!formData.github_link.startsWith('https://github.com/')) {
-      errors.github_link = "유효한 GitHub URL을 입력해주세요.";
+      errors.github_link = t('submit.githubLinkInvalid');
     }
     
     if (!formData.description.trim()) {
-      errors.description = "Description은 필수입니다.";
+      errors.description = t('submit.descriptionRequired');
     }
     
     if (!formData.protocol.trim()) {
-      errors.protocol = "Protocol은 필수입니다.";
+      errors.protocol = t('submit.protocolRequired');
     }
     
     if (formData.url.trim() && formData.protocol !== ProtocolType.STDIO) {
       if (!isValidUrl(formData.url)) {
-        errors.url = "유효한 URL을 입력해주세요.";
+        errors.url = t('submit.serverUrlInvalid');
       }
     }
     
@@ -611,7 +613,7 @@ export default function SubmitMCPPage() {
     setError("");
     
     if (!isAuthenticated) {
-      setError("Sign in required.");
+      setError(t('submit.signInRequired'));
       return;
     }
     
@@ -627,7 +629,7 @@ export default function SubmitMCPPage() {
         try {
           config = JSON.parse(formData.config);
         } catch (error) {
-          throw new Error('Server Config JSON 형식이 올바르지 않습니다.');
+          throw new Error(t('submit.serverConfigInvalid'));
         }
       } else if (formData.url.trim()) {
         config = { url: formData.url.trim() };
@@ -669,9 +671,9 @@ export default function SubmitMCPPage() {
       setShowSuccessModal(true);
     } catch (err) {
       if (err instanceof Error && err.message.includes('JSON')) {
-        setError('Server Config JSON 형식이 올바르지 않습니다.');
+        setError(t('submit.serverConfigInvalid'));
       } else {
-        setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
+        setError(err instanceof Error ? err.message : t('signup.unknownError'));
       }
     } finally {
       setIsSubmitting(false);
@@ -699,7 +701,7 @@ export default function SubmitMCPPage() {
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Checking authentication...</p>
+          <p className="mt-4 text-gray-600">{t('submit.checkingAuth')}</p>
         </div>
       </div>
     );
@@ -719,19 +721,19 @@ export default function SubmitMCPPage() {
               </div>
               
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                Session Expired
+                {t('submit.sessionExpired')}
               </h3>
               
               <div className="text-gray-600 mb-6 space-y-2">
-                <p>Draft saved automatically.</p>
-                <p>Log in again to continue.</p>
+                <p>{t('submit.draftSaved')}</p>
+                <p>{t('submit.loginAgain')}</p>
               </div>
               
               <button
                 onClick={() => router.push('/login')}
                 className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors font-medium"
               >
-                OK
+                {t('submit.ok')}
               </button>
             </div>
           </div>
@@ -748,12 +750,12 @@ export default function SubmitMCPPage() {
               </div>
               
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                MCP 서버 등록이 완료되었습니다.
+                {t('submit.successTitle')}
               </h3>
               
               <div className="text-gray-600 mb-8 space-y-2">
-                <p>승인 후 MCP 목록에서 확인할 수 있으며,</p>
-                <p>내 등록 서버는 My Page에서 확인하세요.</p>
+                <p>{t('submit.successDesc1')}</p>
+                <p>{t('submit.successDesc2')}</p>
               </div>
               
               <div className="flex gap-3">
@@ -761,13 +763,13 @@ export default function SubmitMCPPage() {
                   onClick={handleViewMCPList}
                   className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                 >
-                  MCP 목록 보기
+                  {t('submit.viewMcpList')}
                 </button>
                 <button
                   onClick={handleViewMyPage}
                   className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
                 >
-                  My Page
+                  {t('submit.viewMyPage')}
                 </button>
               </div>
             </div>
@@ -778,11 +780,11 @@ export default function SubmitMCPPage() {
       <div className="w-full max-w-4xl p-8 bg-white shadow-lg rounded-lg my-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-800 text-center">
-            Register a New MCP Server
+            {t('submit.title')}
           </h1>
           {lastSavedTime && (
             <p className="text-xs text-gray-500 text-center mt-2">
-              💾 자동 저장됨: {lastSavedTime.toLocaleTimeString('ko-KR')}
+              💾 {t('submit.autoSaved', { time: lastSavedTime.toLocaleTimeString('ko-KR') })}
             </p>
           )}
         </div>
@@ -797,7 +799,7 @@ export default function SubmitMCPPage() {
           {/* Server Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Server Name *
+              {t('submit.serverName')} *
             </label>
             <input
               type="text"
@@ -807,7 +809,7 @@ export default function SubmitMCPPage() {
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 validationErrors.name ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder="My MCP Server"
+              placeholder={t('submit.serverNamePlaceholder')}
             />
             {validationErrors.name && (
               <p className="mt-1 text-sm text-red-600">{validationErrors.name}</p>
@@ -818,7 +820,7 @@ export default function SubmitMCPPage() {
           {/* GitHub Link */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              GitHub Link *
+              {t('submit.githubLink')} *
             </label>
             <input
               type="url"
@@ -828,7 +830,7 @@ export default function SubmitMCPPage() {
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 validationErrors.github_link ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder="https://github.com/username/repository"
+              placeholder={t('submit.githubLinkPlaceholder')}
             />
             {validationErrors.github_link && (
               <p className="mt-1 text-sm text-red-600">{validationErrors.github_link}</p>
@@ -838,7 +840,7 @@ export default function SubmitMCPPage() {
           {/* Description */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Description *
+              {t('submit.description')} *
             </label>
             <textarea
               required
@@ -848,7 +850,7 @@ export default function SubmitMCPPage() {
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 validationErrors.description ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder="Describe your MCP server..."
+              placeholder={t('submit.descriptionPlaceholder')}
             />
             {validationErrors.description && (
               <p className="mt-1 text-sm text-red-600">{validationErrors.description}</p>
@@ -867,7 +869,7 @@ export default function SubmitMCPPage() {
           {/* Protocol */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Protocol *
+              {t('submit.protocol')} *
             </label>
             <select
               required
@@ -883,7 +885,7 @@ export default function SubmitMCPPage() {
                 validationErrors.protocol ? 'border-red-500' : 'border-gray-300'
               }`}
             >
-              <option value="">Select a protocol</option>
+              <option value="">{t('submit.protocolSelect')}</option>
               <option value={ProtocolType.HTTP}>HTTP</option>
               <option value={ProtocolType.HTTP_STREAM}>HTTP-Stream</option>
               <option value={ProtocolType.WEBSOCKET}>WebSocket</option>
@@ -897,7 +899,7 @@ export default function SubmitMCPPage() {
           {/* URL */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Server URL
+              {t('submit.serverUrl')}
             </label>
             <input
               type="url"
@@ -912,15 +914,15 @@ export default function SubmitMCPPage() {
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 validationErrors.url ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder={formData.protocol === ProtocolType.STDIO ? "python stdio_test_mcp_server.py" : "http://localhost:3000"}
+              placeholder={formData.protocol === ProtocolType.STDIO ? t('submit.serverUrlPlaceholderStdio') : t('submit.serverUrlPlaceholderHttp')}
             />
             {validationErrors.url && (
               <p className="mt-1 text-sm text-red-600">{validationErrors.url}</p>
             )}
             <p className="mt-1 text-xs text-gray-500">
               {formData.protocol === ProtocolType.STDIO 
-                ? "MCP 서버 실행 명령어를 입력하세요. Protocol과 함께 입력하면 자동으로 tools를 미리보기합니다."
-                : "MCP Server의 URL을 입력하세요. Protocol과 함께 입력하면 자동으로 tools를 미리보기합니다."
+                ? t('submit.serverUrlHelpStdio')
+                : t('submit.serverUrlHelpHttp')
               }
             </p>
           </div>
@@ -928,17 +930,17 @@ export default function SubmitMCPPage() {
           {/* Server Config */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Server Config (JSON)
+              {t('submit.serverConfig')}
             </label>
             <textarea
               value={formData.config}
               onChange={(e) => handleInputChange('config', e.target.value)}
               rows={4}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder='{"type": "streamable-http", "url": "http://localhost:3000"}'
+              placeholder={t('submit.serverConfigPlaceholder')}
             />
             <p className="mt-1 text-xs text-gray-500">
-              MCP Server 설정을 JSON 형식으로 입력하세요.
+              {t('submit.serverConfigHelp')}
             </p>
           </div>
 
@@ -946,7 +948,7 @@ export default function SubmitMCPPage() {
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
               <div className="flex items-center">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                <span className="text-blue-700">MCP Server에서 tools 정보를 가져오는 중...</span>
+                <span className="text-blue-700">{t('submit.loadingTools')}</span>
               </div>
             </div>
           )}
@@ -955,14 +957,14 @@ export default function SubmitMCPPage() {
             <div className="p-4 bg-green-50 border border-green-200 rounded-md">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium text-green-800">
-                  MCP Server Tools ({previewTools.length}개)
+                  {t('submit.toolsPreview', { count: String(previewTools.length) })}
                 </h3>
                 <button
                   type="button"
                   onClick={handleUsePreviewTools}
                   className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors"
                 >
-                  모두 추가
+                  {t('submit.addAllTools')}
                 </button>
               </div>
               <div className="space-y-3">
@@ -971,7 +973,7 @@ export default function SubmitMCPPage() {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <h4 className="font-medium text-green-900 text-sm">{tool.name}</h4>
-                        <p className="text-xs text-green-700 mt-1">{tool.description || '설명 없음'}</p>
+                        <p className="text-xs text-green-700 mt-1">{tool.description || t('submit.noDescription')}</p>
                         
                         {/* Parameters 정보 표시 */}
                         {tool.inputSchema?.properties && (
@@ -983,7 +985,7 @@ export default function SubmitMCPPage() {
                                   <span className="font-medium">{paramName}</span>
                                   <span className="text-blue-600">({paramInfo.type || 'any'})</span>
                                   {tool.inputSchema?.required?.includes(paramName) && (
-                                    <span className="text-red-600 text-xs">required</span>
+                                    <span className="text-red-600 text-xs">{t('submit.required')}</span>
                                   )}
                                   {paramInfo.description && (
                                     <span className="text-gray-500">- {paramInfo.description}</span>
@@ -1006,7 +1008,7 @@ export default function SubmitMCPPage() {
               <div className="flex items-center">
                 <div className="text-yellow-600 mr-2">⚠️</div>
                 <span className="text-yellow-700 text-sm">
-                  MCP Server에 연결할 수 없습니다. Server URL과 프로토콜을 확인하고 서버가 실행 중인지 확인해주세요.
+                  {t('submit.connectionError')}
                 </span>
               </div>
             </div>
@@ -1017,9 +1019,9 @@ export default function SubmitMCPPage() {
               <div className="flex items-center">
                 <div className="text-yellow-600 mr-2">⚠️</div>
                 <div className="text-yellow-700 text-sm">
-                  <p className="font-medium mb-1">STDIO 프로토콜 안내:</p>
-                  <p>STDIO 프로토콜은 브라우저에서 직접 미리보기할 수 없습니다.</p>
-                  <p>수동으로 tools를 추가해주세요.</p>
+                  <p className="font-medium mb-1">{t('submit.stdioWarning')}</p>
+                  <p>{t('submit.stdioWarningDesc1')}</p>
+                  <p>{t('submit.stdioWarningDesc2')}</p>
                 </div>
               </div>
             </div>
@@ -1028,7 +1030,7 @@ export default function SubmitMCPPage() {
           <div className="border-t pt-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-800">
-                Tools ({tools.length})
+                {t('submit.tools', { count: String(tools.length) })}
               </h2>
               <button
                 type="button"
@@ -1036,7 +1038,7 @@ export default function SubmitMCPPage() {
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
               >
                 <PlusIcon className="h-4 w-4" />
-                Add Tool
+                {t('submit.addTool')}
               </button>
             </div>
 
@@ -1050,13 +1052,13 @@ export default function SubmitMCPPage() {
                         <p className="text-sm text-gray-600 mt-1">{tool.description}</p>
                         {tool.parameters && tool.parameters.length > 0 && (
                           <div className="mt-2">
-                            <p className="text-xs font-medium text-gray-700 mb-1">Parameters:</p>
+                            <p className="text-xs font-medium text-gray-700 mb-1">{t('submit.parameters')}</p>
                             <div className="space-y-1">
                               {tool.parameters.map((param: MCPServerProperty, paramIndex: number) => (
                                 <div key={paramIndex} className="text-xs text-gray-600">
                                   • {param.name} 
                                   {param.type && <span className="text-blue-600"> ({param.type})</span>}
-                                  {param.required && <span className="text-red-600"> (required)</span>}
+                                  {param.required && <span className="text-red-600"> ({t('submit.required')})</span>}
                                   {param.description && ` - ${param.description}`}
                                 </div>
                               ))}
@@ -1065,13 +1067,13 @@ export default function SubmitMCPPage() {
                         )}
                         {tool.inputSchema?.properties && Object.keys(tool.inputSchema.properties).length > 0 && (
                           <div className="mt-2">
-                            <p className="text-xs font-medium text-gray-700 mb-1">Parameters:</p>
+                            <p className="text-xs font-medium text-gray-700 mb-1">{t('submit.parameters')}</p>
                             <div className="space-y-1">
                               {Object.entries(tool.inputSchema.properties).map(([paramName, paramInfo]: [string, any]) => (
                                 <div key={paramName} className="text-xs text-gray-600">
                                   • {paramName} 
                                   {paramInfo.type && <span className="text-blue-600"> ({paramInfo.type})</span>}
-                                  {tool.inputSchema?.required?.includes(paramName) && <span className="text-red-600"> (required)</span>}
+                                  {tool.inputSchema?.required?.includes(paramName) && <span className="text-red-600"> ({t('submit.required')})</span>}
                                   {paramInfo.description && ` - ${paramInfo.description}`}
                                 </div>
                               ))}
@@ -1105,33 +1107,33 @@ export default function SubmitMCPPage() {
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                 <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                   <h3 className="text-lg font-semibold mb-4">
-                    {editingToolIndex !== null ? 'Edit Tool' : 'Add New Tool'}
+                    {editingToolIndex !== null ? t('submit.editTool') : t('submit.addNewTool')}
                   </h3>
                   
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Tool Name *
+                        {t('submit.toolName')} *
                       </label>
                       <input
                         type="text"
                         value={toolForm.name}
                         onChange={(e) => setToolForm(prev => ({ ...prev, name: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="tool_name"
+                        placeholder={t('submit.toolNamePlaceholder')}
                       />
                     </div>
                     
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Description *
+                        {t('submit.toolDescription')} *
                       </label>
                       <textarea
                         value={toolForm.description}
                         onChange={(e) => setToolForm(prev => ({ ...prev, description: e.target.value }))}
                         rows={3}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Tool description..."
+                        placeholder={t('submit.toolDescriptionPlaceholder')}
                       />
                     </div>
 
@@ -1139,14 +1141,14 @@ export default function SubmitMCPPage() {
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <label className="block text-sm font-medium text-gray-700">
-                          Parameters
+                          {t('submit.parameters')}
                         </label>
                         <button
                           type="button"
                           onClick={() => setShowAddParameter(true)}
                           className="text-sm text-blue-600 hover:text-blue-800"
                         >
-                          + Add Parameter
+                          + {t('submit.addParameter')}
                         </button>
                       </div>
                       
@@ -1156,8 +1158,8 @@ export default function SubmitMCPPage() {
                             <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
                               <span className="text-sm font-medium">{param.name}</span>
                               {param.type && <span className="text-xs text-blue-600">({param.type})</span>}
-                              {!param.type && <span className="text-xs text-gray-400">(no type)</span>}
-                              {param.required && <span className="text-xs text-red-600">(required)</span>}
+                              {!param.type && <span className="text-xs text-gray-400">({t('submit.noType')})</span>}
+                              {param.required && <span className="text-xs text-red-600">({t('submit.required')})</span>}
                               {param.description && <span className="text-xs text-gray-600">- {param.description}</span>}
                               <div className="flex gap-1 ml-auto">
                                 <button
@@ -1183,19 +1185,19 @@ export default function SubmitMCPPage() {
                       {showAddParameter && (
                         <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
                           <h4 className="text-sm font-medium text-gray-700 mb-2">
-                            {editingParameterIndex !== null ? 'Edit Parameter' : 'Add Parameter'}
+                            {editingParameterIndex !== null ? t('submit.editParameter') : t('submit.addParameter')}
                           </h4>
                           <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-2">
                             <input
                               type="text"
-                              placeholder="Parameter name"
+                              placeholder={t('submit.parameterName')}
                               value={parameterForm.name}
                               onChange={(e) => setParameterForm(prev => ({ ...prev, name: e.target.value }))}
                               className="px-2 py-1 text-sm border border-gray-300 rounded"
                             />
                             <input
                               type="text"
-                              placeholder="Description (optional)"
+                              placeholder={t('submit.parameterDescription')}
                               value={parameterForm.description}
                               onChange={(e) => setParameterForm(prev => ({ ...prev, description: e.target.value }))}
                               className="px-2 py-1 text-sm border border-gray-300 rounded"
@@ -1205,7 +1207,7 @@ export default function SubmitMCPPage() {
                               onChange={(e) => setParameterForm(prev => ({ ...prev, type: e.target.value }))}
                               className="px-2 py-1 text-sm border border-gray-300 rounded"
                             >
-                              <option value="">Select type</option>
+                              <option value="">{t('submit.selectType')}</option>
                               <option value="string">String</option>
                               <option value="integer">Integer</option>
                               <option value="number">Number</option>
@@ -1233,7 +1235,7 @@ export default function SubmitMCPPage() {
                               onClick={editingParameterIndex !== null ? handleUpdateParameter : handleAddParameter}
                               className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
                             >
-                              {editingParameterIndex !== null ? 'Update' : 'Add'}
+                              {editingParameterIndex !== null ? t('submit.update') : t('submit.add')}
                             </button>
                             <button
                               type="button"
@@ -1249,7 +1251,7 @@ export default function SubmitMCPPage() {
                               }}
                               className="px-3 py-1 bg-gray-500 text-white text-sm rounded hover:bg-gray-600"
                             >
-                              Cancel
+                              {t('submit.cancel')}
                             </button>
                           </div>
                         </div>
@@ -1263,7 +1265,7 @@ export default function SubmitMCPPage() {
                       onClick={handleSaveTool}
                       className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                     >
-                      {editingToolIndex !== null ? 'Update' : 'Add'} Tool
+                      {editingToolIndex !== null ? t('submit.updateTool') : t('submit.addToolButton')}
                     </button>
                     <button
                       type="button"
@@ -1274,7 +1276,7 @@ export default function SubmitMCPPage() {
                       }}
                       className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
                     >
-                      Cancel
+                      {t('submit.cancel')}
                     </button>
                   </div>
                 </div>
@@ -1287,7 +1289,7 @@ export default function SubmitMCPPage() {
             disabled={isSubmitting}
             className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? '등록 중...' : 'MCP Server 등록'}
+            {isSubmitting ? t('submit.submitting') : t('submit.submitButton')}
           </button>
         </form>
       </div>

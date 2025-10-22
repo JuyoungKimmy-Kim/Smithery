@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { MCPServer, ProtocolType, MCPServerTool, MCPServerProperty } from "../../../../types/mcp";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { PlusIcon, TrashIcon, PencilIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import TagSelector from "@/components/tag-selector";
 import { apiFetch } from "@/lib/api-client";
@@ -12,6 +13,7 @@ export default function EditMCPServerPage() {
   const params = useParams();
   const router = useRouter();
   const { token, isAuthenticated } = useAuth();
+  const { t } = useLanguage();
   const AUTOSAVE_KEY = `mcp_edit_autosave_${params.id}`;
   const hasRedirectedRef = useRef(false);
   
@@ -101,7 +103,7 @@ export default function EditMCPServerPage() {
         const hoursSinceAutosave = (now - savedTime) / (1000 * 60 * 60);
         
         if (hoursSinceAutosave < 24) {
-          if (confirm('이전에 수정하던 내용이 있습니다. 복원하시겠습니까?')) {
+          if (confirm(t('edit.restorePrompt'))) {
             setFormData(parsed.formData || formData);
             setSelectedTags(parsed.selectedTags || []);
             setTools(parsed.tools || []);
@@ -151,7 +153,7 @@ export default function EditMCPServerPage() {
         };
         localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(dataToSave));
         setLastSavedTime(now);
-        console.log('수정 중인 내용이 자동 저장되었습니다.');
+        console.log('Auto-saved edit.');
       } catch (error) {
         console.error('자동 저장 실패:', error);
       }
@@ -183,7 +185,7 @@ export default function EditMCPServerPage() {
     const handlePopState = (e: PopStateEvent) => {
       if (hasUnsavedChanges && !isSubmitting) {
         const confirmLeave = window.confirm(
-          '수정 중인 내용이 자동 저장되었습니다.\n페이지를 벗어나시겠습니까?'
+          t('edit.leaveConfirm')
         );
         
         if (!confirmLeave) {
@@ -212,7 +214,7 @@ export default function EditMCPServerPage() {
         e.stopPropagation();
         
         const confirmLeave = window.confirm(
-          '수정 중인 내용이 자동 저장되었습니다.\n페이지를 벗어나시겠습니까?'
+          t('edit.leaveConfirm')
         );
         
         if (confirmLeave) {
@@ -383,7 +385,7 @@ export default function EditMCPServerPage() {
 
   const handleSaveTool = () => {
     if (!toolForm.name.trim() || !toolForm.description.trim()) {
-      alert('Tool name과 description은 필수입니다.');
+      alert(t('edit.toolNameRequired'));
       return;
     }
 
@@ -411,7 +413,7 @@ export default function EditMCPServerPage() {
   };
 
   const handleDeleteTool = (index: number) => {
-    if (window.confirm('이 tool을 삭제하시겠습니까?')) {
+    if (window.confirm(t('edit.deleteToolConfirm'))) {
       const updatedTools = tools.filter((_, i) => i !== index);
       setTools(updatedTools);
     }
@@ -419,7 +421,7 @@ export default function EditMCPServerPage() {
 
   const handleAddParameter = () => {
     if (!parameterForm.name.trim()) {
-      alert('Parameter name은 필수입니다.');
+      alert(t('edit.parameterNameRequired'));
       return;
     }
 
@@ -465,7 +467,7 @@ export default function EditMCPServerPage() {
 
   const handleUpdateParameter = () => {
     if (!parameterForm.name.trim()) {
-      alert('Parameter name은 필수입니다.');
+      alert(t('edit.parameterNameRequired'));
       return;
     }
 
@@ -499,18 +501,18 @@ export default function EditMCPServerPage() {
     
     
     if (!formData.description.trim()) {
-      errors.description = "Description은 필수입니다.";
+      errors.description = t('edit.descriptionRequired');
     }
     
     if (!formData.protocol.trim()) {
-      errors.protocol = "Protocol은 필수입니다.";
+      errors.protocol = t('edit.protocolRequired');
     }
     
     if (formData.url.trim() && formData.protocol !== ProtocolType.STDIO) {
       try {
         new URL(formData.url);
       } catch {
-        errors.url = "유효한 URL을 입력해주세요.";
+        errors.url = t('edit.serverUrlInvalid');
       }
     }
     
@@ -534,7 +536,7 @@ export default function EditMCPServerPage() {
         try {
           config = JSON.parse(formData.config);
         } catch (error) {
-          throw new Error('Server Config JSON 형식이 올바르지 않습니다.');
+          throw new Error(t('edit.serverConfigInvalid'));
         }
       } else if (formData.url.trim()) {
         config = { url: formData.url.trim() };
@@ -580,9 +582,9 @@ export default function EditMCPServerPage() {
       }
       
       if (err instanceof Error && err.message.includes('JSON')) {
-        setError('Server Config JSON 형식이 올바르지 않습니다.');
+        setError(t('edit.serverConfigInvalid'));
       } else {
-        setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
+        setError(err instanceof Error ? err.message : t('signup.unknownError'));
       }
     } finally {
       setIsSubmitting(false);
@@ -608,7 +610,7 @@ export default function EditMCPServerPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <h2 className="text-xl text-gray-600">
-          Loading MCP server...
+          {t('edit.loading')}
         </h2>
       </div>
     );
@@ -618,7 +620,7 @@ export default function EditMCPServerPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <h2 className="text-xl text-red-600">
-          {error || "MCP server not found"}
+          {error || t('edit.notFound')}
         </h2>
       </div>
     );
@@ -638,19 +640,19 @@ export default function EditMCPServerPage() {
               </div>
               
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                Session Expired
+                {t('edit.sessionExpired')}
               </h3>
               
               <div className="text-gray-600 mb-6 space-y-2">
-                <p>Draft saved automatically.</p>
-                <p>Log in again to continue.</p>
+                <p>{t('edit.draftSaved')}</p>
+                <p>{t('edit.loginAgain')}</p>
               </div>
               
               <button
                 onClick={() => router.push('/login')}
                 className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors font-medium"
               >
-                OK
+                {t('edit.ok')}
               </button>
             </div>
           </div>
@@ -667,12 +669,12 @@ export default function EditMCPServerPage() {
               </div>
               
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                MCP 서버 수정이 완료되었습니다.
+                {t('edit.successTitle')}
               </h3>
               
               <div className="text-gray-600 mb-8 space-y-2">
-                <p>수정된 내용이 반영되었으며,</p>
-                <p>MCP 목록에서 확인할 수 있습니다.</p>
+                <p>{t('edit.successDesc1')}</p>
+                <p>{t('edit.successDesc2')}</p>
               </div>
               
               <div className="flex gap-3">
@@ -680,13 +682,13 @@ export default function EditMCPServerPage() {
                   onClick={handleSuccessModalClose}
                   className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                 >
-                  상세 페이지 보기
+                  {t('edit.viewDetail')}
                 </button>
                 <button
                   onClick={handleViewMCPList}
                   className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
                 >
-                  MCP 목록 보기
+                  {t('edit.viewMcpList')}
                 </button>
               </div>
             </div>
@@ -697,11 +699,11 @@ export default function EditMCPServerPage() {
       <div className="w-full max-w-4xl p-8 bg-white shadow-lg rounded-lg my-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-800 text-center">
-            Edit MCP Server
+            {t('edit.title')}
           </h1>
           {lastSavedTime && (
             <p className="text-xs text-gray-500 text-center mt-2">
-              💾 자동 저장됨: {lastSavedTime.toLocaleTimeString('ko-KR')}
+              💾 {t('edit.autoSaved', { time: lastSavedTime.toLocaleTimeString('ko-KR') })}
             </p>
           )}
         </div>
@@ -716,7 +718,7 @@ export default function EditMCPServerPage() {
           {/* Server Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Server Name
+              {t('edit.serverName')}
             </label>
             <input
               type="text"
@@ -729,7 +731,7 @@ export default function EditMCPServerPage() {
           {/* GitHub Link */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              GitHub Link
+              {t('edit.githubLink')}
             </label>
             <input
               type="url"
@@ -742,7 +744,7 @@ export default function EditMCPServerPage() {
           {/* Description */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Description *
+              {t('edit.description')} *
             </label>
             <textarea
               required
@@ -752,7 +754,7 @@ export default function EditMCPServerPage() {
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 validationErrors.description ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder="MCP 서버에 대한 상세한 설명을 입력하세요"
+              placeholder={t('edit.descriptionPlaceholder')}
             />
             {validationErrors.description && (
               <p className="mt-1 text-sm text-red-600">{validationErrors.description}</p>
@@ -772,7 +774,7 @@ export default function EditMCPServerPage() {
           {/* Protocol */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Protocol *
+              {t('edit.protocol')} *
             </label>
             <select
               required
@@ -782,7 +784,7 @@ export default function EditMCPServerPage() {
                 validationErrors.protocol ? 'border-red-500' : 'border-gray-300'
               }`}
             >
-              <option value="">Select a protocol</option>
+              <option value="">{t('edit.protocolSelect')}</option>
               <option value={ProtocolType.HTTP}>HTTP</option>
               <option value={ProtocolType.HTTP_STREAM}>HTTP-Stream</option>
               <option value={ProtocolType.WEBSOCKET}>WebSocket</option>
@@ -796,7 +798,7 @@ export default function EditMCPServerPage() {
           {/* URL */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Server URL
+              {t('edit.serverUrl')}
             </label>
             <input
               type="url"
@@ -805,15 +807,15 @@ export default function EditMCPServerPage() {
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 validationErrors.url ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder={formData.protocol === ProtocolType.STDIO ? "python stdio_test_mcp_server.py" : "http://localhost:3000"}
+              placeholder={formData.protocol === ProtocolType.STDIO ? t('edit.serverUrlPlaceholderStdio') : t('edit.serverUrlPlaceholderHttp')}
             />
             {validationErrors.url && (
               <p className="mt-1 text-sm text-red-600">{validationErrors.url}</p>
             )}
             <p className="mt-1 text-xs text-gray-500">
               {formData.protocol === ProtocolType.STDIO 
-                ? "MCP 서버 실행 명령어를 입력하세요."
-                : "MCP Server의 URL을 입력하세요."
+                ? t('edit.serverUrlHelpStdio')
+                : t('edit.serverUrlHelpHttp')
               }
             </p>
           </div>
@@ -823,9 +825,9 @@ export default function EditMCPServerPage() {
               <div className="flex items-center">
                 <div className="text-yellow-600 mr-2">⚠️</div>
                 <div className="text-yellow-700 text-sm">
-                  <p className="font-medium mb-1">STDIO 프로토콜 안내:</p>
-                  <p>STDIO 프로토콜은 브라우저에서 직접 미리보기할 수 없습니다.</p>
-                  <p>수동으로 tools를 추가해주세요.</p>
+                  <p className="font-medium mb-1">{t('edit.stdioWarning')}</p>
+                  <p>{t('edit.stdioWarningDesc1')}</p>
+                  <p>{t('edit.stdioWarningDesc2')}</p>
                 </div>
               </div>
             </div>
@@ -833,24 +835,24 @@ export default function EditMCPServerPage() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Server Config (JSON)
+              {t('edit.serverConfig')}
             </label>
             <textarea
               rows={6}
               value={formData.config}
               onChange={(e) => handleInputChange('config', e.target.value)}
-              placeholder='{"mcpServers": {"example": {"command": "python", "args": ["server.py"]}}}'
+              placeholder={t('edit.serverConfigPlaceholder')}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <p className="mt-1 text-sm text-gray-500">
-              JSON 형식으로 서버 설정을 입력하세요. 비워두면 기본 설정이 사용됩니다.
+              {t('edit.serverConfigHelp')}
             </p>
           </div>
 
           <div className="border-t pt-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-800">
-                Tools ({tools.length})
+                {t('edit.tools', { count: String(tools.length) })}
               </h2>
               <button
                 type="button"
@@ -858,7 +860,7 @@ export default function EditMCPServerPage() {
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
               >
                 <PlusIcon className="h-4 w-4" />
-                Add Tool
+                {t('edit.addTool')}
               </button>
             </div>
 
@@ -872,14 +874,14 @@ export default function EditMCPServerPage() {
                         <p className="text-sm text-gray-600 mt-1">{tool.description}</p>
                         {tool.parameters.length > 0 && (
                           <div className="mt-2">
-                            <p className="text-xs font-medium text-gray-700 mb-1">Parameters:</p>
+                            <p className="text-xs font-medium text-gray-700 mb-1">{t('edit.parameters')}</p>
                             <div className="space-y-1">
                               {tool.parameters.map((param: MCPServerProperty, paramIndex: number) => (
                                 <div key={paramIndex} className="text-xs text-gray-600">
                                   • {param.name} 
                                   {param.type && <span className="text-blue-600"> ({param.type})</span>}
-                                  {!param.type && <span className="text-gray-400"> (no type)</span>}
-                                  {param.required && <span className="text-red-600"> (required)</span>}
+                                  {!param.type && <span className="text-gray-400"> ({t('edit.noType')})</span>}
+                                  {param.required && <span className="text-red-600"> ({t('edit.required')})</span>}
                                   {param.description && ` - ${param.description}`}
                                 </div>
                               ))}
@@ -913,33 +915,33 @@ export default function EditMCPServerPage() {
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                 <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                   <h3 className="text-lg font-semibold mb-4">
-                    {editingToolIndex !== null ? 'Edit Tool' : 'Add New Tool'}
+                    {editingToolIndex !== null ? t('edit.editTool') : t('edit.addNewTool')}
                   </h3>
                   
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Tool Name *
+                        {t('edit.toolName')} *
                       </label>
                       <input
                         type="text"
                         value={toolForm.name}
                         onChange={(e) => setToolForm(prev => ({ ...prev, name: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="tool_name"
+                        placeholder={t('edit.toolNamePlaceholder')}
                       />
                     </div>
                     
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Description *
+                        {t('edit.toolDescription')} *
                       </label>
                       <textarea
                         value={toolForm.description}
                         onChange={(e) => setToolForm(prev => ({ ...prev, description: e.target.value }))}
                         rows={3}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Tool description..."
+                        placeholder={t('edit.toolDescriptionPlaceholder')}
                       />
                     </div>
 
@@ -947,14 +949,14 @@ export default function EditMCPServerPage() {
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <label className="block text-sm font-medium text-gray-700">
-                          Parameters
+                          {t('edit.parameters')}
                         </label>
                         <button
                           type="button"
                           onClick={() => setShowAddParameter(true)}
                           className="text-sm text-blue-600 hover:text-blue-800"
                         >
-                          + Add Parameter
+                          + {t('edit.addParameter')}
                         </button>
                       </div>
                       
@@ -964,8 +966,8 @@ export default function EditMCPServerPage() {
                             <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
                               <span className="text-sm font-medium">{param.name}</span>
                               {param.type && <span className="text-xs text-blue-600">({param.type})</span>}
-                              {!param.type && <span className="text-xs text-gray-400">(no type)</span>}
-                              {param.required && <span className="text-xs text-red-600">(required)</span>}
+                              {!param.type && <span className="text-xs text-gray-400">({t('edit.noType')})</span>}
+                              {param.required && <span className="text-xs text-red-600">({t('edit.required')})</span>}
                               {param.description && <span className="text-xs text-gray-600">- {param.description}</span>}
                               <div className="flex gap-1 ml-auto">
                                 <button
@@ -991,19 +993,19 @@ export default function EditMCPServerPage() {
                       {showAddParameter && (
                         <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
                           <h4 className="text-sm font-medium text-gray-700 mb-2">
-                            {editingParameterIndex !== null ? 'Edit Parameter' : 'Add Parameter'}
+                            {editingParameterIndex !== null ? t('edit.editParameter') : t('edit.addParameter')}
                           </h4>
                           <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-2">
                             <input
                               type="text"
-                              placeholder="Parameter name"
+                              placeholder={t('edit.parameterName')}
                               value={parameterForm.name}
                               onChange={(e) => setParameterForm(prev => ({ ...prev, name: e.target.value }))}
                               className="px-2 py-1 text-sm border border-gray-300 rounded"
                             />
                             <input
                               type="text"
-                              placeholder="Description (optional)"
+                              placeholder={t('edit.parameterDescription')}
                               value={parameterForm.description}
                               onChange={(e) => setParameterForm(prev => ({ ...prev, description: e.target.value }))}
                               className="px-2 py-1 text-sm border border-gray-300 rounded"
@@ -1013,7 +1015,7 @@ export default function EditMCPServerPage() {
                               onChange={(e) => setParameterForm(prev => ({ ...prev, type: e.target.value }))}
                               className="px-2 py-1 text-sm border border-gray-300 rounded"
                             >
-                              <option value="">Select type</option>
+                              <option value="">{t('edit.selectType')}</option>
                               <option value="string">String</option>
                               <option value="integer">Integer</option>
                               <option value="number">Number</option>
@@ -1041,7 +1043,7 @@ export default function EditMCPServerPage() {
                               onClick={editingParameterIndex !== null ? handleUpdateParameter : handleAddParameter}
                               className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
                             >
-                              {editingParameterIndex !== null ? 'Update' : 'Add'}
+                              {editingParameterIndex !== null ? t('edit.update') : t('edit.add')}
                             </button>
                             <button
                               type="button"
@@ -1057,7 +1059,7 @@ export default function EditMCPServerPage() {
                               }}
                               className="px-3 py-1 bg-gray-500 text-white text-sm rounded hover:bg-gray-600"
                             >
-                              Cancel
+                              {t('edit.cancel')}
                             </button>
                           </div>
                         </div>
@@ -1071,7 +1073,7 @@ export default function EditMCPServerPage() {
                       onClick={handleSaveTool}
                       className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                     >
-                      {editingToolIndex !== null ? 'Update' : 'Add'} Tool
+                      {editingToolIndex !== null ? t('edit.updateTool') : t('edit.addToolButton')}
                     </button>
                     <button
                       type="button"
@@ -1082,7 +1084,7 @@ export default function EditMCPServerPage() {
                       }}
                       className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
                     >
-                      Cancel
+                      {t('edit.cancel')}
                     </button>
                   </div>
                 </div>
@@ -1096,14 +1098,14 @@ export default function EditMCPServerPage() {
               onClick={() => router.push(`/mcp/${params.id}`)}
               className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
             >
-              Cancel
+              {t('edit.cancelButton')}
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
               className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? "Updating..." : "Update Server"}
+              {isSubmitting ? t('edit.updating') : t('edit.updateButton')}
             </button>
           </div>
         </form>
