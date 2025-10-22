@@ -445,7 +445,11 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                   {rankingTab === 'topUsers' ? (
                     // Top Users 탭
                     topUsers.map(({ username, count, post }, index) => (
-                      <div key={`user-${String(username)}-${index}-${refreshKey}`} className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-md transition-shadow">
+                      <div 
+                        key={`user-${String(username)}-${index}-${refreshKey}`} 
+                        onClick={() => handleViewUser(username)}
+                        className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-lg transition-all cursor-pointer"
+                      >
                         <div className="flex items-center gap-3">
                           {/* 순위 */}
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${
@@ -482,7 +486,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                             </div>
                           </div>
                           
-                          {/* 점수와 액션 */}
+                          {/* 점수 */}
                           <div className="flex items-center space-x-3 flex-shrink-0">
                             <div className="text-right">
                               <div className="flex items-center justify-end space-x-1">
@@ -497,12 +501,6 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                                 {t('ranking.servers')}
                               </div>
                             </div>
-                            <button 
-                              onClick={() => handleViewUser(username)}
-                              className="bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 transition-colors text-xs font-medium"
-                            >
-                              {t('ranking.viewProfile')}
-                            </button>
                           </div>
                         </div>
                       </div>
@@ -510,7 +508,11 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                   ) : (
                     // Top 3 / 최신 등록 탭
                     currentRankingPosts.map(({ category, tags, title, desc, date, author, id, favorites_count }, index) => (
-                      <div key={`ranking-${id || title}-${refreshKey}`} className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-md transition-shadow">
+                      <div 
+                        key={`ranking-${id || title}-${refreshKey}`} 
+                        onClick={() => handleViewMCP(id)}
+                        className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-lg transition-all cursor-pointer"
+                      >
                         <div className="flex items-center gap-3">
                           {/* 순위 */}
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${
@@ -568,7 +570,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                             </div>
                           </div>
                           
-                          {/* 점수와 액션 */}
+                          {/* 점수 */}
                           <div className="flex items-center space-x-3 flex-shrink-0">
                             <div className="text-right">
                               <div className="flex items-center justify-end space-x-1">
@@ -583,12 +585,6 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                                 {rankingTab === 'top3' ? t('ranking.favorites') : ''}
                               </div>
                             </div>
-                            <button 
-                              onClick={() => handleViewMCP(id)}
-                              className="bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium"
-                            >
-                              {t('ranking.viewDetails')}
-                            </button>
                           </div>
                         </div>
                       </div>
