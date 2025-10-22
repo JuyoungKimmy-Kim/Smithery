@@ -149,6 +149,38 @@ export default function EditMCPServerPage() {
     return () => clearTimeout(timeoutId);
   }, [formData, selectedTags, tools, isDataLoaded, mcp]);
 
+  // 다른 탭에서 localStorage 변경 감지 및 동기화
+  useEffect(() => {
+    if (!isDataLoaded || !mcp) return;
+
+    const handleStorageChange = (e: StorageEvent) => {
+      // 다른 탭에서 AUTOSAVE_KEY가 변경된 경우에만 처리
+      if (e.key === AUTOSAVE_KEY && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          const savedTime = new Date(parsed.savedAt);
+          
+          // 다른 탭의 변경사항으로 현재 탭 업데이트
+          if (parsed.formData) {
+            setFormData(parsed.formData);
+          }
+          if (parsed.selectedTags) {
+            setSelectedTags(parsed.selectedTags);
+          }
+          if (parsed.tools) {
+            setTools(parsed.tools);
+          }
+          setLastSavedTime(savedTime);
+        } catch (error) {
+          console.error('다른 탭의 데이터 동기화 실패:', error);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [isDataLoaded, mcp]);
+
   // 페이지 이탈 방지 (브라우저 닫기/새로고침)
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
