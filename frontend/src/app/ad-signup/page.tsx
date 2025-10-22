@@ -4,11 +4,13 @@ import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function ADSignupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
+  const { t } = useLanguage();
   
   const [formData, setFormData] = useState({
     username: "",
@@ -61,7 +63,7 @@ export default function ADSignupPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || '회원가입에 실패했습니다.');
+        throw new Error(errorData.detail || t('signup.error'));
       }
 
       const result = await response.json();
@@ -72,7 +74,7 @@ export default function ADSignupPage() {
       // 메인 페이지로 이동
       router.push('/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
+      setError(err instanceof Error ? err.message : t('signup.unknownError'));
     } finally {
       setIsLoading(false);
     }
@@ -83,10 +85,10 @@ export default function ADSignupPage() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            회원가입
+            {t('signup.title')}
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            추가 정보를 입력하여 회원가입을 완료하세요
+            {t('signup.subtitle')}
           </p>
         </div>
         
@@ -101,7 +103,7 @@ export default function ADSignupPage() {
             {/* Username (읽기 전용) */}
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-gray-700">
-                Knox ID
+                {t('signup.knoxId')}
               </label>
               <input
                 id="username"
@@ -116,7 +118,7 @@ export default function ADSignupPage() {
             {/* Nickname (입력 가능) */}
             <div>
               <label htmlFor="nickname" className="block text-sm font-medium text-gray-700">
-                닉네임 *
+                {t('signup.nickname')} *
               </label>
               <input
                 id="nickname"
@@ -124,24 +126,24 @@ export default function ADSignupPage() {
                 type="text"
                 required
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="닉네임을 입력하세요"
+                placeholder={t('signup.nicknamePlaceholder')}
                 value={formData.nickname}
                 onChange={(e) => handleInputChange('nickname', e.target.value)}
               />
-              <p className="mt-1 text-xs text-gray-500">닉네임은 공개됩니다. 비속어, 혐오 표현 사용은 제한됩니다.</p>
+              <p className="mt-1 text-xs text-gray-500">{t('signup.nicknameHelp')}</p>
             </div>
 
             {/* Bio (입력 가능) */}
             <div>
               <label htmlFor="bio" className="block text-sm font-medium text-gray-700">
-                자기소개
+                {t('signup.bio')}
               </label>
               <textarea
                 id="bio"
                 name="bio"
                 rows={3}
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="자기소개를 입력하세요 (선택사항)"
+                placeholder={t('signup.bioPlaceholder')}
                 value={formData.bio}
                 onChange={(e) => handleInputChange('bio', e.target.value)}
               />
@@ -154,13 +156,13 @@ export default function ADSignupPage() {
               disabled={isLoading}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? '회원가입 중...' : '회원가입 완료'}
+              {isLoading ? t('signup.submitting') : t('signup.submit')}
             </button>
           </div>
 
           <div className="text-center">
             <Link href="/login" className="text-sm text-blue-600 hover:text-blue-500">
-              로그인 페이지로 돌아가기
+              {t('signup.backToLogin')}
             </Link>
           </div>
         </form>

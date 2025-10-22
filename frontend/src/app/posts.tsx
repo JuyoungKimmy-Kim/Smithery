@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import BlogPostCard from "@/components/blog-post-card";
 import { MCPServer } from "@/types/mcp";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Post {
   category: string;
@@ -27,6 +28,7 @@ interface PostsProps {
 
 export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
   const { isAuthenticated } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
   const [allPosts, setAllPosts] = useState<Post[]>([]);
@@ -405,36 +407,36 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                 {/* 탭 헤더 */}
                 <div className="flex justify-center mb-8">
                   <div className="bg-gray-100 p-1 rounded-lg flex">
-                    <button
-                      onClick={() => setRankingTab('top3')}
-                      className={`px-6 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
-                        rankingTab === 'top3'
-                          ? 'bg-white text-blue-600 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
-                      Top 3
-                    </button>
-                    <button
-                      onClick={() => setRankingTab('latest')}
-                      className={`px-6 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
-                        rankingTab === 'latest'
-                          ? 'bg-white text-blue-600 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
-                      최신 등록
-                    </button>
-                    <button
-                      onClick={() => setRankingTab('topUsers')}
-                      className={`px-6 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
-                        rankingTab === 'topUsers'
-                          ? 'bg-white text-blue-600 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
-                      Top Users
-                    </button>
+                  <button
+                    onClick={() => setRankingTab('top3')}
+                    className={`px-6 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
+                      rankingTab === 'top3'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    {t('ranking.top3')}
+                  </button>
+                  <button
+                    onClick={() => setRankingTab('latest')}
+                    className={`px-6 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
+                      rankingTab === 'latest'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    {t('ranking.latest')}
+                  </button>
+                  <button
+                    onClick={() => setRankingTab('topUsers')}
+                    className={`px-6 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
+                      rankingTab === 'topUsers'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    {t('ranking.topUsers')}
+                  </button>
                   </div>
                 </div>
 
@@ -471,12 +473,12 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                           {/* 사용자 정보 */}
                           <div className="flex-1 min-w-0">
                             <h3 className="text-base font-semibold text-gray-900 mb-0.5 truncate">{String(username)}</h3>
-                            <p className="text-xs text-gray-600 mb-1 truncate">MCP 서버 개발자</p>
+                            <p className="text-xs text-gray-600 mb-1 truncate">{t('ranking.mcpDeveloper')}</p>
                             <div className="flex items-center space-x-3 text-xs text-gray-500">
                               <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded-full text-xs">
-                                {count}개 서버
+                                {t('ranking.serverCount', { count: String(count) })}
                               </span>
-                              <span className="flex-shrink-0">개발자</span>
+                              <span className="flex-shrink-0">{t('ranking.developer')}</span>
                             </div>
                           </div>
                           
@@ -492,14 +494,14 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                                 </span>
                               </div>
                               <div className="text-xs text-gray-500">
-                                MCP 서버
+                                {t('ranking.servers')}
                               </div>
                             </div>
                             <button 
                               onClick={() => handleViewUser(username)}
                               className="bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 transition-colors text-xs font-medium"
                             >
-                              View User
+                              {t('ranking.viewProfile')}
                             </button>
                           </div>
                         </div>
@@ -578,14 +580,14 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                                 </span>
                               </div>
                               <div className="text-xs text-gray-500">
-                                {rankingTab === 'top3' ? 'favorites' : ''}
+                                {rankingTab === 'top3' ? t('ranking.favorites') : ''}
                               </div>
                             </div>
                             <button 
                               onClick={() => handleViewMCP(id)}
                               className="bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium"
                             >
-                              View MCP
+                              {t('ranking.viewDetails')}
                             </button>
                           </div>
                         </div>

@@ -78,6 +78,33 @@ const translations: Record<Language, Record<string, string>> = {
     'comments.editErrorUnknown': '댓글 수정 중 오류가 발생했습니다.',
     'comments.deleteError': '댓글 삭제 실패: {error}',
     'comments.deleteErrorUnknown': '댓글 삭제 중 오류가 발생했습니다.',
+    
+    // Signup Page
+    'signup.title': '회원가입',
+    'signup.subtitle': '추가 정보를 입력하여 회원가입을 완료하세요',
+    'signup.knoxId': 'Knox ID',
+    'signup.nickname': '닉네임',
+    'signup.nicknamePlaceholder': '닉네임을 입력하세요',
+    'signup.nicknameHelp': '닉네임은 공개됩니다. 비속어, 혐오 표현 사용은 제한됩니다.',
+    'signup.bio': '자기소개',
+    'signup.bioPlaceholder': '자기소개를 입력하세요 (선택사항)',
+    'signup.submitting': '회원가입 중...',
+    'signup.submit': '회원가입 완료',
+    'signup.backToLogin': '로그인 페이지로 돌아가기',
+    'signup.error': '회원가입에 실패했습니다.',
+    'signup.unknownError': '알 수 없는 오류가 발생했습니다.',
+    
+    // Main Page Ranking
+    'ranking.top3': 'Top 3',
+    'ranking.latest': '최신 등록',
+    'ranking.topUsers': 'Top Users',
+    'ranking.favorites': 'favorites',
+    'ranking.servers': 'servers',
+    'ranking.viewDetails': 'VIEW',
+    'ranking.mcpDeveloper': 'MCP 서버 개발자',
+    'ranking.serverCount': '{count}개 서버',
+    'ranking.developer': '개발자',
+    'ranking.viewProfile': 'VIEW',
   },
   en: {
     // Navbar
@@ -143,6 +170,33 @@ const translations: Record<Language, Record<string, string>> = {
     'comments.editErrorUnknown': 'An error occurred while editing the comment.',
     'comments.deleteError': 'Failed to delete comment: {error}',
     'comments.deleteErrorUnknown': 'An error occurred while deleting the comment.',
+    
+    // Signup Page
+    'signup.title': 'Sign Up',
+    'signup.subtitle': 'Complete your registration by entering additional information',
+    'signup.knoxId': 'Knox ID',
+    'signup.nickname': 'Nickname',
+    'signup.nicknamePlaceholder': 'Enter your nickname',
+    'signup.nicknameHelp': 'Your nickname will be public. Profanity and hate speech are prohibited.',
+    'signup.bio': 'Bio',
+    'signup.bioPlaceholder': 'Enter your bio (optional)',
+    'signup.submitting': 'Signing up...',
+    'signup.submit': 'Complete Sign Up',
+    'signup.backToLogin': 'Back to Login',
+    'signup.error': 'Sign up failed.',
+    'signup.unknownError': 'An unknown error occurred.',
+    
+    // Main Page Ranking
+    'ranking.top3': 'Top 3',
+    'ranking.latest': 'Latest',
+    'ranking.topUsers': 'Top Users',
+    'ranking.favorites': 'favorites',
+    'ranking.servers': 'servers',
+    'ranking.viewDetails': 'VIEW',
+    'ranking.mcpDeveloper': 'MCP Server Developer',
+    'ranking.serverCount': '{count} servers',
+    'ranking.developer': 'Developer',
+    'ranking.viewProfile': 'VIEW',
   },
 };
 
