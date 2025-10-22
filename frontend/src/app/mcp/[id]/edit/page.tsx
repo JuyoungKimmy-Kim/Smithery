@@ -98,37 +98,24 @@ export default function EditMCPServerPage() {
       
       if (savedData && !hasAskedRestore) {
         const parsed = JSON.parse(savedData);
-        const savedTime = new Date(parsed.savedAt).getTime();
-        const now = new Date().getTime();
-        const hoursSinceAutosave = (now - savedTime) / (1000 * 60 * 60);
         
-        if (hoursSinceAutosave < 24) {
-          if (confirm(t('edit.restorePrompt'))) {
-            setFormData(parsed.formData || formData);
-            setSelectedTags(parsed.selectedTags || []);
-            setTools(parsed.tools || []);
-            sessionStorage.setItem(`hasAskedRestore_${params.id}`, 'true');
-            console.log('자동 저장된 수정 내용을 복원했습니다.');
-          } else {
-            localStorage.removeItem(AUTOSAVE_KEY);
-            sessionStorage.setItem(`hasAskedRestore_${params.id}`, 'true');
-          }
+        if (confirm(t('edit.restorePrompt'))) {
+          setFormData(parsed.formData || formData);
+          setSelectedTags(parsed.selectedTags || []);
+          setTools(parsed.tools || []);
+          sessionStorage.setItem(`hasAskedRestore_${params.id}`, 'true');
+          console.log('자동 저장된 수정 내용을 복원했습니다.');
         } else {
           localStorage.removeItem(AUTOSAVE_KEY);
+          sessionStorage.setItem(`hasAskedRestore_${params.id}`, 'true');
         }
       } else if (savedData && hasAskedRestore) {
         // 이미 복원 여부를 물어봤으면 조용히 복원
         const parsed = JSON.parse(savedData);
-        const savedTime = new Date(parsed.savedAt).getTime();
-        const now = new Date().getTime();
-        const hoursSinceAutosave = (now - savedTime) / (1000 * 60 * 60);
-        
-        if (hoursSinceAutosave < 24) {
-          setFormData(parsed.formData || formData);
-          setSelectedTags(parsed.selectedTags || []);
-          setTools(parsed.tools || []);
-          console.log('자동 저장된 수정 내용을 조용히 복원했습니다.');
-        }
+        setFormData(parsed.formData || formData);
+        setSelectedTags(parsed.selectedTags || []);
+        setTools(parsed.tools || []);
+        console.log('자동 저장된 수정 내용을 조용히 복원했습니다.');
       }
     } catch (error) {
       console.error('자동 저장 데이터 복원 실패:', error);
