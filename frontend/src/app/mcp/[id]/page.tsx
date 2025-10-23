@@ -13,6 +13,7 @@ import {
   TrashIcon,
   ClipboardDocumentIcon,
   CheckIcon,
+  MegaphoneIcon,
 } from "@heroicons/react/24/outline";
 import { MCPServer } from "@/types/mcp";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,6 +32,9 @@ export default function MCPServerDetail() {
   const [currentToolPage, setCurrentToolPage] = useState(1);
   const toolsPerPage = 3;
   const [isConfigCopied, setIsConfigCopied] = useState(false);
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+  const [announcementText, setAnnouncementText] = useState("");
+  const [isUpdatingAnnouncement, setIsUpdatingAnnouncement] = useState(false);
 
   const toggleToolExpansion = (index: number) => {
     const newExpanded = new Set(expandedTools);
@@ -72,6 +76,76 @@ export default function MCPServerDetail() {
       document.body.removeChild(textArea);
       setIsConfigCopied(true);
       setTimeout(() => setIsConfigCopied(false), 2000);
+    }
+  };
+
+  const handleAddAnnouncement = () => {
+    setAnnouncementText(mcp?.announcement || "");
+    setShowAnnouncementModal(true);
+  };
+
+  const handleSaveAnnouncement = async () => {
+    if (!mcp) return;
+    
+    setIsUpdatingAnnouncement(true);
+    
+    try {
+      const response = await apiFetch(`/api/mcps/${mcp.id}/announcement`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          announcement: announcementText.trim() || null
+        }),
+        requiresAuth: true,
+      });
+      
+      if (response.ok) {
+        const updatedMCP = await response.json();
+        setMcp(updatedMCP);
+        setShowAnnouncementModal(false);
+        setAnnouncementText("");
+      } else {
+        const errorData = await response.json();
+        console.error('API Error:', errorData);
+        throw new Error(errorData.detail || `HTTP ${response.status}: Failed to update announcement`);
+      }
+    } catch (error) {
+      console.error('Announcement update error:', error);
+      alert(`Failed to update announcement: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsUpdatingAnnouncement(false);
+    }
+  };
+
+  const handleDeleteAnnouncement = async () => {
+    if (!mcp) return;
+    
+    const confirmed = window.confirm("Are you sure you want to delete the announcement?");
+    if (!confirmed) return;
+    
+    setIsUpdatingAnnouncement(true);
+    
+    try {
+      const response = await apiFetch(`/api/mcps/${mcp.id}/announcement`, {
+        method: 'DELETE',
+        requiresAuth: true,
+      });
+      
+      if (response.ok) {
+        const updatedMCP = await response.json();
+        setMcp(updatedMCP);
+      } else {
+        const errorData = await response.json();
+        console.error('API Error:', errorData);
+        throw new Error(errorData.detail || `HTTP ${response.status}: Failed to delete announcement`);
+      }
+    } catch (error) {
+      console.error('Announcement delete error:', error);
+      alert(`Failed to delete announcement: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsUpdatingAnnouncement(false);
     }
   };
 
@@ -171,6 +245,41 @@ export default function MCPServerDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Announcement Banner - Top of Page */}
+      {mcp.announcement && (
+        <div className="bg-yellow-100 border-b-2 border-yellow-300">
+          <div className="container mx-auto px-4 max-w-6xl py-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-3 flex-1">
+                <MegaphoneIcon className="h-6 w-6 text-black mt-1 flex-shrink-0" />
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-black mb-2">공지사항</h3>
+                  <p className="text-black whitespace-pre-wrap">{mcp.announcement}</p>
+                </div>
+              </div>
+              {isOwner && (
+                <div className="flex gap-2 ml-4 flex-shrink-0">
+                  <button
+                    onClick={handleAddAnnouncement}
+                    className="px-3 py-1 bg-yellow-600 text-white text-sm rounded-md hover:bg-yellow-700 transition-colors flex items-center gap-1"
+                    disabled={isUpdatingAnnouncement}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={handleDeleteAnnouncement}
+                    className="px-3 py-1 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition-colors flex items-center gap-1"
+                    disabled={isUpdatingAnnouncement}
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="container mx-auto px-4 max-w-6xl py-8">
         {/* Header Section */}
         <div className="bg-white rounded-lg shadow-sm p-8 mb-8">
@@ -196,6 +305,20 @@ export default function MCPServerDetail() {
               <p className="text-lg text-gray-600 mb-6">
                 {mcp.description}
               </p>
+
+              {/* 공지사항 추가 버튼 - 공지사항이 없을 때만 표시 */}
+              {isOwner && !mcp.announcement && (
+                <div className="mb-4">
+                  <button 
+                    className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors flex items-center gap-2"
+                    onClick={handleAddAnnouncement}
+                    disabled={isUpdatingAnnouncement}
+                  >
+                    <ClipboardDocumentIcon className="h-4 w-4" />
+                    공지사항 추가
+                  </button>
+                </div>
+              )}
 
               <div className="flex items-center gap-6 text-sm text-gray-600">
                 {mcp.created_at && (
@@ -233,6 +356,7 @@ export default function MCPServerDetail() {
                   Edit
                 </button>
               )}
+              
               
               {canDelete && (
                 <button 
@@ -275,6 +399,7 @@ export default function MCPServerDetail() {
             </div>
           )}
         </div>
+
 
         {/* Tools & Config Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
@@ -512,9 +637,52 @@ export default function MCPServerDetail() {
 
         {/* 댓글 섹션 */}
         <div className="mt-8">
-          <Comments mcpServerId={mcp.id} />
+          <Comments mcpServerId={parseInt(mcp.id)} />
         </div>
       </div>
+
+      {/* Announcement Modal */}
+      {showAnnouncementModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              {mcp.announcement ? "Edit Announcement" : "Add Announcement"}
+            </h3>
+            
+            <textarea
+              value={announcementText}
+              onChange={(e) => setAnnouncementText(e.target.value)}
+              placeholder="Enter your announcement here..."
+              className="w-full h-32 p-3 border border-gray-300 rounded-md resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              maxLength={1000}
+            />
+            
+            <div className="text-sm text-gray-500 mt-2">
+              {announcementText.length}/1000 characters
+            </div>
+            
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowAnnouncementModal(false);
+                  setAnnouncementText("");
+                }}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                disabled={isUpdatingAnnouncement}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveAnnouncement}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+                disabled={isUpdatingAnnouncement}
+              >
+                {isUpdatingAnnouncement ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 
