@@ -285,23 +285,9 @@ export default function MCPServerDetail() {
         <div className="bg-white rounded-lg shadow-sm p-8 mb-8">
           <div className="flex items-start justify-between mb-6">
             <div className="flex-1">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                  {mcp.category || "Uncategorized"}
-                </span>
-                <span className={`px-2 py-1 text-xs rounded-full ${
-                  mcp.status === "active" 
-                    ? "bg-green-100 text-green-800" 
-                    : "bg-gray-100 text-gray-800"
-                }`}>
-                  {mcp.status || "Unknown"}
-                </span>
-              </div>
-              
               <h1 className="text-3xl font-bold text-gray-900 mb-4">
                 {mcp.name}
               </h1>
-              
               <p className="text-lg text-gray-600 mb-6">
                 {mcp.description}
               </p>
