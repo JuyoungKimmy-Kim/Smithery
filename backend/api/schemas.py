@@ -1,4 +1,4 @@
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
@@ -88,6 +88,7 @@ class MCPServerResponse(BaseModel):
     owner_id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
+    announcement: Optional[str] = None
     tools: List[MCPServerToolResponse] = []
     tags: List['TagResponse'] = []
     owner: Optional[UserResponse] = None
@@ -136,3 +137,12 @@ class PreviewToolsResponse(BaseModel):
     tools: List[PreviewToolResponse]
     success: bool
     message: Optional[str] = None
+
+class AnnouncementRequest(BaseModel):
+    announcement: Optional[str] = None
+    
+    @validator('announcement')
+    def validate_announcement_length(cls, v):
+        if v is not None and len(v) > 1000:
+            raise ValueError('Announcement must be 1000 characters or less')
+        return v

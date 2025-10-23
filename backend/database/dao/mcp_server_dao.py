@@ -175,3 +175,14 @@ class MCPServerDAO:
         return self.db.query(UserFavorite).filter(
             UserFavorite.mcp_server_id == mcp_server_id
         ).count()
+    
+    def update_mcp_server_announcement(self, mcp_server_id: int, announcement: Optional[str]) -> Optional[MCPServer]:
+        """MCP 서버의 공지사항을 업데이트합니다."""
+        mcp_server = self.get_mcp_server_by_id(mcp_server_id)
+        if not mcp_server:
+            return None
+        
+        mcp_server.announcement = announcement
+        self.db.commit()
+        self.db.refresh(mcp_server)
+        return mcp_server
