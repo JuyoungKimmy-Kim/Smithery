@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import TagList from "./tag-list";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { apiFetch } from "@/lib/api-client";
 
 interface AdminServerCardProps {
@@ -28,6 +29,7 @@ export function AdminServerCard({
   onReject,
 }: AdminServerCardProps) {
   const router = useRouter();
+  const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleClick = () => {
@@ -39,6 +41,10 @@ export function AdminServerCard({
   const handleApprove = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!id || isLoading) return;
+
+    if (!confirm(t('mypage.approveConfirm'))) {
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -63,11 +69,11 @@ export function AdminServerCard({
       } else {
         const errorData = await response.json();
         console.error('Failed to approve server:', errorData);
-        alert('승인에 실패했습니다.');
+        alert(t('mypage.approveFailed'));
       }
     } catch (error) {
       console.error('Error approving server:', error);
-      alert('승인 중 오류가 발생했습니다.');
+      alert(t('mypage.approveError'));
     } finally {
       setIsLoading(false);
     }
@@ -77,7 +83,7 @@ export function AdminServerCard({
     e.stopPropagation();
     if (!id || isLoading) return;
 
-    if (!confirm('정말로 이 서버를 거부하시겠습니까?')) {
+    if (!confirm(t('mypage.rejectConfirm'))) {
       return;
     }
 
@@ -104,11 +110,11 @@ export function AdminServerCard({
       } else {
         const errorData = await response.json();
         console.error('Failed to reject server:', errorData);
-        alert('거부에 실패했습니다.');
+        alert(t('mypage.rejectFailed'));
       }
     } catch (error) {
       console.error('Error rejecting server:', error);
-      alert('거부 중 오류가 발생했습니다.');
+      alert(t('mypage.rejectError'));
     } finally {
       setIsLoading(false);
     }
@@ -149,7 +155,7 @@ export function AdminServerCard({
             {category}
           </span>
           <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
-            승인 대기중
+            {t('mypage.pendingBadge')}
           </span>
         </div>
         <h3 className="text-xl font-semibold text-gray-900 mb-2 normal-case transition-colors hover:text-gray-700 cursor-pointer">

@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
       title: server.name,
       desc: server.description,
       date: new Date(server.created_at).toLocaleDateString(),
+      status: server.status || 'approved', // status 추가
       author: {
         img: server.owner?.avatar_url || '/image/avatar1.jpg',
         name: server.owner?.username || 'Unknown'

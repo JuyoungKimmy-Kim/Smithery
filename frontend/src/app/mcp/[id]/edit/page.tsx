@@ -98,37 +98,24 @@ export default function EditMCPServerPage() {
       
       if (savedData && !hasAskedRestore) {
         const parsed = JSON.parse(savedData);
-        const savedTime = new Date(parsed.savedAt).getTime();
-        const now = new Date().getTime();
-        const hoursSinceAutosave = (now - savedTime) / (1000 * 60 * 60);
         
-        if (hoursSinceAutosave < 24) {
-          if (confirm(t('edit.restorePrompt'))) {
-            setFormData(parsed.formData || formData);
-            setSelectedTags(parsed.selectedTags || []);
-            setTools(parsed.tools || []);
-            sessionStorage.setItem(`hasAskedRestore_${params.id}`, 'true');
-            console.log('자동 저장된 수정 내용을 복원했습니다.');
-          } else {
-            localStorage.removeItem(AUTOSAVE_KEY);
-            sessionStorage.setItem(`hasAskedRestore_${params.id}`, 'true');
-          }
+        if (confirm(t('edit.restorePrompt'))) {
+          setFormData(parsed.formData || formData);
+          setSelectedTags(parsed.selectedTags || []);
+          setTools(parsed.tools || []);
+          sessionStorage.setItem(`hasAskedRestore_${params.id}`, 'true');
+          console.log('자동 저장된 수정 내용을 복원했습니다.');
         } else {
           localStorage.removeItem(AUTOSAVE_KEY);
+          sessionStorage.setItem(`hasAskedRestore_${params.id}`, 'true');
         }
       } else if (savedData && hasAskedRestore) {
         // 이미 복원 여부를 물어봤으면 조용히 복원
         const parsed = JSON.parse(savedData);
-        const savedTime = new Date(parsed.savedAt).getTime();
-        const now = new Date().getTime();
-        const hoursSinceAutosave = (now - savedTime) / (1000 * 60 * 60);
-        
-        if (hoursSinceAutosave < 24) {
-          setFormData(parsed.formData || formData);
-          setSelectedTags(parsed.selectedTags || []);
-          setTools(parsed.tools || []);
-          console.log('자동 저장된 수정 내용을 조용히 복원했습니다.');
-        }
+        setFormData(parsed.formData || formData);
+        setSelectedTags(parsed.selectedTags || []);
+        setTools(parsed.tools || []);
+        console.log('자동 저장된 수정 내용을 조용히 복원했습니다.');
       }
     } catch (error) {
       console.error('자동 저장 데이터 복원 실패:', error);
@@ -161,6 +148,38 @@ export default function EditMCPServerPage() {
 
     return () => clearTimeout(timeoutId);
   }, [formData, selectedTags, tools, isDataLoaded, mcp]);
+
+  // 다른 탭에서 localStorage 변경 감지 및 동기화
+  useEffect(() => {
+    if (!isDataLoaded || !mcp) return;
+
+    const handleStorageChange = (e: StorageEvent) => {
+      // 다른 탭에서 AUTOSAVE_KEY가 변경된 경우에만 처리
+      if (e.key === AUTOSAVE_KEY && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          const savedTime = new Date(parsed.savedAt);
+          
+          // 다른 탭의 변경사항으로 현재 탭 업데이트
+          if (parsed.formData) {
+            setFormData(parsed.formData);
+          }
+          if (parsed.selectedTags) {
+            setSelectedTags(parsed.selectedTags);
+          }
+          if (parsed.tools) {
+            setTools(parsed.tools);
+          }
+          setLastSavedTime(savedTime);
+        } catch (error) {
+          console.error('다른 탭의 데이터 동기화 실패:', error);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [isDataLoaded, mcp]);
 
   // 페이지 이탈 방지 (브라우저 닫기/새로고침)
   useEffect(() => {

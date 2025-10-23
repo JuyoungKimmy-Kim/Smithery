@@ -74,43 +74,28 @@ export default function SubmitMCPPage() {
       const savedData = localStorage.getItem(AUTOSAVE_KEY);
       if (savedData && !hasAskedRestore) {
         const parsed = JSON.parse(savedData);
-        const savedTime = new Date(parsed.savedAt).getTime();
-        const now = new Date().getTime();
-        const hoursSinceAutosave = (now - savedTime) / (1000 * 60 * 60);
         
-        // 24시간 이내에 저장된 데이터만 복원
-        if (hoursSinceAutosave < 24) {
-          // 사용자에게 먼저 물어보고 복원
-          if (confirm(t('submit.restorePrompt'))) {
-            // 복원
-            setFormData(parsed.formData || formData);
-            setSelectedTags(parsed.selectedTags || []);
-            setTools(parsed.tools || []);
-            console.log('자동 저장된 데이터를 복원했습니다.');
-            // 이번 세션에서 복원했다는 플래그 설정
-            sessionStorage.setItem('hasAskedRestore', 'true');
-          } else {
-            // 사용자가 거부하면 localStorage에서 삭제
-            localStorage.removeItem(AUTOSAVE_KEY);
-            // 이번 세션에서 물어봤다는 플래그 설정
-            sessionStorage.setItem('hasAskedRestore', 'true');
-          }
+        // 사용자에게 먼저 물어보고 복원
+        if (confirm(t('submit.restorePrompt'))) {
+          // 복원
+          setFormData(parsed.formData || formData);
+          setSelectedTags(parsed.selectedTags || []);
+          setTools(parsed.tools || []);
+          console.log('자동 저장된 데이터를 복원했습니다.');
+          // 이번 세션에서 복원했다는 플래그 설정
+          sessionStorage.setItem('hasAskedRestore', 'true');
         } else {
-          // 24시간이 지난 데이터는 삭제
+          // 사용자가 거부하면 localStorage에서 삭제
           localStorage.removeItem(AUTOSAVE_KEY);
+          // 이번 세션에서 물어봤다는 플래그 설정
+          sessionStorage.setItem('hasAskedRestore', 'true');
         }
       } else if (savedData && hasAskedRestore) {
         // 이미 복원 여부를 물어봤으면 조용히 복원 (confirm 없이)
         const parsed = JSON.parse(savedData);
-        const savedTime = new Date(parsed.savedAt).getTime();
-        const now = new Date().getTime();
-        const hoursSinceAutosave = (now - savedTime) / (1000 * 60 * 60);
-        
-        if (hoursSinceAutosave < 24) {
-          setFormData(parsed.formData || formData);
-          setSelectedTags(parsed.selectedTags || []);
-          setTools(parsed.tools || []);
-        }
+        setFormData(parsed.formData || formData);
+        setSelectedTags(parsed.selectedTags || []);
+        setTools(parsed.tools || []);
       }
     } catch (error) {
       console.error('자동 저장 데이터 복원 실패:', error);
@@ -145,6 +130,38 @@ export default function SubmitMCPPage() {
 
     return () => clearTimeout(timeoutId);
   }, [formData, selectedTags, tools, isDataLoaded]);
+
+  // 다른 탭에서 localStorage 변경 감지 및 동기화
+  useEffect(() => {
+    if (!isDataLoaded) return;
+
+    const handleStorageChange = (e: StorageEvent) => {
+      // 다른 탭에서 AUTOSAVE_KEY가 변경된 경우에만 처리
+      if (e.key === AUTOSAVE_KEY && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          const savedTime = new Date(parsed.savedAt);
+          
+          // 다른 탭의 변경사항으로 현재 탭 업데이트
+          if (parsed.formData) {
+            setFormData(parsed.formData);
+          }
+          if (parsed.selectedTags) {
+            setSelectedTags(parsed.selectedTags);
+          }
+          if (parsed.tools) {
+            setTools(parsed.tools);
+          }
+          setLastSavedTime(savedTime);
+        } catch (error) {
+          console.error('다른 탭의 데이터 동기화 실패:', error);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [isDataLoaded]);
 
   // 초기 인증 체크 (한 번만 실행)
   useEffect(() => {
