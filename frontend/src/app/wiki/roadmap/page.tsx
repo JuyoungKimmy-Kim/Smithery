@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from 'react';
-import { ChevronDownIcon, ChevronUpIcon, CheckCircleIcon, ClockIcon, SparklesIcon } from '@heroicons/react/24/solid';
+import { ChevronDownIcon, ChevronUpIcon, CheckCircleIcon, ClockIcon, SparklesIcon, PauseIcon } from '@heroicons/react/24/solid';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Feature {
   title: string;
   description: string;
   implementation?: string;
-  status?: 'completed' | 'in-progress' | 'planned';
+  status?: 'completed' | 'in-progress' | 'planned' | 'on-hold';
 }
 
 interface Version {
@@ -117,7 +117,7 @@ const roadmapDataKo: Version[] = [
       {
         title: 'Ranking 시스템',
         description: '인기 MCP 서버 랭킹(좋아요 수 기준)과 기여도 높은 사용자 랭킹(등록한 서버 수 기준)을 제공합니다. 메인 페이지에서 인기 콘텐츠를 한눈에 확인할 수 있습니다.',
-        status: 'in-progress'
+        status: 'on-hold'
       },
       {
         title: '다국어 지원 (한국어/영어)',
@@ -319,7 +319,7 @@ const roadmapDataEn: Version[] = [
       {
         title: 'Ranking System',
         description: 'Provides popular MCP server rankings (based on likes) and high-contributing user rankings (based on number of registered servers). You can check popular content at a glance on the main page.',
-        status: 'in-progress'
+        status: 'on-hold'
       },
       {
         title: 'Multi-language Support (Korean/English)',
@@ -444,13 +444,14 @@ function StatusBadge({ status }: { status: 'released' | 'in-progress' | 'planned
   );
 }
 
-function FeatureStatusIcon({ status }: { status?: 'completed' | 'in-progress' | 'planned' }) {
+function FeatureStatusIcon({ status }: { status?: 'completed' | 'in-progress' | 'planned' | 'on-hold' }) {
   if (!status) return null;
   
   const icons = {
     completed: <CheckCircleIcon className="h-5 w-5 text-green-600" />,
     'in-progress': <SparklesIcon className="h-5 w-5 text-blue-600" />,
-    planned: <ClockIcon className="h-5 w-5 text-gray-400" />
+    planned: <ClockIcon className="h-5 w-5 text-gray-400" />,
+    'on-hold': <PauseIcon className="h-5 w-5 text-orange-500" />
   };
 
   return icons[status];
