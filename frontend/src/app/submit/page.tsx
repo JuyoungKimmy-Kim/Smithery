@@ -168,7 +168,7 @@ export default function SubmitMCPPage() {
     // 데이터 로드 완료 후, 인증되지 않았고, 아직 리다이렉트하지 않았고, 모달이 표시 중이 아니면
     if (isDataLoaded && !isAuthenticated && !hasRedirectedRef.current && !showSessionExpiredModal) {
       hasRedirectedRef.current = true;
-      router.push('/login');
+      router.push('/ad-login');
     }
   }, [isDataLoaded, isAuthenticated, showSessionExpiredModal, router]);
 
@@ -747,7 +747,7 @@ export default function SubmitMCPPage() {
               </div>
               
               <button
-                onClick={() => router.push('/login')}
+                onClick={() => router.push('/ad-login')}
                 className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors font-medium"
               >
                 {t('submit.ok')}

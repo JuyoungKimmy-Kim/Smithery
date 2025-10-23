@@ -190,3 +190,7 @@ class MCPServerService:
     def get_mcp_server_favorites_count(self, mcp_server_id: int) -> int:
         """특정 MCP 서버의 즐겨찾기 수를 조회합니다."""
         return self.mcp_server_dao.get_mcp_server_favorites_count(mcp_server_id)
+    
+    def update_mcp_server_announcement(self, mcp_server_id: int, announcement: Optional[str]) -> Optional[MCPServer]:
+        """MCP 서버의 공지사항을 업데이트합니다."""
+        return self.mcp_server_dao.update_mcp_server_announcement(mcp_server_id, announcement)

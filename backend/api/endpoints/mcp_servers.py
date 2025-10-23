@@ -8,7 +8,8 @@ from backend.database.model import User
 from backend.api.schemas import (
     MCPServerCreate, MCPServerResponse, MCPServerUpdate,
     SearchRequest, SearchResponse, FavoriteRequest, FavoriteResponse,
-    AdminApprovalRequest, TagResponse, PreviewToolsRequest, PreviewToolsResponse
+    AdminApprovalRequest, TagResponse, PreviewToolsRequest, PreviewToolsResponse,
+    AnnouncementRequest
 )
 from backend.api.auth import get_current_user, get_current_admin_user
 
@@ -363,4 +364,75 @@ def delete_mcp_server_by_owner(
             detail="MCP Server not found"
         )
     
-    return {"message": "MCP Server deleted successfully"} 
+    return {"message": "MCP Server deleted successfully"}
+
+@router.put("/{mcp_server_id}/announcement", response_model=MCPServerResponse)
+def update_mcp_server_announcement(
+    mcp_server_id: int,
+    announcement_data: AnnouncementRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """MCP 서버의 공지사항을 추가하거나 수정합니다. 소유자만 가능합니다. 최대 1000자까지 입력 가능합니다."""
+    mcp_service = MCPServerService(db)
+    
+    # MCP 서버 존재 확인 및 소유자 확인
+    existing_server = mcp_service.get_mcp_server_by_id(mcp_server_id)
+    if not existing_server:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="MCP Server not found"
+        )
+    
+    # 소유자만 공지사항 수정 가능
+    if existing_server.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the server owner can update announcement"
+        )
+    
+    # 공지사항 업데이트
+    updated_server = mcp_service.update_mcp_server_announcement(
+        mcp_server_id, announcement_data.announcement
+    )
+    if not updated_server:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="MCP Server not found"
+        )
+    
+    return updated_server
+
+@router.delete("/{mcp_server_id}/announcement", response_model=MCPServerResponse)
+def delete_mcp_server_announcement(
+    mcp_server_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """MCP 서버의 공지사항을 삭제합니다. 소유자만 가능합니다."""
+    mcp_service = MCPServerService(db)
+    
+    # MCP 서버 존재 확인 및 소유자 확인
+    existing_server = mcp_service.get_mcp_server_by_id(mcp_server_id)
+    if not existing_server:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="MCP Server not found"
+        )
+    
+    # 소유자만 공지사항 삭제 가능
+    if existing_server.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the server owner can delete announcement"
+        )
+    
+    # 공지사항 삭제 (None으로 설정)
+    updated_server = mcp_service.update_mcp_server_announcement(mcp_server_id, None)
+    if not updated_server:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="MCP Server not found"
+        )
+    
+    return updated_server 

@@ -15,6 +15,7 @@ class MCPServer(Base):
     status = Column(String(20), default='pending')
     protocol = Column(String(20), nullable=False)
     config = Column(JSON, nullable=True)
+    announcement = Column(Text, nullable=True)
     owner_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

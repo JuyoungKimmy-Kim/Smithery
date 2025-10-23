@@ -46,6 +46,7 @@ export interface MCPServer {
   category?: string;
   tags?: string[];
   status?: string;
+  announcement?: string;
   tools: MCPServerTool[];
   resources: MCPServerResource[];
   config?: any;
