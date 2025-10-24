@@ -62,6 +62,10 @@ class UserDAO:
             and_(MCPServer.owner_id == user_id, MCPServer.status == 'approved')
         ).all()
     
+    def get_user_all_mcp_servers(self, user_id: int) -> List[MCPServer]:
+        """사용자가 등록한 모든 MCP 서버 목록을 조회합니다. (pending 포함)"""
+        return self.db.query(MCPServer).filter(MCPServer.owner_id == user_id).all()
+    
     def get_user_favorites(self, user_id: int) -> List[MCPServer]:
         """사용자가 즐겨찾기한 MCP 서버 목록을 조회합니다."""
         return self.db.query(MCPServer).join(UserFavorite).filter(UserFavorite.user_id == user_id).all()

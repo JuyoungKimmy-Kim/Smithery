@@ -195,9 +195,9 @@ def get_user_mcp_servers(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """사용자가 등록한 MCP 서버 목록을 조회합니다."""
+    """사용자가 등록한 MCP 서버 목록을 조회합니다. (mypage용 - pending 포함)"""
     user_service = UserService(db)
-    return user_service.get_user_mcp_servers(current_user.id)
+    return user_service.get_user_all_mcp_servers(current_user.id)
 
 @router.get("/user/{username}", response_model=List[MCPServerResponse])
 def get_user_mcp_servers_by_username(

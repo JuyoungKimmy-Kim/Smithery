@@ -54,6 +54,10 @@ class UserService:
         """사용자가 등록한 MCP 서버 목록을 조회합니다."""
         return self.user_dao.get_user_mcp_servers(user_id)
     
+    def get_user_all_mcp_servers(self, user_id: int) -> List[MCPServer]:
+        """사용자가 등록한 모든 MCP 서버 목록을 조회합니다. (pending 포함)"""
+        return self.user_dao.get_user_all_mcp_servers(user_id)
+    
     def get_user_mcp_servers_by_username(self, username: str) -> List[MCPServer]:
         """사용자명으로 사용자가 등록한 MCP 서버 목록을 조회합니다."""
         user = self.user_dao.get_user_by_username(username)
