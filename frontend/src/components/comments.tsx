@@ -21,6 +21,7 @@ interface Comment {
   created_at: string;
   updated_at: string;
   user_nickname: string;
+  user_avatar_url: string;
 }
 
 interface CommentsProps {
@@ -242,6 +243,11 @@ export default function Comments({ mcpServerId }: CommentsProps) {
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
+                    <img
+                      src={comment.user_avatar_url || '/image/avatar1.jpg'}
+                      alt={comment.user_nickname}
+                      className="w-8 h-8 rounded-full object-cover"
+                    />
                     <span className="font-medium text-gray-900">
                       {comment.user_nickname}
                     </span>

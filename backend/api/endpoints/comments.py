@@ -25,6 +25,7 @@ class CommentResponse(BaseModel):
     created_at: str
     updated_at: str
     user_nickname: str
+    user_avatar_url: str
     
     class Config:
         from_attributes = True
@@ -53,7 +54,8 @@ async def create_comment(
         user_id=comment.user_id,
         created_at=comment.created_at.isoformat(),
         updated_at=comment.updated_at.isoformat() if comment.updated_at else comment.created_at.isoformat(),
-        user_nickname=current_user.nickname
+        user_nickname=current_user.nickname,
+        user_avatar_url=current_user.avatar_url or '/image/avatar1.jpg'
     )
 
 @router.get("/mcp-servers/{mcp_server_id}/comments", response_model=List[CommentResponse])
@@ -80,7 +82,8 @@ async def get_comments(
             user_id=comment.user_id,
             created_at=comment.created_at.isoformat(),
             updated_at=comment.updated_at.isoformat() if comment.updated_at else comment.created_at.isoformat(),
-            user_nickname=comment.user.nickname
+            user_nickname=comment.user.nickname,
+            user_avatar_url=comment.user.avatar_url or '/image/avatar1.jpg'
         )
         for comment in comments
     ]
@@ -115,7 +118,8 @@ async def update_comment(
         user_id=comment.user_id,
         created_at=comment.created_at.isoformat(),
         updated_at=comment.updated_at.isoformat() if comment.updated_at else comment.created_at.isoformat(),
-        user_nickname=current_user.nickname
+        user_nickname=current_user.nickname,
+        user_avatar_url=current_user.avatar_url or '/image/avatar1.jpg'
     )
 
 @router.delete("/{comment_id}")
