@@ -531,9 +531,15 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                               className="w-8 h-8 rounded-full object-cover"
                             />
                             {index === 0 && (
-                              <div className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center">
-                                <span className="text-white text-xs">👑</span>
-                              </div>
+                              rankingTab === 'latest' ? (
+                                <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
+                                  NEW
+                                </div>
+                              ) : (
+                                <div className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center">
+                                  <span className="text-white text-xs">👑</span>
+                                </div>
+                              )
                             )}
                           </div>
                           
