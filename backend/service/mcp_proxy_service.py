@@ -82,7 +82,9 @@ class MCPProxyService:
         1️⃣ POST 시도
         2️⃣ 3xx Redirect 처리
         3️⃣ 405/403 시 GET fallback (여러 엔드포인트 시도)
-        4️⃣ Content-Type 기반 자동 감지
+        4️⃣ SSE session 처리 (/mcp → /messages/?session_id=...)
+        5️⃣ Content-Type 기반 자동 감지
+        6️⃣ Invalid Content-Type → /messages POST fallback
         """
         async with aiohttp.ClientSession() as session:
             try:
@@ -96,6 +98,7 @@ class MCPProxyService:
                     timeout=aiohttp.ClientTimeout(total=MCPProxyService.HTTP_TIMEOUT),
                     allow_redirects=False
                 ) as response:
+                    content_type = response.headers.get("Content-Type", "")
                     
                     # 3xx Redirect 처리
                     if response.status in (301, 302, 303, 307, 308):
@@ -107,9 +110,13 @@ class MCPProxyService:
                     if response.status in (403, 405):
                         return await MCPProxyService._try_http_get(session, url)
                     
-                    # 정상 응답 처리
-                    content_type = response.headers.get("Content-Type", "")
+                    # SSE session opener (/mcp)
+                    if "text/event-stream" in content_type:
+                        result = await MCPProxyService._handle_sse_session(session, response)
+                        if result:
+                            return result
                     
+                    # 정상 응답 처리
                     if response.status == 200:
                         if "application/json" in content_type:
                             try:
@@ -122,13 +129,16 @@ class MCPProxyService:
                             return await MCPProxyService._parse_stream_response(response)
                         else:
                             text = await response.text()
+                            # Invalid Content-Type 헤더 확인
+                            if "Invalid Content-Type" in text:
+                                return await MCPProxyService._try_messages_post(session, url, payload)
                             return MCPProxyService._create_error_response(f"Unknown content-type: {content_type}, response: {text[:100]}")
                     
                     # 기타 상태 코드에 대해서는 HTTP-stream 시도
                     return await MCPProxyService._fetch_http_stream(url, payload)
                     
-            except aiohttp.ClientError as e:
-                return MCPProxyService._create_error_response(f"HTTP client error: {str(e)}")
+            except aiohttp.ClientError:
+                return await MCPProxyService._try_http_get(session, url)
             except Exception as e:
                 return MCPProxyService._create_error_response(f"HTTP request failed: {str(e)}")
     
@@ -161,11 +171,11 @@ class MCPProxyService:
     
     @staticmethod
     async def _parse_stream_response(response: aiohttp.ClientResponse) -> Dict[str, Any]:
-        """Parse NDJSON or SSE stream."""
+        """Parse NDJSON or SSE stream with nested payload support."""
         tools = []
         async for raw_line in response.content:
             line = raw_line.decode("utf-8").strip()
-            if not line:
+            if not line or line.startswith(":"):
                 continue
             if line.startswith("data:"):
                 line = line[5:].strip()
@@ -173,15 +183,26 @@ class MCPProxyService:
                     break
             try:
                 obj = json.loads(line)
+                # 표준 JSON-RPC 응답
                 if "result" in obj and "tools" in obj["result"]:
                     tools = obj["result"]["tools"]
                     break
+                # 직접 tools 필드
                 elif "tools" in obj:
                     tools = obj["tools"]
                     break
+                # 배열로 직접 tools 전송
                 elif isinstance(obj, list) and len(obj) > 0:
                     tools = obj
                     break
+                # Nested JSON string (payload 안의 JSON string)
+                elif "payload" in obj:
+                    payload_str = obj["payload"]
+                    if isinstance(payload_str, str):
+                        payload_obj = json.loads(payload_str)
+                        if "tools" in payload_obj:
+                            tools = payload_obj["tools"]
+                            break
             except json.JSONDecodeError:
                 continue
         
@@ -189,6 +210,91 @@ class MCPProxyService:
             return MCPProxyService._create_success_response(tools, "Tools fetched successfully from stream")
         else:
             return MCPProxyService._create_error_response("No tools found in stream response")
+    
+    @staticmethod
+    async def _handle_sse_session(session: aiohttp.ClientSession, response: aiohttp.ClientResponse) -> Dict[str, Any]:
+        """
+        SSE session 처리: /mcp → /messages/?session_id=...
+        서버가 세션 URL을 반환하면 해당 URL을 구독
+        """
+        try:
+            async for line in response.content:
+                text = line.decode("utf-8").strip()
+                if text.startswith("data:"):
+                    data = text[5:].strip()
+                    if "/messages/" in data:
+                        # 절대 URL 또는 상대 URL 처리
+                        session_url = data if data.startswith("http") else response.url.scheme + "://" + response.url.host + data
+                        return await MCPProxyService._listen_messages(session, session_url)
+            return None
+        except Exception as e:
+            return MCPProxyService._create_error_response(f"SSE session handling failed: {str(e)}")
+    
+    @staticmethod
+    async def _listen_messages(session: aiohttp.ClientSession, session_url: str) -> Dict[str, Any]:
+        """
+        실제 /messages SSE 스트림 구독
+        """
+        try:
+            async with session.get(
+                session_url,
+                headers={"Accept": "text/event-stream"},
+                timeout=aiohttp.ClientTimeout(total=MCPProxyService.STREAM_TIMEOUT)
+            ) as response:
+                return await MCPProxyService._parse_stream_response(response)
+        except Exception as e:
+            return MCPProxyService._create_error_response(f"Failed to listen to messages stream: {str(e)}")
+    
+    @staticmethod
+    async def _try_messages_post(session: aiohttp.ClientSession, base_url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Invalid Content-Type header → /messages POST fallback
+        """
+        root = base_url.rstrip("/")
+        # /messages 엔드포인트로 변경
+        if root.endswith("/mcp"):
+            messages_url = root.replace("/mcp", "/messages")
+        elif root.endswith("/messages"):
+            messages_url = root
+        else:
+            messages_url = f"{root}/messages"
+        
+        try:
+            # 1️⃣ 기본 요청
+            async with session.post(
+                messages_url,
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=MCPProxyService.HTTP_TIMEOUT)
+            ) as response:
+                if response.status == 200:
+                    try:
+                        data = await response.json()
+                        tools = data.get("result", {}).get("tools", [])
+                        return MCPProxyService._create_success_response(tools)
+                    except Exception:
+                        pass
+            
+            # 2️⃣ root-level session_id 추가 시도
+            req_with_session = payload.copy()
+            if "params" in req_with_session and "session_id" in req_with_session["params"]:
+                req_with_session["session_id"] = req_with_session["params"]["session_id"]
+            
+            async with session.post(
+                messages_url,
+                json=req_with_session,
+                timeout=aiohttp.ClientTimeout(total=MCPProxyService.HTTP_TIMEOUT)
+            ) as response2:
+                if response2.status == 200:
+                    try:
+                        data = await response2.json()
+                        tools = data.get("result", {}).get("tools", [])
+                        return MCPProxyService._create_success_response(tools)
+                    except Exception:
+                        pass
+            
+            return MCPProxyService._create_error_response(f"messages POST failed for {messages_url}")
+        except Exception as e:
+            return MCPProxyService._create_error_response(f"messages POST attempt failed: {str(e)}")
     
     @staticmethod
     async def _fetch_http_stream(url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
