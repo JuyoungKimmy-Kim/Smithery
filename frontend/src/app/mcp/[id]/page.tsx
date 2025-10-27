@@ -113,7 +113,8 @@ export default function MCPServerDetail() {
       }
     } catch (error) {
       console.error('Announcement update error:', error);
-      alert(`Failed to update announcement: ${error.message || 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to update announcement: ${errorMessage}`);
     } finally {
       setIsUpdatingAnnouncement(false);
     }
@@ -143,7 +144,8 @@ export default function MCPServerDetail() {
       }
     } catch (error) {
       console.error('Announcement delete error:', error);
-      alert(`Failed to delete announcement: ${error.message || 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to delete announcement: ${errorMessage}`);
     } finally {
       setIsUpdatingAnnouncement(false);
     }
@@ -306,13 +308,14 @@ export default function MCPServerDetail() {
                 </div>
               )}
 
-              <div className="flex items-center gap-6 text-sm text-gray-600">
+              <div className="flex items-center gap-6 text-sm text-gray-600 flex-wrap">
                 {mcp.created_at && (
                   <div className="flex items-center gap-2">
                     <CalendarIcon className="h-4 w-4" />
                     <span>Created: {new Date(mcp.created_at).toLocaleDateString()}</span>
                   </div>
                 )}
+                
                 {/* 권한 정보 표시 */}
                 {isAuthenticated && (
                   <div className="flex items-center gap-2">
@@ -569,10 +572,25 @@ export default function MCPServerDetail() {
         {/* Metadata Section */}
         <div className="bg-white rounded-lg shadow-sm p-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">
-            Metadata
+            등록 정보
           </h2>
           
           <div className="grid gap-4 md:grid-cols-2">       
+            <div>
+              <p className="text-sm font-medium text-gray-600">
+                Owner
+              </p>
+              {mcp.owner ? (
+                <button 
+                  className="text-blue-600 hover:text-blue-800 hover:underline"
+                  onClick={() => router.push(`/user/${mcp.owner?.username}`)}
+                >
+                  {mcp.owner.username}
+                </button>
+              ) : (
+                <p className="text-gray-900">Unknown</p>
+              )}
+            </div>
             <div>
               <p className="text-sm font-medium text-gray-600">
                 GitHub Link
@@ -583,18 +601,6 @@ export default function MCPServerDetail() {
               >
                 {mcp.github_link}
               </button>
-            </div>         
-            <div>
-              <p className="text-sm font-medium text-gray-600">
-                Status
-              </p>
-              <span className={`px-2 py-1 text-xs rounded-full ${
-                mcp.status === "active" 
-                  ? "bg-green-100 text-green-800" 
-                  : "bg-gray-100 text-gray-800"
-              }`}>
-                {mcp.status || "Unknown"}
-              </span>
             </div>
             
             {mcp.created_at && (

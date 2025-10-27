@@ -36,6 +36,14 @@ export interface MCPServerResource {
   url: string;
 }
 
+export interface User {
+  id: number;
+  username: string;
+  nickname: string;
+  email: string;
+  avatar_url?: string;
+}
+
 export interface MCPServer {
   id: string;
   github_link: string;
@@ -52,6 +60,8 @@ export interface MCPServer {
   config?: any;
   created_at?: string;
   updated_at?: string;
+  owner?: User;
+  owner_id?: number;
 }
 
 export interface Post {
