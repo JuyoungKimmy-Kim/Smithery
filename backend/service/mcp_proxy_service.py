@@ -23,6 +23,7 @@ class MCPProxyService:
     STREAM_TIMEOUT = 30  # 스트림 타임아웃
     WEBSOCKET_TIMEOUT = 30  # WebSocket 타임아웃
     STDIO_TIMEOUT = 30  # STDIO 타임아웃
+    AUTO_FETCH_TIMEOUT = 60  # 전체 자동 감지 타임아웃 (최대 총 3단계 시도)
     
     @staticmethod
     def _create_success_response(tools: list, message: str = "Tools fetched successfully") -> Dict[str, Any]:
@@ -102,6 +103,20 @@ class MCPProxyService:
         """
         logger.info(f"[HTTP Auto] Starting - URL: {url}")
         
+        try:
+            return await asyncio.wait_for(
+                MCPProxyService._fetch_http_auto_impl(url, req),
+                timeout=MCPProxyService.AUTO_FETCH_TIMEOUT
+            )
+        except (asyncio.TimeoutError, asyncio.CancelledError) as e:
+            logger.error(f"[HTTP Auto] Timeout or cancelled: {type(e).__name__}")
+            return MCPProxyService._create_error_response(
+                f"Request timeout after {MCPProxyService.AUTO_FETCH_TIMEOUT}s"
+            )
+    
+    @staticmethod
+    async def _fetch_http_auto_impl(url: str, req: Dict[str, Any]) -> Dict[str, Any]:
+        """HTTP 자동 감지 구현부 (내부 메서드)"""
         async with aiohttp.ClientSession() as session:
             # 1️⃣ POST (JSON-RPC)
             try:
@@ -132,22 +147,29 @@ class MCPProxyService:
                     if "Invalid Content-Type" in text or resp.status in (403, 405):
                         logger.warning(f"[HTTP Auto] POST failed (status: {resp.status}), trying GET fallback")
                         return await MCPProxyService._try_http_get(session, url)
-            except aiohttp.ClientError as e:
-                logger.warning(f"[HTTP Auto] POST failed: {e}, trying GET fallback")
+            except (aiohttp.ClientError, asyncio.TimeoutError, asyncio.CancelledError) as e:
+                logger.warning(f"[HTTP Auto] POST failed: {type(e).__name__}: {e}, trying GET fallback")
+                # CancelledError는 재발생시켜 상위로 전파
+                if isinstance(e, asyncio.CancelledError):
+                    raise
             
             # 2️⃣ GET-only fallback
             try:
                 logger.info("[HTTP Auto] Attempting GET fallback")
                 return await MCPProxyService._try_http_get(session, url)
+            except asyncio.CancelledError:
+                raise  # CancelledError는 그대로 전파
             except Exception as e:
-                logger.warning(f"[HTTP Auto] GET fallback failed: {e}")
+                logger.warning(f"[HTTP Auto] GET fallback failed: {type(e).__name__}: {e}")
             
             # 3️⃣ Session-based (/mcp → /messages)
             try:
                 logger.info("[HTTP Auto] Attempting session-based")
                 return await MCPProxyService._handle_session_based(session, url)
+            except asyncio.CancelledError:
+                raise  # CancelledError는 그대로 전파
             except Exception as e:
-                logger.error(f"[HTTP Auto] All methods failed: {e}")
+                logger.error(f"[HTTP Auto] All methods failed: {type(e).__name__}: {e}")
                 raise Exception("No valid response from server")
     
     @staticmethod
