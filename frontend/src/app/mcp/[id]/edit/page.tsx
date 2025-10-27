@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { MCPServer, ProtocolType, MCPServerTool, MCPServerProperty } from "../../../../types/mcp";
+import { MCPServer, TransportType, MCPServerTool, MCPServerProperty } from "../../../../types/mcp";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { PlusIcon, TrashIcon, PencilIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
@@ -527,7 +527,7 @@ export default function EditMCPServerPage() {
       errors.protocol = t('edit.protocolRequired');
     }
     
-    if (formData.url.trim() && formData.protocol !== ProtocolType.STDIO) {
+    if (formData.url.trim() && formData.protocol !== TransportType.STDIO) {
       try {
         new URL(formData.url);
       } catch {
@@ -790,7 +790,7 @@ export default function EditMCPServerPage() {
             onNewTagAdded={handleNewTagAdded}
           />
           
-          {/* Protocol */}
+          {/* Transport Type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {t('edit.protocol')} *
@@ -804,10 +804,9 @@ export default function EditMCPServerPage() {
               }`}
             >
               <option value="">{t('edit.protocolSelect')}</option>
-              <option value={ProtocolType.HTTP}>HTTP</option>
-              <option value={ProtocolType.HTTP_STREAM}>HTTP-Stream</option>
-              <option value={ProtocolType.WEBSOCKET}>WebSocket</option>
-              <option value={ProtocolType.STDIO}>STDIO</option>
+              <option value={TransportType.STREAMABLE_HTTP}>Streamable HTTP</option>
+              <option value={TransportType.SSE}>SSE</option>
+              <option value={TransportType.STDIO}>STDIO</option>
             </select>
             {validationErrors.protocol && (
               <p className="mt-1 text-sm text-red-600">{validationErrors.protocol}</p>
@@ -826,20 +825,20 @@ export default function EditMCPServerPage() {
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 validationErrors.url ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder={formData.protocol === ProtocolType.STDIO ? t('edit.serverUrlPlaceholderStdio') : t('edit.serverUrlPlaceholderHttp')}
+              placeholder={formData.protocol === TransportType.STDIO ? t('edit.serverUrlPlaceholderStdio') : t('edit.serverUrlPlaceholderHttp')}
             />
             {validationErrors.url && (
               <p className="mt-1 text-sm text-red-600">{validationErrors.url}</p>
             )}
             <p className="mt-1 text-xs text-gray-500">
-              {formData.protocol === ProtocolType.STDIO 
+              {formData.protocol === TransportType.STDIO
                 ? t('edit.serverUrlHelpStdio')
                 : t('edit.serverUrlHelpHttp')
               }
             </p>
           </div>
 
-          {formData.protocol === ProtocolType.STDIO && (
+          {formData.protocol === TransportType.STDIO && (
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
               <div className="flex items-center">
                 <div className="text-yellow-600 mr-2">⚠️</div>

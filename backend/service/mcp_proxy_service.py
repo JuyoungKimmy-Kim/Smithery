@@ -6,9 +6,7 @@ Inspector의 구현을 최대한 그대로 따라서 구현
 import asyncio
 import json
 import logging
-import aiohttp
 from typing import Dict, Any, List, Optional
-from urllib.parse import urlparse
 
 try:
     from mcp import ClientSession, StdioServerParameters
@@ -37,9 +35,8 @@ class MCPProxyService:
     Inspector처럼 SDK를 직접 사용
     """
 
-    # 타임아웃 설정
-    DEFAULT_TIMEOUT = 60
-    HTTP_TIMEOUT = 10
+    # 타임아웃 설정 - Inspector처럼 충분한 시간 확보
+    DEFAULT_TIMEOUT = 120
 
     @staticmethod
     def _create_success_response(tools: List[Dict[str, Any]], message: str = "Tools fetched successfully") -> Dict[str, Any]:
@@ -102,13 +99,15 @@ class MCPProxyService:
         """프로토콜 이름 정규화 - Inspector와 동일"""
         protocol = protocol.lower().strip()
 
-        # Inspector는 stdio, sse, streamable-http 3가지만 지원
+        # Inspector의 정확한 매핑
         if protocol in ("stdio",):
             return "stdio"
-        elif protocol in ("sse",):
+        elif protocol in ("sse", "server-sent-events"):
             return "sse"
+        elif protocol in ("streamable-http", "http", "https", "http-stream", "websocket"):
+            return "streamable-http"
         else:
-            # 나머지는 모두 streamable-http
+            # 기본값
             return "streamable-http"
 
     @staticmethod
@@ -269,18 +268,12 @@ class MCPProxyService:
         except asyncio.TimeoutError:
             error_msg = f"Streamable HTTP timeout after {MCPProxyService.DEFAULT_TIMEOUT}s"
             logger.error(f"[Streamable HTTP] {error_msg}")
-
-            # Fallback to manual methods
-            logger.info("[Streamable HTTP] Trying manual fallback")
-            return await MCPProxyService._fetch_http_manual(url)
+            return MCPProxyService._create_error_response(error_msg)
 
         except Exception as e:
             error_msg = f"Streamable HTTP failed: {type(e).__name__}: {str(e)}"
             logger.error(f"[Streamable HTTP] {error_msg}", exc_info=True)
-
-            # Fallback to manual methods
-            logger.info("[Streamable HTTP] Trying manual fallback")
-            return await MCPProxyService._fetch_http_manual(url)
+            return MCPProxyService._create_error_response(error_msg)
 
     @staticmethod
     def _convert_tools(tools_list) -> List[Dict[str, Any]]:
@@ -295,84 +288,3 @@ class MCPProxyService:
                 tool_dict["inputSchema"] = tool.inputSchema
             tools.append(tool_dict)
         return tools
-
-    @staticmethod
-    async def _fetch_http_manual(url: str) -> Dict[str, Any]:
-        """
-        수동 HTTP fallback - SDK 실패 시
-        """
-        logger.info(f"[HTTP Manual] Starting with URL: {url}")
-
-        json_rpc_request = {
-            "jsonrpc": "2.0",
-            "method": "tools/list",
-            "id": 1,
-            "params": {}
-        }
-
-        async with aiohttp.ClientSession() as session:
-            # 1. POST 시도
-            try:
-                logger.info("[HTTP Manual] Trying POST")
-                async with session.post(
-                    url,
-                    json=json_rpc_request,
-                    headers={"Accept": "application/json, text/event-stream"},
-                    timeout=aiohttp.ClientTimeout(total=MCPProxyService.HTTP_TIMEOUT)
-                ) as resp:
-                    logger.info(f"[HTTP Manual] POST Status: {resp.status}")
-
-                    if resp.status == 200:
-                        content_type = resp.headers.get("Content-Type", "")
-                        if "application/json" in content_type:
-                            data = await resp.json()
-                            tools = data.get("result", {}).get("tools", [])
-                            if tools:
-                                logger.info(f"[HTTP Manual] POST success: {len(tools)} tools")
-                                return MCPProxyService._create_success_response(
-                                    tools,
-                                    f"Fetched {len(tools)} tools via POST"
-                                )
-            except Exception as e:
-                logger.warning(f"[HTTP Manual] POST failed: {e}")
-
-            # 2. GET 시도
-            get_paths = ["", "/tools", "/tools/list"]
-            for path in get_paths:
-                try:
-                    get_url = url.rstrip("/") + path
-                    logger.info(f"[HTTP Manual] Trying GET: {get_url}")
-
-                    async with session.get(
-                        get_url,
-                        headers={"Accept": "application/json"},
-                        timeout=aiohttp.ClientTimeout(total=MCPProxyService.HTTP_TIMEOUT)
-                    ) as resp:
-                        if resp.status != 200:
-                            continue
-
-                        data = await resp.json()
-
-                        tools = None
-                        if isinstance(data, list) and data and isinstance(data[0], dict) and "name" in data[0]:
-                            tools = data
-                        elif isinstance(data, dict):
-                            if "result" in data and "tools" in data["result"]:
-                                tools = data["result"]["tools"]
-                            elif "tools" in data:
-                                tools = data["tools"]
-
-                        if tools:
-                            logger.info(f"[HTTP Manual] GET success: {len(tools)} tools")
-                            return MCPProxyService._create_success_response(
-                                tools,
-                                f"Fetched {len(tools)} tools via GET"
-                            )
-                except Exception as e:
-                    logger.debug(f"[HTTP Manual] GET {path} failed: {e}")
-                    continue
-
-            logger.error("[HTTP Manual] All attempts failed")
-            return MCPProxyService._create_error_response(
-                "Could not fetch tools: all methods failed"
-            )
