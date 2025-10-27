@@ -72,52 +72,123 @@ class MCPProxyService:
     
     @staticmethod
     async def _fetch_http(url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """HTTP 프로토콜로 tools 가져오기 (POST → GET → HTTP-stream fallback)"""
-        try:
-            # 1️⃣ 기본 POST 요청
-            async with aiohttp.ClientSession() as session:
+        """HTTP 프로토콜로 tools 가져오기 (POST → GET fallback → Stream)"""
+        return await MCPProxyService._fetch_http_auto(url, payload)
+    
+    @staticmethod
+    async def _fetch_http_auto(url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        HTTP transport 자동 감지 및 fallback:
+        1️⃣ POST 시도
+        2️⃣ 3xx Redirect 처리
+        3️⃣ 405/403 시 GET fallback (여러 엔드포인트 시도)
+        4️⃣ Content-Type 기반 자동 감지
+        """
+        async with aiohttp.ClientSession() as session:
+            try:
+                # 1️⃣ 기본 POST 요청
                 async with session.post(
                     url,
                     json=payload,
                     headers={
-                        "Content-Type": "application/json",
-                        "Accept": "application/json"
+                        "Accept": "application/json, text/event-stream, application/x-ndjson"
                     },
+                    timeout=aiohttp.ClientTimeout(total=MCPProxyService.HTTP_TIMEOUT),
+                    allow_redirects=False
+                ) as response:
+                    
+                    # 3xx Redirect 처리
+                    if response.status in (301, 302, 303, 307, 308):
+                        redirect_url = response.headers.get("Location")
+                        if redirect_url:
+                            return await MCPProxyService._fetch_http_auto(redirect_url, payload)
+                    
+                    # 405 / 403 → GET fallback
+                    if response.status in (403, 405):
+                        return await MCPProxyService._try_http_get(session, url)
+                    
+                    # 정상 응답 처리
+                    content_type = response.headers.get("Content-Type", "")
+                    
+                    if response.status == 200:
+                        if "application/json" in content_type:
+                            try:
+                                data = await response.json()
+                                tools = data.get("result", {}).get("tools", [])
+                                return MCPProxyService._create_success_response(tools)
+                            except Exception as e:
+                                return MCPProxyService._create_error_response(f"Failed to parse JSON: {str(e)}")
+                        elif "application/x-ndjson" in content_type or "text/event-stream" in content_type:
+                            return await MCPProxyService._parse_stream_response(response)
+                        else:
+                            text = await response.text()
+                            return MCPProxyService._create_error_response(f"Unknown content-type: {content_type}, response: {text[:100]}")
+                    
+                    # 기타 상태 코드에 대해서는 HTTP-stream 시도
+                    return await MCPProxyService._fetch_http_stream(url, payload)
+                    
+            except aiohttp.ClientError as e:
+                return MCPProxyService._create_error_response(f"HTTP client error: {str(e)}")
+            except Exception as e:
+                return MCPProxyService._create_error_response(f"HTTP request failed: {str(e)}")
+    
+    @staticmethod
+    async def _try_http_get(session: aiohttp.ClientSession, base_url: str) -> Dict[str, Any]:
+        """GET fallback: 여러 엔드포인트 시도"""
+        candidates = ["", "/tools", "/tools/list"]
+        for path in candidates:
+            test_url = base_url.rstrip("/") + path
+            try:
+                async with session.get(
+                    test_url,
+                    headers={"Accept": "application/json"},
                     timeout=aiohttp.ClientTimeout(total=MCPProxyService.HTTP_TIMEOUT)
                 ) as response:
                     if response.status == 200:
                         try:
                             data = await response.json()
                             tools = data.get("result", {}).get("tools", [])
-                            return MCPProxyService._create_success_response(tools)
+                            return MCPProxyService._create_success_response(tools, f"Tools fetched successfully via GET {test_url}")
+                        except aiohttp.ContentTypeError:
+                            text = await response.text()
+                            continue
                         except Exception as e:
-                            return MCPProxyService._create_error_response(f"Failed to parse JSON: {str(e)}")
-                    
-                    # 2️⃣ 405일 때 GET fallback
-                    if response.status == 405:  # Method Not Allowed
-                        async with session.get(url) as get_resp:
-                            if get_resp.status == 200:
-                                try:
-                                    data = await get_resp.json()
-                                    tools = data.get("result", {}).get("tools", [])
-                                    return MCPProxyService._create_success_response(tools, "Tools fetched successfully (GET)")
-                                except aiohttp.ContentTypeError:
-                                    text = await get_resp.text()
-                                    return MCPProxyService._create_error_response(f"Non-JSON response received: {text[:100]}")
-                                except Exception as e:
-                                    return MCPProxyService._create_error_response(f"GET fallback failed: {str(e)}")
-                    
-                    # 3️⃣ HTTP-stream fallback (다른 status code에서도 시도)
-                    try:
-                        return await MCPProxyService._fetch_http_stream(url, payload)
-                    except Exception as se:
-                        return MCPProxyService._create_error_response(
-                            f"HTTP request failed (status: {response.status}, stream fallback failed: {str(se)})"
-                        )
-        except aiohttp.ClientError as e:
-            return MCPProxyService._create_error_response(f"HTTP client error: {str(e)}")
-        except Exception as e:
-            return MCPProxyService._create_error_response(f"HTTP request failed: {str(e)}")
+                            continue
+            except Exception:
+                continue
+        
+        return MCPProxyService._create_error_response(f"GET fallback failed for all endpoints: {candidates}")
+    
+    @staticmethod
+    async def _parse_stream_response(response: aiohttp.ClientResponse) -> Dict[str, Any]:
+        """Parse NDJSON or SSE stream."""
+        tools = []
+        async for raw_line in response.content:
+            line = raw_line.decode("utf-8").strip()
+            if not line:
+                continue
+            if line.startswith("data:"):
+                line = line[5:].strip()
+                if line == "[DONE]":
+                    break
+            try:
+                obj = json.loads(line)
+                if "result" in obj and "tools" in obj["result"]:
+                    tools = obj["result"]["tools"]
+                    break
+                elif "tools" in obj:
+                    tools = obj["tools"]
+                    break
+                elif isinstance(obj, list) and len(obj) > 0:
+                    tools = obj
+                    break
+            except json.JSONDecodeError:
+                continue
+        
+        if tools:
+            return MCPProxyService._create_success_response(tools, "Tools fetched successfully from stream")
+        else:
+            return MCPProxyService._create_error_response("No tools found in stream response")
     
     @staticmethod
     async def _fetch_http_stream(url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -125,55 +196,28 @@ class MCPProxyService:
         HTTP-stream (NDJSON or SSE) 프로토콜 지원.
         서버가 'application/x-ndjson' 또는 'text/event-stream'으로 응답하는 경우 모두 커버.
         """
-        tools = []
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 url,
                 json=payload,
                 headers={
-                    "Accept": "application/json, application/x-ndjson, text/event-stream"
+                    "Accept": "application/x-ndjson, text/event-stream, application/json"
                 },
                 timeout=aiohttp.ClientTimeout(total=MCPProxyService.STREAM_TIMEOUT)
             ) as response:
                 content_type = response.headers.get("Content-Type", "")
 
                 # 1️⃣ 일반 JSON 응답
-                if "application/json" in content_type:
-                    data = await response.json()
-                    tools = data.get("result", {}).get("tools", [])
-                    return MCPProxyService._create_success_response(tools)
+                if "application/json" in content_type and response.status == 200:
+                    try:
+                        data = await response.json()
+                        tools = data.get("result", {}).get("tools", [])
+                        return MCPProxyService._create_success_response(tools)
+                    except Exception:
+                        pass
 
                 # 2️⃣ 스트림 응답 (NDJSON / SSE)
-                async for line in response.content:
-                    line_str = line.decode("utf-8").strip()
-                    if not line_str:
-                        continue
-
-                    # SSE 형식 (data: prefix)
-                    if line_str.startswith("data:"):
-                        line_str = line_str[5:].strip()
-                        if line_str == "[DONE]":
-                            break
-
-                    try:
-                        data = json.loads(line_str)
-                        # 다양한 서버 응답 형태 호환
-                        if "result" in data and "tools" in data["result"]:
-                            tools = data["result"]["tools"]
-                            break
-                        elif "tools" in data:
-                            tools = data["tools"]
-                            break
-                        elif isinstance(data, list) and len(data) > 0:
-                            tools = data
-                            break
-                    except json.JSONDecodeError:
-                        continue
-
-        if not tools:
-            return MCPProxyService._create_error_response("No tools found in stream response")
-        
-        return MCPProxyService._create_success_response(tools, "Tools fetched successfully from stream")
+                return await MCPProxyService._parse_stream_response(response)
     
     @staticmethod
     async def _fetch_websocket(url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
