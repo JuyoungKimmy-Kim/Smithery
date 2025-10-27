@@ -448,7 +448,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                       <div 
                         key={`user-${String(username)}-${index}-${refreshKey}`} 
                         onClick={() => handleViewUser(username)}
-                        className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-lg transition-all cursor-pointer"
+                        className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-all cursor-pointer"
                       >
                         <div className="flex items-center gap-3">
                           {/* 순위 */}
@@ -511,7 +511,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                       <div 
                         key={`ranking-${id || title}-${refreshKey}`} 
                         onClick={() => handleViewMCP(id)}
-                        className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-lg transition-all cursor-pointer"
+                        className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-all cursor-pointer"
                       >
                         <div className="flex items-center gap-3">
                           {/* 순위 */}
