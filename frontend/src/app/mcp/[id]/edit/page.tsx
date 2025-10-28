@@ -60,6 +60,9 @@ export default function EditMCPServerPage() {
   // Tool 미리보기 관련 상태
   const [previewTools, setPreviewTools] = useState<any[]>([]);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateTools, setDuplicateTools] = useState<{existing: MCPServerTool[], new: MCPServerTool[]}>({existing: [], new: []});
+  const [pendingNewTools, setPendingNewTools] = useState<MCPServerTool[]>([]);
 
   // 폼에 내용이 있는지 확인하는 함수
   const hasFormContent = (): boolean => {
@@ -336,15 +339,29 @@ export default function EditMCPServerPage() {
         if (response.ok) {
           const data = await response.json();
           setMcp(data);
-          
+
+          // config에서 url 추출
+          let urlValue = "";
+          let configObj = null;
+          try {
+            if (typeof data.config === 'string') {
+              configObj = JSON.parse(data.config);
+            } else if (data.config && typeof data.config === 'object') {
+              configObj = data.config;
+            }
+            urlValue = configObj?.url || "";
+          } catch (e) {
+            console.error('Failed to parse config:', e);
+          }
+
           setFormData({
             name: data.name || "",
             github_link: data.github_link || "",
             description: data.description || "",
             tags: formatTagsToString(data.tags),
-            protocol: data.protocol || "http",
-            url: data.config?.url || "",
-            config: data.config ? JSON.stringify(data.config, null, 2) : ""
+            protocol: data.protocol || "",
+            url: urlValue,
+            config: data.config ? (typeof data.config === 'string' ? data.config : JSON.stringify(data.config, null, 2)) : ""
           });
 
           // 기존 태그를 선택된 태그로 설정
@@ -475,9 +492,52 @@ export default function EditMCPServerPage() {
   const handleUsePreviewTools = () => {
     if (previewTools.length > 0) {
       const convertedTools = convertMCPToolsToMCPServerTools(previewTools);
-      setTools(convertedTools);
-      alert(t('edit.toolsAdded', { count: String(convertedTools.length) }));
+
+      // 중복된 tool 찾기
+      const duplicates: {existing: MCPServerTool[], new: MCPServerTool[]} = {existing: [], new: []};
+      const newToolsOnly: MCPServerTool[] = [];
+
+      convertedTools.forEach(newTool => {
+        const existingTool = tools.find(t => t.name === newTool.name);
+        if (existingTool) {
+          duplicates.existing.push(existingTool);
+          duplicates.new.push(newTool);
+        } else {
+          newToolsOnly.push(newTool);
+        }
+      });
+
+      // 중복이 있으면 모달 표시
+      if (duplicates.existing.length > 0) {
+        setDuplicateTools(duplicates);
+        setPendingNewTools(newToolsOnly);
+        setShowDuplicateModal(true);
+      } else {
+        // 중복 없으면 바로 추가
+        setTools([...tools, ...newToolsOnly]);
+        alert(t('edit.toolsAdded', { count: String(newToolsOnly.length) }));
+      }
     }
+  };
+
+  const handleKeepExisting = () => {
+    // 기존 것 유지, 중복 아닌 것만 추가
+    setTools([...tools, ...pendingNewTools]);
+    setShowDuplicateModal(false);
+    alert(t('edit.toolsAdded', { count: String(pendingNewTools.length) }));
+  };
+
+  const handleReplaceWithNew = () => {
+    // 중복된 것을 새로운 것으로 교체
+    const duplicateNames = new Set(duplicateTools.existing.map(t => t.name));
+    const filteredTools = tools.filter(t => !duplicateNames.has(t.name));
+    setTools([...filteredTools, ...duplicateTools.new, ...pendingNewTools]);
+    setShowDuplicateModal(false);
+    alert(t('edit.toolsAdded', { count: String(duplicateTools.new.length + pendingNewTools.length) }));
+  };
+
+  const handleCancelDuplicate = () => {
+    setShowDuplicateModal(false);
   };
 
   const handleAddTool = () => {
@@ -756,22 +816,101 @@ export default function EditMCPServerPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
-              
+
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
                 {t('edit.sessionExpired')}
               </h3>
-              
+
               <div className="text-gray-600 mb-6 space-y-2">
                 <p>{t('edit.draftSaved')}</p>
                 <p>{t('edit.loginAgain')}</p>
               </div>
-              
+
               <button
                 onClick={() => router.push('/ad-login')}
                 className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors font-medium"
               >
                 {t('edit.ok')}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Duplicate Tools Modal */}
+      {showDuplicateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 transform transition-all max-h-[80vh] overflow-y-auto">
+            <div className="p-8">
+              <div className="flex items-center mb-6">
+                <div className="flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 mr-4">
+                  <svg className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">
+                    {t('edit.duplicateToolsTitle')}
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {t('edit.duplicateToolsDesc')}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                {duplicateTools.existing.map((existingTool, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="border-r pr-4">
+                        <h4 className="text-sm font-semibold text-blue-700 mb-2">{t('edit.existingTool')}</h4>
+                        <div className="bg-blue-50 p-3 rounded">
+                          <p className="font-medium text-gray-900">{existingTool.name}</p>
+                          <p className="text-sm text-gray-600 mt-1">{existingTool.description}</p>
+                          {existingTool.parameters.length > 0 && (
+                            <div className="mt-2">
+                              <p className="text-xs font-medium text-gray-700">Parameters: {existingTool.parameters.length}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="pl-4">
+                        <h4 className="text-sm font-semibold text-green-700 mb-2">{t('edit.newTool')}</h4>
+                        <div className="bg-green-50 p-3 rounded">
+                          <p className="font-medium text-gray-900">{duplicateTools.new[index].name}</p>
+                          <p className="text-sm text-gray-600 mt-1">{duplicateTools.new[index].description}</p>
+                          {duplicateTools.new[index].parameters.length > 0 && (
+                            <div className="mt-2">
+                              <p className="text-xs font-medium text-gray-700">Parameters: {duplicateTools.new[index].parameters.length}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleKeepExisting}
+                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  {t('edit.keepExisting')}
+                </button>
+                <button
+                  onClick={handleReplaceWithNew}
+                  className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                >
+                  {t('edit.replaceWithNew')}
+                </button>
+                <button
+                  onClick={handleCancelDuplicate}
+                  className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                >
+                  {t('edit.cancel')}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -969,7 +1108,7 @@ export default function EditMCPServerPage() {
                   onClick={handleUsePreviewTools}
                   className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors"
                 >
-                  {t('edit.addAllTools')}
+                  모두 추가
                 </button>
               </div>
               <div className="space-y-3">

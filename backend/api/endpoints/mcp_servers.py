@@ -117,16 +117,16 @@ def get_mcp_server_favorites_count(mcp_server_id: int, db: Session = Depends(get
 @router.get("/{mcp_server_id}", response_model=MCPServerResponse)
 def get_mcp_server(mcp_server_id: int, db: Session = Depends(get_db)):
     """특정 MCP 서버의 상세 정보를 조회합니다."""
-    
+
     mcp_service = MCPServerService(db)
     mcp_server = mcp_service.get_mcp_server_with_tools(mcp_server_id)
-    
+
     if not mcp_server:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="MCP Server not found"
         )
-    
+
     return mcp_server
 
 @router.post("/search", response_model=SearchResponse)
