@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { MCPServer, ProtocolType, MCPServerTool, MCPServerProperty } from "../../types/mcp";
+import { MCPServer, TransportType, MCPServerTool, MCPServerProperty } from "../../types/mcp";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { PlusIcon, TrashIcon, PencilIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
@@ -359,7 +359,7 @@ export default function SubmitMCPPage() {
     }
     
     try {
-      console.log('MCP Server URL detected:', url, 'Protocol:', protocol);
+      console.log('MCP Server URL detected:', url, 'Transport Type:', protocol);
       await detectAndPreviewTools({ url: url.trim(), protocol });
     } catch (error) {
       console.error('URL 처리 실패:', error);
@@ -409,7 +409,7 @@ export default function SubmitMCPPage() {
     setIsLoadingPreview(true);
     
     try {
-      console.log('Fetching tools from MCP Server:', config.url, 'Protocol:', config.protocol);
+      console.log('Fetching tools from MCP Server:', config.url, 'Transport Type:', config.protocol);
       await requestToolsList(config);
     } catch (error) {
       console.error('MCP Server tools 가져오기 실패:', error);
@@ -606,7 +606,7 @@ export default function SubmitMCPPage() {
       errors.protocol = t('submit.protocolRequired');
     }
     
-    if (formData.url.trim() && formData.protocol !== ProtocolType.STDIO) {
+    if (formData.url.trim() && formData.protocol !== TransportType.STDIO) {
       if (!isValidUrl(formData.url)) {
         errors.url = t('submit.serverUrlInvalid');
       }
@@ -883,7 +883,7 @@ export default function SubmitMCPPage() {
             onNewTagAdded={handleNewTagAdded}
           />
 
-          {/* Protocol */}
+          {/* Transport Type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {t('submit.protocol')} *
@@ -893,7 +893,7 @@ export default function SubmitMCPPage() {
               value={formData.protocol}
               onChange={(e) => {
                 handleInputChange('protocol', e.target.value);
-                // Protocol과 URL이 모두 있을 때 미리보기 시도
+                // Transport Type과 URL이 모두 있을 때 미리보기 시도
                 if (formData.url.trim()) {
                   handleUrlChange(formData.url, e.target.value);
                 }
@@ -903,10 +903,9 @@ export default function SubmitMCPPage() {
               }`}
             >
               <option value="">{t('submit.protocolSelect')}</option>
-              <option value={ProtocolType.HTTP}>HTTP</option>
-              <option value={ProtocolType.HTTP_STREAM}>HTTP-Stream</option>
-              <option value={ProtocolType.WEBSOCKET}>WebSocket</option>
-              <option value={ProtocolType.STDIO}>STDIO</option>
+              <option value={TransportType.STREAMABLE_HTTP}>Streamable HTTP</option>
+              <option value={TransportType.SSE}>SSE</option>
+              <option value={TransportType.STDIO}>STDIO</option>
             </select>
             {validationErrors.protocol && (
               <p className="mt-1 text-sm text-red-600">{validationErrors.protocol}</p>
@@ -923,7 +922,7 @@ export default function SubmitMCPPage() {
               value={formData.url}
               onChange={(e) => {
                 handleInputChange('url', e.target.value);
-                // Protocol과 URL이 모두 있을 때 미리보기 시도
+                // Transport Type과 URL이 모두 있을 때 미리보기 시도
                 if (formData.protocol.trim()) {
                   handleUrlChange(e.target.value, formData.protocol);
                 }
@@ -931,13 +930,13 @@ export default function SubmitMCPPage() {
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 validationErrors.url ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder={formData.protocol === ProtocolType.STDIO ? t('submit.serverUrlPlaceholderStdio') : t('submit.serverUrlPlaceholderHttp')}
+              placeholder={formData.protocol === TransportType.STDIO ? t('submit.serverUrlPlaceholderStdio') : t('submit.serverUrlPlaceholderHttp')}
             />
             {validationErrors.url && (
               <p className="mt-1 text-sm text-red-600">{validationErrors.url}</p>
             )}
             <p className="mt-1 text-xs text-gray-500">
-              {formData.protocol === ProtocolType.STDIO 
+              {formData.protocol === TransportType.STDIO
                 ? t('submit.serverUrlHelpStdio')
                 : t('submit.serverUrlHelpHttp')
               }
@@ -1020,7 +1019,7 @@ export default function SubmitMCPPage() {
             </div>
           )}
 
-          {formData.url && formData.protocol && !isLoadingPreview && previewTools.length === 0 && formData.protocol !== ProtocolType.STDIO && (
+          {formData.url && formData.protocol && !isLoadingPreview && previewTools.length === 0 && formData.protocol !== TransportType.STDIO && (
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
               <div className="flex items-center">
                 <div className="text-yellow-600 mr-2">⚠️</div>
@@ -1031,7 +1030,7 @@ export default function SubmitMCPPage() {
             </div>
           )}
 
-          {formData.protocol === ProtocolType.STDIO && (
+          {formData.protocol === TransportType.STDIO && (
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
               <div className="flex items-center">
                 <div className="text-yellow-600 mr-2">⚠️</div>

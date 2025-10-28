@@ -1,288 +1,290 @@
 """
 MCP 프록시 서비스
-Frontend에서 MCP 서버의 tools를 미리보기할 때 사용하는 프록시 서비스
-HTTPS → HTTP Mixed Content 문제와 CORS 문제를 해결
+Inspector의 구현을 최대한 그대로 따라서 구현
 """
 
 import asyncio
-import aiohttp
 import json
-import subprocess
+import logging
 from typing import Dict, Any, List, Optional
+
+try:
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+    from mcp.client.sse import sse_client
+    try:
+        # streamablehttp_client가 없을 수도 있음
+        from mcp.client.streamable_http import streamablehttp_client
+        HAS_STREAMABLE_HTTP = True
+    except ImportError:
+        HAS_STREAMABLE_HTTP = False
+        # SSE로 대체
+    MCP_SDK_AVAILABLE = True
+except ImportError:
+    MCP_SDK_AVAILABLE = False
+    HAS_STREAMABLE_HTTP = False
+
+# 로깅 설정
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class MCPProxyService:
-    """MCP 서버와 통신하는 프록시 서비스"""
-    
+    """
+    MCP 서버와 통신하는 프록시 서비스
+    Inspector처럼 SDK를 직접 사용
+    """
+
+    # 타임아웃 설정 - Inspector처럼 충분한 시간 확보
+    DEFAULT_TIMEOUT = 120
+
+    @staticmethod
+    def _create_success_response(tools: List[Dict[str, Any]], message: str = "Tools fetched successfully") -> Dict[str, Any]:
+        """성공 응답 생성"""
+        return {
+            "success": True,
+            "tools": tools,
+            "message": message
+        }
+
+    @staticmethod
+    def _create_error_response(message: str) -> Dict[str, Any]:
+        """에러 응답 생성"""
+        return {
+            "success": False,
+            "tools": [],
+            "message": message
+        }
+
     @staticmethod
     async def fetch_tools(url: str, protocol: str) -> Dict[str, Any]:
         """
         MCP 서버에서 tools 목록을 가져옵니다
-        
+        Inspector의 createTransport와 동일한 패턴
+
         Args:
             url: MCP 서버 URL 또는 명령어
-            protocol: 프로토콜 타입 (http, http-stream, websocket, stdio)
-        
+            protocol: 프로토콜 타입 (stdio, sse, streamable-http)
+
         Returns:
             Dict containing tools list and status
         """
-        json_rpc_request = {
-            "jsonrpc": "2.0",
-            "method": "tools/list",
-            "id": 1,
-            "params": {}
-        }
-        
-        try:
-            if protocol == "http":
-                return await MCPProxyService._fetch_http(url, json_rpc_request)
-            elif protocol == "http-stream":
-                return await MCPProxyService._fetch_http_stream(url, json_rpc_request)
-            elif protocol == "websocket":
-                return await MCPProxyService._fetch_websocket(url, json_rpc_request)
-            elif protocol == "stdio":
-                return await MCPProxyService._fetch_stdio(url, json_rpc_request)
-            else:
-                return {
-                    "success": False,
-                    "tools": [],
-                    "message": f"Unsupported protocol: {protocol}"
-                }
-        except Exception as e:
-            return {
-                "success": False,
-                "tools": [],
-                "message": f"Failed to fetch tools: {str(e)}"
-            }
-    
-    @staticmethod
-    async def _fetch_http(url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """HTTP 프로토콜로 tools 가져오기"""
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url,
-                json=payload,
-                headers={
-                    "Content-Type": "application/json",
-                    "Accept": "application/json"
-                },
-                timeout=aiohttp.ClientTimeout(total=10)
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    tools = data.get("result", {}).get("tools", [])
-                    return {
-                        "success": True,
-                        "tools": tools,
-                        "message": "Tools fetched successfully"
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "tools": [],
-                        "message": f"HTTP request failed with status {response.status}"
-                    }
-    
-    @staticmethod
-    async def _fetch_http_stream(url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """HTTP-Stream (SSE) 프로토콜로 tools 가져오기"""
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url,
-                json=payload,
-                headers={
-                    "Content-Type": "application/json",
-                    "Accept": "application/json, text/event-stream"
-                },
-                timeout=aiohttp.ClientTimeout(total=10)
-            ) as response:
-                content_type = response.headers.get('Content-Type', '')
-                
-                # 200 OK + JSON 응답인 경우 (즉시 응답)
-                if response.status == 200 and 'application/json' in content_type:
-                    data = await response.json()
-                    tools = data.get("result", {}).get("tools", [])
-                    return {
-                        "success": True,
-                        "tools": tools,
-                        "message": "Tools fetched successfully"
-                    }
-                
-                # 202 Accepted 응답인 경우 (SSE 스트림으로 전환)
-                if response.status == 202:
-                    # 응답 본문에서 스트림 URL 또는 엔드포인트 정보를 가져옴
-                    response_data = await response.json()
-                    stream_url = response_data.get('stream_url') or response_data.get('endpoint') or url
-                    
-                    # GET 요청으로 SSE 스트림 구독
-                    return await MCPProxyService._fetch_sse_stream(session, stream_url, payload)
-                
-                # 200 OK + SSE 스트림인 경우 (바로 스트림 응답)
-                if response.status == 200:
-                    return await MCPProxyService._process_sse_stream(response)
-                
-                # 기타 오류
-                return {
-                    "success": False,
-                    "tools": [],
-                    "message": f"HTTP-Stream request failed with status {response.status}"
-                }
-    
-    @staticmethod
-    async def _fetch_sse_stream(session: aiohttp.ClientSession, stream_url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """GET 요청으로 SSE 스트림 구독"""
-        try:
-            async with session.get(
-                stream_url,
-                headers={
-                    "Accept": "text/event-stream"
-                },
-                timeout=aiohttp.ClientTimeout(total=30)
-            ) as response:
-                if response.status == 200:
-                    return await MCPProxyService._process_sse_stream(response)
-                else:
-                    return {
-                        "success": False,
-                        "tools": [],
-                        "message": f"SSE stream request failed with status {response.status}"
-                    }
-        except Exception as e:
-            return {
-                "success": False,
-                "tools": [],
-                "message": f"Failed to connect to SSE stream: {str(e)}"
-            }
-    
-    @staticmethod
-    async def _process_sse_stream(response: aiohttp.ClientResponse) -> Dict[str, Any]:
-        """SSE 스트림 데이터 처리"""
-        tools = []
-        async for line in response.content:
-            line_str = line.decode('utf-8').strip()
-            if line_str.startswith('data:'):
-                try:
-                    data_str = line_str[5:].strip()
-                    if data_str and data_str != '[DONE]':
-                        data = json.loads(data_str)
-                        
-                        # 다양한 응답 형식 처리
-                        if 'result' in data and 'tools' in data['result']:
-                            tools = data['result']['tools']
-                            break
-                        elif isinstance(data, list) and len(data) > 0:
-                            tools = data
-                            break
-                        elif 'tools' in data:
-                            tools = data['tools']
-                            break
-                except json.JSONDecodeError:
-                    continue
-        
-        return {
-            "success": True,
-            "tools": tools,
-            "message": "Tools fetched successfully from SSE stream"
-        }
-    
-    @staticmethod
-    async def _fetch_websocket(url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """WebSocket 프로토콜로 tools 가져오기"""
-        try:
-            # http:// -> ws:// 변환
-            ws_url = url.replace('http://', 'ws://').replace('https://', 'wss://')
-            
-            async with aiohttp.ClientSession() as session:
-                async with session.ws_connect(ws_url, timeout=10) as ws:
-                    # JSON-RPC 요청 전송
-                    await ws.send_json(payload)
-                    
-                    # 응답 대기
-                    async for msg in ws:
-                        if msg.type == aiohttp.WSMsgType.TEXT:
-                            data = json.loads(msg.data)
-                            
-                            # ID가 일치하는 응답만 처리
-                            if data.get('id') == payload['id']:
-                                tools = data.get("result", {}).get("tools", [])
-                                return {
-                                    "success": True,
-                                    "tools": tools,
-                                    "message": "Tools fetched successfully"
-                                }
-                        elif msg.type == aiohttp.WSMsgType.ERROR:
-                            break
-                    
-                    return {
-                        "success": False,
-                        "tools": [],
-                        "message": "No response from WebSocket server"
-                    }
-        except Exception as e:
-            return {
-                "success": False,
-                "tools": [],
-                "message": f"WebSocket connection failed: {str(e)}"
-            }
-    
-    @staticmethod
-    async def _fetch_stdio(command: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """STDIO 프로토콜로 tools 가져오기"""
-        try:
-            # 명령어를 공백으로 분리
-            cmd_parts = command.split()
-            if not cmd_parts:
-                return {
-                    "success": False,
-                    "tools": [],
-                    "message": "Invalid command"
-                }
-            
-            # 프로세스 실행
-            process = await asyncio.create_subprocess_exec(
-                *cmd_parts,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            
-            # JSON-RPC 요청 전송
-            request_str = json.dumps(payload) + "\n"
-            stdout, stderr = await asyncio.wait_for(
-                process.communicate(input=request_str.encode('utf-8')),
-                timeout=10
-            )
-            
-            # 응답 파싱
-            if stdout:
-                try:
-                    data = json.loads(stdout.decode('utf-8'))
-                    if data.get('id') == payload['id']:
-                        tools = data.get("result", {}).get("tools", [])
-                        return {
-                            "success": True,
-                            "tools": tools,
-                            "message": "Tools fetched successfully"
-                        }
-                except json.JSONDecodeError:
-                    pass
-            
-            return {
-                "success": False,
-                "tools": [],
-                "message": f"STDIO process error: {stderr.decode('utf-8') if stderr else 'Unknown error'}"
-            }
-            
-        except asyncio.TimeoutError:
-            return {
-                "success": False,
-                "tools": [],
-                "message": "STDIO process timeout"
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "tools": [],
-                "message": f"STDIO process failed: {str(e)}"
-            }
+        logger.info(f"[MCP Proxy] Fetching tools - URL: {url}, Protocol: {protocol}")
 
+        if not MCP_SDK_AVAILABLE:
+            logger.error("MCP SDK is not installed")
+            return MCPProxyService._create_error_response(
+                "MCP SDK is not installed. Please install with: pip install mcp[cli]"
+            )
+
+        try:
+            # 프로토콜 정규화
+            normalized_protocol = MCPProxyService._normalize_protocol(protocol)
+
+            # Inspector의 createTransport처럼 프로토콜에 따라 분기
+            if normalized_protocol == "stdio":
+                return await MCPProxyService._fetch_stdio(url)
+            elif normalized_protocol == "sse":
+                return await MCPProxyService._fetch_sse(url)
+            else:
+                # streamable-http (기본값)
+                return await MCPProxyService._fetch_streamable_http(url)
+
+        except Exception as e:
+            logger.error(f"[MCP Proxy] Failed to fetch tools: {str(e)}", exc_info=True)
+            return MCPProxyService._create_error_response(f"Failed to fetch tools: {str(e)}")
+
+    @staticmethod
+    def _normalize_protocol(protocol: str) -> str:
+        """프로토콜 이름 정규화 - Inspector와 동일"""
+        protocol = protocol.lower().strip()
+
+        # Inspector의 정확한 매핑
+        if protocol in ("stdio",):
+            return "stdio"
+        elif protocol in ("sse", "server-sent-events"):
+            return "sse"
+        elif protocol in ("streamable-http", "http", "https", "http-stream", "websocket"):
+            return "streamable-http"
+        else:
+            # 기본값
+            return "streamable-http"
+
+    @staticmethod
+    async def _fetch_stdio(command: str) -> Dict[str, Any]:
+        """
+        STDIO transport - Inspector의 StdioClientTransport와 동일
+        """
+        logger.info(f"[STDIO] Starting with command: {command}")
+
+        try:
+            parts = command.split()
+            if not parts:
+                return MCPProxyService._create_error_response("Empty command")
+
+            cmd = parts[0]
+            args = parts[1:] if len(parts) > 1 else []
+
+            server_params = StdioServerParameters(
+                command=cmd,
+                args=args,
+                env=None
+            )
+
+            logger.info(f"[STDIO] Command={cmd}, Args={args}")
+
+            # Inspector: await transport.start()
+            # Python: async with stdio_client
+            async with stdio_client(server_params) as (read, write):
+                async with ClientSession(read, write) as session:
+                    logger.info("[STDIO] Initializing session...")
+
+                    await asyncio.wait_for(
+                        session.initialize(),
+                        timeout=MCPProxyService.DEFAULT_TIMEOUT
+                    )
+
+                    logger.info("[STDIO] Listing tools...")
+
+                    result = await asyncio.wait_for(
+                        session.list_tools(),
+                        timeout=MCPProxyService.DEFAULT_TIMEOUT
+                    )
+
+                    tools = MCPProxyService._convert_tools(result.tools)
+
+                    logger.info(f"[STDIO] Success: {len(tools)} tools")
+                    return MCPProxyService._create_success_response(
+                        tools,
+                        f"Fetched {len(tools)} tools via STDIO"
+                    )
+
+        except asyncio.TimeoutError:
+            logger.error(f"[STDIO] Timeout after {MCPProxyService.DEFAULT_TIMEOUT}s")
+            return MCPProxyService._create_error_response(
+                f"STDIO timeout after {MCPProxyService.DEFAULT_TIMEOUT}s"
+            )
+        except Exception as e:
+            logger.error(f"[STDIO] Failed: {type(e).__name__}: {str(e)}", exc_info=True)
+            return MCPProxyService._create_error_response(f"STDIO failed: {str(e)}")
+
+    @staticmethod
+    async def _fetch_sse(url: str) -> Dict[str, Any]:
+        """
+        SSE transport - Inspector의 SSEClientTransport와 동일
+        """
+        logger.info(f"[SSE] Connecting to: {url}")
+
+        try:
+            if not url.startswith("http://") and not url.startswith("https://"):
+                return MCPProxyService._create_error_response(f"Invalid URL: {url}")
+
+            logger.info(f"[SSE] Creating SSE client for {url}")
+
+            # Inspector: new SSEClientTransport(new URL(url), {headers...})
+            # Python: sse_client(url)
+            async with sse_client(url) as (read, write):
+                async with ClientSession(read, write) as session:
+                    logger.info("[SSE] Session created, initializing...")
+
+                    await asyncio.wait_for(
+                        session.initialize(),
+                        timeout=MCPProxyService.DEFAULT_TIMEOUT
+                    )
+
+                    logger.info(f"[SSE] Session initialized")
+                    logger.info("[SSE] Listing tools...")
+
+                    result = await asyncio.wait_for(
+                        session.list_tools(),
+                        timeout=MCPProxyService.DEFAULT_TIMEOUT
+                    )
+
+                    tools = MCPProxyService._convert_tools(result.tools)
+
+                    logger.info(f"[SSE] Success: {len(tools)} tools")
+                    return MCPProxyService._create_success_response(
+                        tools,
+                        f"Fetched {len(tools)} tools via SSE"
+                    )
+
+        except asyncio.TimeoutError:
+            error_msg = f"SSE timeout after {MCPProxyService.DEFAULT_TIMEOUT}s"
+            logger.error(f"[SSE] {error_msg}")
+            return MCPProxyService._create_error_response(error_msg)
+        except Exception as e:
+            error_msg = f"SSE failed: {type(e).__name__}: {str(e)}"
+            logger.error(f"[SSE] {error_msg}", exc_info=True)
+            return MCPProxyService._create_error_response(error_msg)
+
+    @staticmethod
+    async def _fetch_streamable_http(url: str) -> Dict[str, Any]:
+        """
+        Streamable HTTP transport - Inspector의 StreamableHTTPClientTransport와 동일
+        """
+        logger.info(f"[Streamable HTTP] Connecting to: {url}")
+
+        try:
+            if not url.startswith("http://") and not url.startswith("https://"):
+                return MCPProxyService._create_error_response(f"Invalid URL: {url}")
+
+            if not HAS_STREAMABLE_HTTP:
+                # Streamable HTTP가 없으면 SSE로 시도
+                logger.warning("[Streamable HTTP] Not available, trying SSE")
+                return await MCPProxyService._fetch_sse(url)
+
+            logger.info(f"[Streamable HTTP] Creating client for {url}")
+
+            # Inspector: new StreamableHTTPClientTransport(new URL(url), {fetch...})
+            # Python: streamablehttp_client(url)
+            async with streamablehttp_client(url) as (read, write, _):
+                async with ClientSession(read, write) as session:
+                    logger.info("[Streamable HTTP] Session created, initializing...")
+
+                    init_result = await asyncio.wait_for(
+                        session.initialize(),
+                        timeout=MCPProxyService.DEFAULT_TIMEOUT
+                    )
+
+                    logger.info(f"[Streamable HTTP] Session initialized")
+                    logger.info(f"[Streamable HTTP] Server info: {init_result}")
+                    logger.info("[Streamable HTTP] Listing tools...")
+
+                    result = await asyncio.wait_for(
+                        session.list_tools(),
+                        timeout=MCPProxyService.DEFAULT_TIMEOUT
+                    )
+
+                    logger.info(f"[Streamable HTTP] Received tools response")
+
+                    tools = MCPProxyService._convert_tools(result.tools)
+
+                    logger.info(f"[Streamable HTTP] Success: {len(tools)} tools")
+                    return MCPProxyService._create_success_response(
+                        tools,
+                        f"Fetched {len(tools)} tools via Streamable HTTP"
+                    )
+
+        except asyncio.TimeoutError:
+            error_msg = f"Streamable HTTP timeout after {MCPProxyService.DEFAULT_TIMEOUT}s"
+            logger.error(f"[Streamable HTTP] {error_msg}")
+            return MCPProxyService._create_error_response(error_msg)
+
+        except Exception as e:
+            error_msg = f"Streamable HTTP failed: {type(e).__name__}: {str(e)}"
+            logger.error(f"[Streamable HTTP] {error_msg}", exc_info=True)
+            return MCPProxyService._create_error_response(error_msg)
+
+    @staticmethod
+    def _convert_tools(tools_list) -> List[Dict[str, Any]]:
+        """Tool 객체를 딕셔너리로 변환"""
+        tools = []
+        for tool in tools_list:
+            tool_dict = {
+                "name": tool.name,
+                "description": tool.description,
+            }
+            if hasattr(tool, 'inputSchema') and tool.inputSchema:
+                tool_dict["inputSchema"] = tool.inputSchema
+            tools.append(tool_dict)
+        return tools

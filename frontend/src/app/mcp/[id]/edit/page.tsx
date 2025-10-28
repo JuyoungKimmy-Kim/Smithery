@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { MCPServer, ProtocolType, MCPServerTool, MCPServerProperty } from "../../../../types/mcp";
+import { MCPServer, TransportType, MCPServerTool, MCPServerProperty } from "../../../../types/mcp";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { PlusIcon, TrashIcon, PencilIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
@@ -56,6 +56,14 @@ export default function EditMCPServerPage() {
     required: false
   });
   const [editingParameterIndex, setEditingParameterIndex] = useState<number | null>(null);
+
+  // Tool 미리보기 관련 상태
+  const [previewTools, setPreviewTools] = useState<any[]>([]);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateTools, setDuplicateTools] = useState<{existing: MCPServerTool[], new: MCPServerTool[]}>({existing: [], new: []});
+  const [pendingNewTools, setPendingNewTools] = useState<MCPServerTool[]>([]);
+  const [selectedChoices, setSelectedChoices] = useState<('existing' | 'new')[]>([]);
 
   // 폼에 내용이 있는지 확인하는 함수
   const hasFormContent = (): boolean => {
@@ -332,15 +340,29 @@ export default function EditMCPServerPage() {
         if (response.ok) {
           const data = await response.json();
           setMcp(data);
-          
+
+          // config에서 url 추출
+          let urlValue = "";
+          let configObj = null;
+          try {
+            if (typeof data.config === 'string') {
+              configObj = JSON.parse(data.config);
+            } else if (data.config && typeof data.config === 'object') {
+              configObj = data.config;
+            }
+            urlValue = configObj?.url || "";
+          } catch (e) {
+            console.error('Failed to parse config:', e);
+          }
+
           setFormData({
             name: data.name || "",
             github_link: data.github_link || "",
             description: data.description || "",
             tags: formatTagsToString(data.tags),
-            protocol: data.protocol || "http",
-            url: data.config?.url || "",
-            config: data.config ? JSON.stringify(data.config, null, 2) : ""
+            protocol: data.protocol || "",
+            url: urlValue,
+            config: data.config ? (typeof data.config === 'string' ? data.config : JSON.stringify(data.config, null, 2)) : ""
           });
 
           // 기존 태그를 선택된 태그로 설정
@@ -372,13 +394,166 @@ export default function EditMCPServerPage() {
       ...prev,
       [field]: value
     }));
-    
+
     if (validationErrors[field]) {
       setValidationErrors(prev => ({
         ...prev,
         [field]: ""
       }));
     }
+  };
+
+  const handleUrlChange = async (url: string, protocol: string) => {
+    if (!url.trim() || !protocol) {
+      setPreviewTools([]);
+      return;
+    }
+
+    try {
+      console.log('MCP Server URL detected:', url, 'Transport Type:', protocol);
+      await detectAndPreviewTools({ url: url.trim(), protocol });
+    } catch (error) {
+      console.error('URL 처리 실패:', error);
+      setPreviewTools([]);
+    }
+  };
+
+  const requestToolsList = async (config: any) => {
+    try {
+      console.log('Requesting tools via backend proxy:', config);
+
+      const response = await fetch('/api/mcp-servers/preview-tools', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          url: config.url,
+          protocol: config.protocol
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Backend proxy response:', data);
+
+        if (data.success && data.tools && data.tools.length > 0) {
+          setPreviewTools(data.tools);
+        } else {
+          console.log('No tools found or request failed:', data.message);
+          setPreviewTools([]);
+        }
+      } else {
+        console.error('Backend proxy request failed:', response.status);
+        setPreviewTools([]);
+      }
+    } catch (error) {
+      console.error('tools/list 요청 실패:', error);
+      setPreviewTools([]);
+    }
+  };
+
+  const detectAndPreviewTools = async (config: any) => {
+    setIsLoadingPreview(true);
+
+    try {
+      console.log('Fetching tools from MCP Server:', config.url, 'Transport Type:', config.protocol);
+      await requestToolsList(config);
+    } catch (error) {
+      console.error('MCP Server tools 가져오기 실패:', error);
+      setPreviewTools([]);
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
+
+  const convertMCPToolsToMCPServerTools = (mcpTools: any[]): MCPServerTool[] => {
+    return mcpTools.map(tool => {
+      const parameters: MCPServerProperty[] = [];
+
+      if (tool.inputSchema?.properties) {
+        Object.entries(tool.inputSchema.properties).forEach(([paramName, paramInfo]: [string, any]) => {
+          parameters.push({
+            name: paramName,
+            description: paramInfo.description || '',
+            type: paramInfo.type || 'string',
+            required: tool.inputSchema?.required?.includes(paramName) || false
+          });
+        });
+      }
+
+      return {
+        name: tool.name,
+        description: tool.description || '',
+        parameters: parameters
+      };
+    });
+  };
+
+  const handleUsePreviewTools = () => {
+    if (previewTools.length > 0) {
+      const convertedTools = convertMCPToolsToMCPServerTools(previewTools);
+
+      // 중복된 tool 찾기
+      const duplicates: {existing: MCPServerTool[], new: MCPServerTool[]} = {existing: [], new: []};
+      const newToolsOnly: MCPServerTool[] = [];
+
+      convertedTools.forEach(newTool => {
+        const existingTool = tools.find(t => t.name === newTool.name);
+        if (existingTool) {
+          duplicates.existing.push(existingTool);
+          duplicates.new.push(newTool);
+        } else {
+          newToolsOnly.push(newTool);
+        }
+      });
+
+      // 중복이 있으면 모달 표시
+      if (duplicates.existing.length > 0) {
+        setDuplicateTools(duplicates);
+        setPendingNewTools(newToolsOnly);
+        // 기본값은 모두 'existing' (기존 것 유지)
+        setSelectedChoices(new Array(duplicates.existing.length).fill('existing'));
+        setShowDuplicateModal(true);
+      } else {
+        // 중복 없으면 바로 추가
+        setTools([...tools, ...newToolsOnly]);
+        alert(t('edit.toolsAdded', { count: String(newToolsOnly.length) }));
+      }
+    }
+  };
+
+  const handleToggleChoice = (index: number) => {
+    setSelectedChoices(prev => {
+      const newChoices = [...prev];
+      newChoices[index] = newChoices[index] === 'existing' ? 'new' : 'existing';
+      return newChoices;
+    });
+  };
+
+  const handleApplyChoices = () => {
+    // 선택된 tool들을 적용
+    const duplicateNamesToReplace = new Set<string>();
+    const toolsToAdd: MCPServerTool[] = [];
+
+    selectedChoices.forEach((choice, index) => {
+      if (choice === 'new') {
+        duplicateNamesToReplace.add(duplicateTools.existing[index].name);
+        toolsToAdd.push(duplicateTools.new[index]);
+      }
+    });
+
+    // 교체할 tool 제거 후 새로운 것 추가
+    const filteredTools = tools.filter(t => !duplicateNamesToReplace.has(t.name));
+    setTools([...filteredTools, ...toolsToAdd, ...pendingNewTools]);
+
+    setShowDuplicateModal(false);
+    const totalAdded = toolsToAdd.length + pendingNewTools.length;
+    alert(t('edit.toolsAdded', { count: String(totalAdded) }));
+  };
+
+  const handleCancelDuplicate = () => {
+    setShowDuplicateModal(false);
   };
 
   const handleAddTool = () => {
@@ -527,7 +702,7 @@ export default function EditMCPServerPage() {
       errors.protocol = t('edit.protocolRequired');
     }
     
-    if (formData.url.trim() && formData.protocol !== ProtocolType.STDIO) {
+    if (formData.url.trim() && formData.protocol !== TransportType.STDIO) {
       try {
         new URL(formData.url);
       } catch {
@@ -657,22 +832,143 @@ export default function EditMCPServerPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
-              
+
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
                 {t('edit.sessionExpired')}
               </h3>
-              
+
               <div className="text-gray-600 mb-6 space-y-2">
                 <p>{t('edit.draftSaved')}</p>
                 <p>{t('edit.loginAgain')}</p>
               </div>
-              
+
               <button
                 onClick={() => router.push('/ad-login')}
                 className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors font-medium"
               >
                 {t('edit.ok')}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Duplicate Tools Modal */}
+      {showDuplicateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 transform transition-all max-h-[85vh] overflow-y-auto">
+            <div className="p-8">
+              <div className="flex items-center mb-6">
+                <div className="flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 mr-4">
+                  <svg className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">
+                    {t('edit.duplicateToolsTitle')}
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {t('edit.duplicateToolsDesc')}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                {duplicateTools.existing.map((existingTool, index) => {
+                  const isExistingSelected = selectedChoices[index] === 'existing';
+                  const isNewSelected = selectedChoices[index] === 'new';
+
+                  return (
+                    <div key={index} className="border-2 border-gray-300 rounded-lg p-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* 기존 Tool */}
+                        <div
+                          className={`border-r pr-4 cursor-pointer transition-all ${
+                            isExistingSelected ? 'opacity-100' : 'opacity-50'
+                          }`}
+                          onClick={() => handleToggleChoice(index)}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-semibold text-blue-700">{t('edit.existingTool')}</h4>
+                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                              isExistingSelected
+                                ? 'border-blue-600 bg-blue-600'
+                                : 'border-gray-300 bg-white'
+                            }`}>
+                              {isExistingSelected && (
+                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                          <div className={`p-3 rounded ${
+                            isExistingSelected ? 'bg-blue-100 border-2 border-blue-500' : 'bg-blue-50'
+                          }`}>
+                            <p className="font-medium text-gray-900">{existingTool.name}</p>
+                            <p className="text-sm text-gray-600 mt-1">{existingTool.description}</p>
+                            {existingTool.parameters.length > 0 && (
+                              <div className="mt-2">
+                                <p className="text-xs font-medium text-gray-700">Parameters: {existingTool.parameters.length}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 새로운 Tool */}
+                        <div
+                          className={`pl-4 cursor-pointer transition-all ${
+                            isNewSelected ? 'opacity-100' : 'opacity-50'
+                          }`}
+                          onClick={() => handleToggleChoice(index)}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-semibold text-green-700">{t('edit.newTool')}</h4>
+                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                              isNewSelected
+                                ? 'border-green-600 bg-green-600'
+                                : 'border-gray-300 bg-white'
+                            }`}>
+                              {isNewSelected && (
+                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                          <div className={`p-3 rounded ${
+                            isNewSelected ? 'bg-green-100 border-2 border-green-500' : 'bg-green-50'
+                          }`}>
+                            <p className="font-medium text-gray-900">{duplicateTools.new[index].name}</p>
+                            <p className="text-sm text-gray-600 mt-1">{duplicateTools.new[index].description}</p>
+                            {duplicateTools.new[index].parameters.length > 0 && (
+                              <div className="mt-2">
+                                <p className="text-xs font-medium text-gray-700">Parameters: {duplicateTools.new[index].parameters.length}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleApplyChoices}
+                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  {t('edit.applyChoices')}
+                </button>
+                <button
+                  onClick={handleCancelDuplicate}
+                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                >
+                  {t('edit.cancel')}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -790,7 +1086,7 @@ export default function EditMCPServerPage() {
             onNewTagAdded={handleNewTagAdded}
           />
           
-          {/* Protocol */}
+          {/* Transport Type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {t('edit.protocol')} *
@@ -798,16 +1094,21 @@ export default function EditMCPServerPage() {
             <select
               required
               value={formData.protocol}
-              onChange={(e) => handleInputChange('protocol', e.target.value)}
+              onChange={(e) => {
+                handleInputChange('protocol', e.target.value);
+                // Transport Type과 URL이 모두 있을 때 미리보기 시도
+                if (formData.url.trim()) {
+                  handleUrlChange(formData.url, e.target.value);
+                }
+              }}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 validationErrors.protocol ? 'border-red-500' : 'border-gray-300'
               }`}
             >
               <option value="">{t('edit.protocolSelect')}</option>
-              <option value={ProtocolType.HTTP}>HTTP</option>
-              <option value={ProtocolType.HTTP_STREAM}>HTTP-Stream</option>
-              <option value={ProtocolType.WEBSOCKET}>WebSocket</option>
-              <option value={ProtocolType.STDIO}>STDIO</option>
+              <option value={TransportType.STREAMABLE_HTTP}>Streamable HTTP</option>
+              <option value={TransportType.SSE}>SSE</option>
+              <option value={TransportType.STDIO}>STDIO</option>
             </select>
             {validationErrors.protocol && (
               <p className="mt-1 text-sm text-red-600">{validationErrors.protocol}</p>
@@ -822,24 +1123,100 @@ export default function EditMCPServerPage() {
             <input
               type="url"
               value={formData.url}
-              onChange={(e) => handleInputChange('url', e.target.value)}
+              onChange={(e) => {
+                handleInputChange('url', e.target.value);
+                // Transport Type과 URL이 모두 있을 때 미리보기 시도
+                if (formData.protocol.trim()) {
+                  handleUrlChange(e.target.value, formData.protocol);
+                }
+              }}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 validationErrors.url ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder={formData.protocol === ProtocolType.STDIO ? t('edit.serverUrlPlaceholderStdio') : t('edit.serverUrlPlaceholderHttp')}
+              placeholder={formData.protocol === TransportType.STDIO ? t('edit.serverUrlPlaceholderStdio') : t('edit.serverUrlPlaceholderHttp')}
             />
             {validationErrors.url && (
               <p className="mt-1 text-sm text-red-600">{validationErrors.url}</p>
             )}
             <p className="mt-1 text-xs text-gray-500">
-              {formData.protocol === ProtocolType.STDIO 
+              {formData.protocol === TransportType.STDIO
                 ? t('edit.serverUrlHelpStdio')
                 : t('edit.serverUrlHelpHttp')
               }
             </p>
           </div>
 
-          {formData.protocol === ProtocolType.STDIO && (
+          {isLoadingPreview && (
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="flex items-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                <span className="text-blue-700">{t('edit.loadingTools')}</span>
+              </div>
+            </div>
+          )}
+
+          {previewTools.length > 0 && (
+            <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-green-800">
+                  {t('edit.toolsPreview', { count: String(previewTools.length) })}
+                </h3>
+                <button
+                  type="button"
+                  onClick={handleUsePreviewTools}
+                  className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors"
+                >
+                  모두 추가
+                </button>
+              </div>
+              <div className="space-y-3">
+                {previewTools.map((tool: any, index: number) => (
+                  <div key={index} className="bg-white rounded-lg p-3 border border-green-200">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-green-900 text-sm">{tool.name}</h4>
+                        <p className="text-xs text-green-700 mt-1">{tool.description || t('edit.noDescription')}</p>
+
+                        {/* Parameters 정보 표시 */}
+                        {tool.inputSchema?.properties && (
+                          <div className="mt-2">
+                            <p className="text-xs font-medium text-gray-700 mb-1">Parameters:</p>
+                            <div className="space-y-1">
+                              {Object.entries(tool.inputSchema.properties).map(([paramName, paramInfo]: [string, any]) => (
+                                <div key={paramName} className="text-xs text-gray-600 flex items-center gap-2">
+                                  <span className="font-medium">{paramName}</span>
+                                  <span className="text-blue-600">({paramInfo.type || 'any'})</span>
+                                  {tool.inputSchema?.required?.includes(paramName) && (
+                                    <span className="text-red-600 text-xs">{t('edit.required')}</span>
+                                  )}
+                                  {paramInfo.description && (
+                                    <span className="text-gray-500">- {paramInfo.description}</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {formData.url && formData.protocol && !isLoadingPreview && previewTools.length === 0 && formData.protocol !== TransportType.STDIO && (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+              <div className="flex items-center">
+                <div className="text-yellow-600 mr-2">⚠️</div>
+                <span className="text-yellow-700 text-sm">
+                  {t('edit.connectionError')}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {formData.protocol === TransportType.STDIO && (
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
               <div className="flex items-center">
                 <div className="text-yellow-600 mr-2">⚠️</div>
