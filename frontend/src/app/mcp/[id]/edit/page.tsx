@@ -57,6 +57,10 @@ export default function EditMCPServerPage() {
   });
   const [editingParameterIndex, setEditingParameterIndex] = useState<number | null>(null);
 
+  // Tool 미리보기 관련 상태
+  const [previewTools, setPreviewTools] = useState<any[]>([]);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+
   // 폼에 내용이 있는지 확인하는 함수
   const hasFormContent = (): boolean => {
     return !!(formData.name || 
@@ -372,12 +376,107 @@ export default function EditMCPServerPage() {
       ...prev,
       [field]: value
     }));
-    
+
     if (validationErrors[field]) {
       setValidationErrors(prev => ({
         ...prev,
         [field]: ""
       }));
+    }
+  };
+
+  const handleUrlChange = async (url: string, protocol: string) => {
+    if (!url.trim() || !protocol) {
+      setPreviewTools([]);
+      return;
+    }
+
+    try {
+      console.log('MCP Server URL detected:', url, 'Protocol:', protocol);
+      await detectAndPreviewTools({ url: url.trim(), protocol });
+    } catch (error) {
+      console.error('URL 처리 실패:', error);
+      setPreviewTools([]);
+    }
+  };
+
+  const requestToolsList = async (config: any) => {
+    try {
+      console.log('Requesting tools via backend proxy:', config);
+
+      const response = await fetch('/api/mcp-servers/preview-tools', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          url: config.url,
+          protocol: config.protocol
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Backend proxy response:', data);
+
+        if (data.success && data.tools && data.tools.length > 0) {
+          setPreviewTools(data.tools);
+        } else {
+          console.log('No tools found or request failed:', data.message);
+          setPreviewTools([]);
+        }
+      } else {
+        console.error('Backend proxy request failed:', response.status);
+        setPreviewTools([]);
+      }
+    } catch (error) {
+      console.error('tools/list 요청 실패:', error);
+      setPreviewTools([]);
+    }
+  };
+
+  const detectAndPreviewTools = async (config: any) => {
+    setIsLoadingPreview(true);
+
+    try {
+      console.log('Fetching tools from MCP Server:', config.url, 'Protocol:', config.protocol);
+      await requestToolsList(config);
+    } catch (error) {
+      console.error('MCP Server tools 가져오기 실패:', error);
+      setPreviewTools([]);
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
+
+  const convertMCPToolsToMCPServerTools = (mcpTools: any[]): MCPServerTool[] => {
+    return mcpTools.map(tool => {
+      const parameters: MCPServerProperty[] = [];
+
+      if (tool.inputSchema?.properties) {
+        Object.entries(tool.inputSchema.properties).forEach(([paramName, paramInfo]: [string, any]) => {
+          parameters.push({
+            name: paramName,
+            description: paramInfo.description || '',
+            type: paramInfo.type || 'string',
+            required: tool.inputSchema?.required?.includes(paramName) || false
+          });
+        });
+      }
+
+      return {
+        name: tool.name,
+        description: tool.description || '',
+        parameters: parameters
+      };
+    });
+  };
+
+  const handleUsePreviewTools = () => {
+    if (previewTools.length > 0) {
+      const convertedTools = convertMCPToolsToMCPServerTools(previewTools);
+      setTools(convertedTools);
+      alert(t('edit.toolsAdded', { count: String(convertedTools.length) }));
     }
   };
 
@@ -798,7 +897,13 @@ export default function EditMCPServerPage() {
             <select
               required
               value={formData.protocol}
-              onChange={(e) => handleInputChange('protocol', e.target.value)}
+              onChange={(e) => {
+                handleInputChange('protocol', e.target.value);
+                // Protocol과 URL이 모두 있을 때 미리보기 시도
+                if (formData.url.trim()) {
+                  handleUrlChange(formData.url, e.target.value);
+                }
+              }}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 validationErrors.protocol ? 'border-red-500' : 'border-gray-300'
               }`}
@@ -821,7 +926,13 @@ export default function EditMCPServerPage() {
             <input
               type="url"
               value={formData.url}
-              onChange={(e) => handleInputChange('url', e.target.value)}
+              onChange={(e) => {
+                handleInputChange('url', e.target.value);
+                // Protocol과 URL이 모두 있을 때 미리보기 시도
+                if (formData.protocol.trim()) {
+                  handleUrlChange(e.target.value, formData.protocol);
+                }
+              }}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 validationErrors.url ? 'border-red-500' : 'border-gray-300'
               }`}
@@ -837,6 +948,76 @@ export default function EditMCPServerPage() {
               }
             </p>
           </div>
+
+          {isLoadingPreview && (
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="flex items-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                <span className="text-blue-700">{t('edit.loadingTools')}</span>
+              </div>
+            </div>
+          )}
+
+          {previewTools.length > 0 && (
+            <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-green-800">
+                  {t('edit.toolsPreview', { count: String(previewTools.length) })}
+                </h3>
+                <button
+                  type="button"
+                  onClick={handleUsePreviewTools}
+                  className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors"
+                >
+                  {t('edit.addAllTools')}
+                </button>
+              </div>
+              <div className="space-y-3">
+                {previewTools.map((tool: any, index: number) => (
+                  <div key={index} className="bg-white rounded-lg p-3 border border-green-200">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-green-900 text-sm">{tool.name}</h4>
+                        <p className="text-xs text-green-700 mt-1">{tool.description || t('edit.noDescription')}</p>
+
+                        {/* Parameters 정보 표시 */}
+                        {tool.inputSchema?.properties && (
+                          <div className="mt-2">
+                            <p className="text-xs font-medium text-gray-700 mb-1">Parameters:</p>
+                            <div className="space-y-1">
+                              {Object.entries(tool.inputSchema.properties).map(([paramName, paramInfo]: [string, any]) => (
+                                <div key={paramName} className="text-xs text-gray-600 flex items-center gap-2">
+                                  <span className="font-medium">{paramName}</span>
+                                  <span className="text-blue-600">({paramInfo.type || 'any'})</span>
+                                  {tool.inputSchema?.required?.includes(paramName) && (
+                                    <span className="text-red-600 text-xs">{t('edit.required')}</span>
+                                  )}
+                                  {paramInfo.description && (
+                                    <span className="text-gray-500">- {paramInfo.description}</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {formData.url && formData.protocol && !isLoadingPreview && previewTools.length === 0 && formData.protocol !== TransportType.STDIO && (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+              <div className="flex items-center">
+                <div className="text-yellow-600 mr-2">⚠️</div>
+                <span className="text-yellow-700 text-sm">
+                  {t('edit.connectionError')}
+                </span>
+              </div>
+            </div>
+          )}
 
           {formData.protocol === TransportType.STDIO && (
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
