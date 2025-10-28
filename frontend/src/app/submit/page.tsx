@@ -359,7 +359,7 @@ export default function SubmitMCPPage() {
     }
     
     try {
-      console.log('MCP Server URL detected:', url, 'Protocol:', protocol);
+      console.log('MCP Server URL detected:', url, 'Transport Type:', protocol);
       await detectAndPreviewTools({ url: url.trim(), protocol });
     } catch (error) {
       console.error('URL 처리 실패:', error);
@@ -409,7 +409,7 @@ export default function SubmitMCPPage() {
     setIsLoadingPreview(true);
     
     try {
-      console.log('Fetching tools from MCP Server:', config.url, 'Protocol:', config.protocol);
+      console.log('Fetching tools from MCP Server:', config.url, 'Transport Type:', config.protocol);
       await requestToolsList(config);
     } catch (error) {
       console.error('MCP Server tools 가져오기 실패:', error);
@@ -893,7 +893,7 @@ export default function SubmitMCPPage() {
               value={formData.protocol}
               onChange={(e) => {
                 handleInputChange('protocol', e.target.value);
-                // Protocol과 URL이 모두 있을 때 미리보기 시도
+                // Transport Type과 URL이 모두 있을 때 미리보기 시도
                 if (formData.url.trim()) {
                   handleUrlChange(formData.url, e.target.value);
                 }
@@ -922,7 +922,7 @@ export default function SubmitMCPPage() {
               value={formData.url}
               onChange={(e) => {
                 handleInputChange('url', e.target.value);
-                // Protocol과 URL이 모두 있을 때 미리보기 시도
+                // Transport Type과 URL이 모두 있을 때 미리보기 시도
                 if (formData.protocol.trim()) {
                   handleUrlChange(e.target.value, formData.protocol);
                 }

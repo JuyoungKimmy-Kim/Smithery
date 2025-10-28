@@ -63,6 +63,7 @@ export default function EditMCPServerPage() {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [duplicateTools, setDuplicateTools] = useState<{existing: MCPServerTool[], new: MCPServerTool[]}>({existing: [], new: []});
   const [pendingNewTools, setPendingNewTools] = useState<MCPServerTool[]>([]);
+  const [selectedChoices, setSelectedChoices] = useState<('existing' | 'new')[]>([]);
 
   // 폼에 내용이 있는지 확인하는 함수
   const hasFormContent = (): boolean => {
@@ -409,7 +410,7 @@ export default function EditMCPServerPage() {
     }
 
     try {
-      console.log('MCP Server URL detected:', url, 'Protocol:', protocol);
+      console.log('MCP Server URL detected:', url, 'Transport Type:', protocol);
       await detectAndPreviewTools({ url: url.trim(), protocol });
     } catch (error) {
       console.error('URL 처리 실패:', error);
@@ -456,7 +457,7 @@ export default function EditMCPServerPage() {
     setIsLoadingPreview(true);
 
     try {
-      console.log('Fetching tools from MCP Server:', config.url, 'Protocol:', config.protocol);
+      console.log('Fetching tools from MCP Server:', config.url, 'Transport Type:', config.protocol);
       await requestToolsList(config);
     } catch (error) {
       console.error('MCP Server tools 가져오기 실패:', error);
@@ -511,6 +512,8 @@ export default function EditMCPServerPage() {
       if (duplicates.existing.length > 0) {
         setDuplicateTools(duplicates);
         setPendingNewTools(newToolsOnly);
+        // 기본값은 모두 'existing' (기존 것 유지)
+        setSelectedChoices(new Array(duplicates.existing.length).fill('existing'));
         setShowDuplicateModal(true);
       } else {
         // 중복 없으면 바로 추가
@@ -520,20 +523,33 @@ export default function EditMCPServerPage() {
     }
   };
 
-  const handleKeepExisting = () => {
-    // 기존 것 유지, 중복 아닌 것만 추가
-    setTools([...tools, ...pendingNewTools]);
-    setShowDuplicateModal(false);
-    alert(t('edit.toolsAdded', { count: String(pendingNewTools.length) }));
+  const handleToggleChoice = (index: number) => {
+    setSelectedChoices(prev => {
+      const newChoices = [...prev];
+      newChoices[index] = newChoices[index] === 'existing' ? 'new' : 'existing';
+      return newChoices;
+    });
   };
 
-  const handleReplaceWithNew = () => {
-    // 중복된 것을 새로운 것으로 교체
-    const duplicateNames = new Set(duplicateTools.existing.map(t => t.name));
-    const filteredTools = tools.filter(t => !duplicateNames.has(t.name));
-    setTools([...filteredTools, ...duplicateTools.new, ...pendingNewTools]);
+  const handleApplyChoices = () => {
+    // 선택된 tool들을 적용
+    const duplicateNamesToReplace = new Set<string>();
+    const toolsToAdd: MCPServerTool[] = [];
+
+    selectedChoices.forEach((choice, index) => {
+      if (choice === 'new') {
+        duplicateNamesToReplace.add(duplicateTools.existing[index].name);
+        toolsToAdd.push(duplicateTools.new[index]);
+      }
+    });
+
+    // 교체할 tool 제거 후 새로운 것 추가
+    const filteredTools = tools.filter(t => !duplicateNamesToReplace.has(t.name));
+    setTools([...filteredTools, ...toolsToAdd, ...pendingNewTools]);
+
     setShowDuplicateModal(false);
-    alert(t('edit.toolsAdded', { count: String(duplicateTools.new.length + pendingNewTools.length) }));
+    const totalAdded = toolsToAdd.length + pendingNewTools.length;
+    alert(t('edit.toolsAdded', { count: String(totalAdded) }));
   };
 
   const handleCancelDuplicate = () => {
@@ -840,7 +856,7 @@ export default function EditMCPServerPage() {
       {/* Duplicate Tools Modal */}
       {showDuplicateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 transform transition-all max-h-[80vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 transform transition-all max-h-[85vh] overflow-y-auto">
             <div className="p-8">
               <div className="flex items-center mb-6">
                 <div className="flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 mr-4">
@@ -859,54 +875,96 @@ export default function EditMCPServerPage() {
               </div>
 
               <div className="space-y-4 mb-6">
-                {duplicateTools.existing.map((existingTool, index) => (
-                  <div key={index} className="border border-gray-200 rounded-lg p-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="border-r pr-4">
-                        <h4 className="text-sm font-semibold text-blue-700 mb-2">{t('edit.existingTool')}</h4>
-                        <div className="bg-blue-50 p-3 rounded">
-                          <p className="font-medium text-gray-900">{existingTool.name}</p>
-                          <p className="text-sm text-gray-600 mt-1">{existingTool.description}</p>
-                          {existingTool.parameters.length > 0 && (
-                            <div className="mt-2">
-                              <p className="text-xs font-medium text-gray-700">Parameters: {existingTool.parameters.length}</p>
+                {duplicateTools.existing.map((existingTool, index) => {
+                  const isExistingSelected = selectedChoices[index] === 'existing';
+                  const isNewSelected = selectedChoices[index] === 'new';
+
+                  return (
+                    <div key={index} className="border-2 border-gray-300 rounded-lg p-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* 기존 Tool */}
+                        <div
+                          className={`border-r pr-4 cursor-pointer transition-all ${
+                            isExistingSelected ? 'opacity-100' : 'opacity-50'
+                          }`}
+                          onClick={() => handleToggleChoice(index)}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-semibold text-blue-700">{t('edit.existingTool')}</h4>
+                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                              isExistingSelected
+                                ? 'border-blue-600 bg-blue-600'
+                                : 'border-gray-300 bg-white'
+                            }`}>
+                              {isExistingSelected && (
+                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
                             </div>
-                          )}
+                          </div>
+                          <div className={`p-3 rounded ${
+                            isExistingSelected ? 'bg-blue-100 border-2 border-blue-500' : 'bg-blue-50'
+                          }`}>
+                            <p className="font-medium text-gray-900">{existingTool.name}</p>
+                            <p className="text-sm text-gray-600 mt-1">{existingTool.description}</p>
+                            {existingTool.parameters.length > 0 && (
+                              <div className="mt-2">
+                                <p className="text-xs font-medium text-gray-700">Parameters: {existingTool.parameters.length}</p>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                      <div className="pl-4">
-                        <h4 className="text-sm font-semibold text-green-700 mb-2">{t('edit.newTool')}</h4>
-                        <div className="bg-green-50 p-3 rounded">
-                          <p className="font-medium text-gray-900">{duplicateTools.new[index].name}</p>
-                          <p className="text-sm text-gray-600 mt-1">{duplicateTools.new[index].description}</p>
-                          {duplicateTools.new[index].parameters.length > 0 && (
-                            <div className="mt-2">
-                              <p className="text-xs font-medium text-gray-700">Parameters: {duplicateTools.new[index].parameters.length}</p>
+
+                        {/* 새로운 Tool */}
+                        <div
+                          className={`pl-4 cursor-pointer transition-all ${
+                            isNewSelected ? 'opacity-100' : 'opacity-50'
+                          }`}
+                          onClick={() => handleToggleChoice(index)}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-semibold text-green-700">{t('edit.newTool')}</h4>
+                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                              isNewSelected
+                                ? 'border-green-600 bg-green-600'
+                                : 'border-gray-300 bg-white'
+                            }`}>
+                              {isNewSelected && (
+                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
                             </div>
-                          )}
+                          </div>
+                          <div className={`p-3 rounded ${
+                            isNewSelected ? 'bg-green-100 border-2 border-green-500' : 'bg-green-50'
+                          }`}>
+                            <p className="font-medium text-gray-900">{duplicateTools.new[index].name}</p>
+                            <p className="text-sm text-gray-600 mt-1">{duplicateTools.new[index].description}</p>
+                            {duplicateTools.new[index].parameters.length > 0 && (
+                              <div className="mt-2">
+                                <p className="text-xs font-medium text-gray-700">Parameters: {duplicateTools.new[index].parameters.length}</p>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="flex gap-3">
                 <button
-                  onClick={handleKeepExisting}
+                  onClick={handleApplyChoices}
                   className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                 >
-                  {t('edit.keepExisting')}
-                </button>
-                <button
-                  onClick={handleReplaceWithNew}
-                  className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
-                >
-                  {t('edit.replaceWithNew')}
+                  {t('edit.applyChoices')}
                 </button>
                 <button
                   onClick={handleCancelDuplicate}
-                  className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
                 >
                   {t('edit.cancel')}
                 </button>
@@ -1038,7 +1096,7 @@ export default function EditMCPServerPage() {
               value={formData.protocol}
               onChange={(e) => {
                 handleInputChange('protocol', e.target.value);
-                // Protocol과 URL이 모두 있을 때 미리보기 시도
+                // Transport Type과 URL이 모두 있을 때 미리보기 시도
                 if (formData.url.trim()) {
                   handleUrlChange(formData.url, e.target.value);
                 }
@@ -1067,7 +1125,7 @@ export default function EditMCPServerPage() {
               value={formData.url}
               onChange={(e) => {
                 handleInputChange('url', e.target.value);
-                // Protocol과 URL이 모두 있을 때 미리보기 시도
+                // Transport Type과 URL이 모두 있을 때 미리보기 시도
                 if (formData.protocol.trim()) {
                   handleUrlChange(e.target.value, formData.protocol);
                 }
