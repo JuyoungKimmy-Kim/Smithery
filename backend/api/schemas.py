@@ -127,6 +127,10 @@ class AdminApprovalRequest(BaseModel):
 class PreviewToolsRequest(BaseModel):
     url: str
     protocol: str
+    command: Optional[str] = None
+    args: Optional[str] = None
+    cwd: Optional[str] = None
+    env: Optional[Dict[str, str]] = None
 
 class PreviewToolResponse(BaseModel):
     name: str
