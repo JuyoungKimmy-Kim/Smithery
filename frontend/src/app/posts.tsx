@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ArrowSmallDownIcon, CheckIcon, PlusIcon } from "@heroicons/react/24/solid";
+import { ArrowSmallDownIcon, CheckIcon, PlusIcon, CheckCircleIcon } from "@heroicons/react/24/solid";
 import { useRouter } from "next/navigation";
 import BlogPostCard from "@/components/blog-post-card";
 import { MCPServer } from "@/types/mcp";
@@ -509,7 +509,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                     ))
                   ) : (
                     // Top 3 / 최신 등록 탭
-                    currentRankingPosts.map(({ category, tags, title, desc, date, author, id, favorites_count }, index) => (
+                    currentRankingPosts.map(({ category, tags, title, desc, date, author, id, favorites_count, health_status }, index) => (
                       <div 
                         key={`ranking-${id || title}-${refreshKey}`} 
                         onClick={() => handleViewMCP(id)}
@@ -547,7 +547,15 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                           
                           {/* 서버 정보 */}
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-base font-semibold text-gray-900 mb-0.5 truncate">{String(title || '')}</h3>
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <h3 className="text-base font-semibold text-gray-900 truncate">{String(title || '')}</h3>
+                              {health_status === 'healthy' && (
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                  <CheckCircleIcon className="h-4 w-4 text-green-500" />
+                                  <span className="text-xs font-medium text-green-700">Active</span>
+                                </div>
+                              )}
+                            </div>
                             <p className="text-xs text-gray-600 mb-1 truncate">{String(desc || '')}</p>
                             <div className="flex items-center space-x-3 text-xs text-gray-500">
                               <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs">

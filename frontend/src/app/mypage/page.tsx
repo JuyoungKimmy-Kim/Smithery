@@ -15,11 +15,13 @@ interface Post {
   desc: string;
   date: string;
   status?: string; // status 추가
+  health_status?: string; // health status 추가
   author: {
     img: string;
     name: string;
   };
   id?: string;
+  favorites_count?: number;
 }
 
 export default function MyPage() {
@@ -260,8 +262,10 @@ export default function MyPage() {
                               desc={server.desc}
                               date={server.date}
                               status={server.status}
+                              healthStatus={server.health_status}
                               author={server.author}
                               id={server.id}
+                              favoritesCount={server.favorites_count || 0}
                             />
                           ))}
                         </div>
@@ -284,8 +288,10 @@ export default function MyPage() {
                               desc={server.desc}
                               date={server.date}
                               status={server.status}
+                              healthStatus={server.health_status}
                               author={server.author}
                               id={server.id}
+                              favoritesCount={server.favorites_count || 0}
                             />
                           ))}
                         </div>
@@ -324,8 +330,10 @@ export default function MyPage() {
                         title={server.title}
                         desc={server.desc}
                         date={server.date}
+                        healthStatus={server.health_status}
                         author={server.author}
                         id={server.id}
+                        favoritesCount={server.favorites_count || 0}
                       />
                     ))}
                   </div>
