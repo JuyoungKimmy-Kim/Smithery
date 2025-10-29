@@ -14,6 +14,11 @@ import {
   ClipboardDocumentIcon,
   CheckIcon,
   MegaphoneIcon,
+  HeartIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  QuestionMarkCircleIcon,
+  ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 import { MCPServer } from "@/types/mcp";
 import { useAuth } from "@/contexts/AuthContext";
@@ -35,6 +40,10 @@ export default function MCPServerDetail() {
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
   const [announcementText, setAnnouncementText] = useState("");
   const [isUpdatingAnnouncement, setIsUpdatingAnnouncement] = useState(false);
+  const [isCheckingHealth, setIsCheckingHealth] = useState(false);
+  const [healthCheckResult, setHealthCheckResult] = useState<any>(null);
+  const [lastHealthCheckTime, setLastHealthCheckTime] = useState<number>(0);
+  const [remainingCooldown, setRemainingCooldown] = useState<number>(0);
 
   const toggleToolExpansion = (index: number) => {
     const newExpanded = new Set(expandedTools);
@@ -122,18 +131,18 @@ export default function MCPServerDetail() {
 
   const handleDeleteAnnouncement = async () => {
     if (!mcp) return;
-    
+
     const confirmed = window.confirm("Are you sure you want to delete the announcement?");
     if (!confirmed) return;
-    
+
     setIsUpdatingAnnouncement(true);
-    
+
     try {
       const response = await apiFetch(`/api/mcps/${mcp.id}/announcement`, {
         method: 'DELETE',
         requiresAuth: true,
       });
-      
+
       if (response.ok) {
         const updatedMCP = await response.json();
         setMcp(updatedMCP);
@@ -148,6 +157,89 @@ export default function MCPServerDetail() {
       alert(`Failed to delete announcement: ${errorMessage}`);
     } finally {
       setIsUpdatingAnnouncement(false);
+    }
+  };
+
+  // Cooldown timer effect
+  useEffect(() => {
+    if (remainingCooldown > 0) {
+      const timer = setInterval(() => {
+        const elapsed = Date.now() - lastHealthCheckTime;
+        const cooldown = 20000; // 20초 쿨다운
+        const remaining = Math.max(0, cooldown - elapsed);
+
+        setRemainingCooldown(remaining);
+
+        if (remaining === 0) {
+          clearInterval(timer);
+        }
+      }, 100);
+
+      return () => clearInterval(timer);
+    }
+  }, [remainingCooldown, lastHealthCheckTime]);
+
+  const handleHealthCheck = async () => {
+    if (!mcp) return;
+
+    // 쿨다운 체크
+    if (remainingCooldown > 0) {
+      alert(`Please wait ${Math.ceil(remainingCooldown / 1000)} seconds before checking again.`);
+      return;
+    }
+
+    setIsCheckingHealth(true);
+    setHealthCheckResult(null);
+
+    try {
+      const response = await fetch(`/api/mcps/${mcp.id}/health-check`, {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setHealthCheckResult(result);
+
+        // Update MCP state with new health status
+        setMcp({
+          ...mcp,
+          health_status: result.health_status,
+          last_health_check: result.last_health_check,
+        });
+
+        // 성공 시 쿨다운 시작
+        const now = Date.now();
+        setLastHealthCheckTime(now);
+        setRemainingCooldown(20000); // 20초
+      } else if (response.status === 429) {
+        // Rate limit exceeded
+        alert('Too many requests. Please wait a moment before trying again.\n(Limit: 3 requests per minute)');
+        setHealthCheckResult({
+          health_status: 'error',
+          error: 'Rate limit exceeded'
+        });
+      } else {
+        const errorData = await response.json();
+        console.error('Health check error:', errorData);
+
+        // Rate limit 에러 체크 (백엔드에서 다른 형식으로 올 수도 있음)
+        if (errorData.detail && errorData.detail.includes('rate limit')) {
+          alert('Too many requests. Please wait a moment before trying again.\n(Limit: 3 requests per minute)');
+        }
+
+        setHealthCheckResult({
+          health_status: 'error',
+          error: errorData.detail || 'Failed to check server health'
+        });
+      }
+    } catch (error) {
+      console.error('Health check error:', error);
+      setHealthCheckResult({
+        health_status: 'error',
+        error: 'Network error during health check'
+      });
+    } finally {
+      setIsCheckingHealth(false);
     }
   };
 
@@ -287,9 +379,64 @@ export default function MCPServerDetail() {
         <div className="bg-white rounded-lg shadow-sm p-8 mb-8">
           <div className="flex items-start justify-between mb-6">
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900 mb-4">
-                {mcp.name}
-              </h1>
+              <div className="flex items-center gap-3 mb-4 flex-wrap">
+                <h1 className="text-3xl font-bold text-gray-900">
+                  {mcp.name}
+                </h1>
+
+                {/* Health Status - next to title */}
+                <div className="flex items-center gap-1.5">
+                  {mcp.health_status === 'healthy' ? (
+                    <>
+                      <CheckCircleIcon className="h-5 w-5 text-green-500" />
+                      <span className="text-sm font-medium text-green-700">Active</span>
+                    </>
+                  ) : mcp.health_status === 'unhealthy' ? (
+                    <>
+                      <XCircleIcon className="h-5 w-5 text-red-500" />
+                      <span className="text-sm font-medium text-red-700">Inactive</span>
+                    </>
+                  ) : (
+                    <>
+                      <QuestionMarkCircleIcon className="h-5 w-5 text-gray-400" />
+                      <span className="text-sm font-medium text-gray-600">Unknown</span>
+                    </>
+                  )}
+
+                  {/* Refresh Health Check Button */}
+                  <button
+                    onClick={handleHealthCheck}
+                    disabled={isCheckingHealth || remainingCooldown > 0}
+                    className={`p-1 rounded-full transition-colors relative ${
+                      isCheckingHealth ? 'animate-spin' : ''
+                    } ${
+                      remainingCooldown > 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100'
+                    }`}
+                    title={
+                      remainingCooldown > 0
+                        ? `Wait ${Math.ceil(remainingCooldown / 1000)}s`
+                        : 'Check server health'
+                    }
+                  >
+                    <ArrowPathIcon className={`h-4 w-4 ${
+                      remainingCooldown > 0 ? 'text-gray-300' : 'text-gray-500 hover:text-gray-700'
+                    }`} />
+                    {remainingCooldown > 0 && (
+                      <span className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 whitespace-nowrap">
+                        {Math.ceil(remainingCooldown / 1000)}s
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Last Health Check */}
+                  {mcp.last_health_check && (
+                    <span className="text-xs text-gray-400 ml-1">
+                      Last checked: {new Date(mcp.last_health_check).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
+                    </span>
+                  )}
+                </div>
+              </div>
+
               <p className="text-lg text-gray-600 mb-6">
                 {mcp.description}
               </p>
@@ -297,7 +444,7 @@ export default function MCPServerDetail() {
               {/* 공지사항 추가 버튼 - 공지사항이 없을 때만 표시 */}
               {isOwner && !mcp.announcement && (
                 <div className="mb-4">
-                  <button 
+                  <button
                     className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors flex items-center gap-2"
                     onClick={handleAddAnnouncement}
                     disabled={isUpdatingAnnouncement}
@@ -315,7 +462,7 @@ export default function MCPServerDetail() {
                     <span>Created: {new Date(mcp.created_at).toLocaleDateString()}</span>
                   </div>
                 )}
-                
+
                 {/* 권한 정보 표시 */}
                 {isAuthenticated && (
                   <div className="flex items-center gap-2">
@@ -328,16 +475,16 @@ export default function MCPServerDetail() {
             </div>
 
             <div className="flex gap-3">
-              <button 
+              <button
                 className="px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 transition-colors flex items-center gap-2"
                 onClick={() => window.open(mcp.github_link, '_blank')}
               >
                 <CodeBracketIcon className="h-4 w-4" />
                 View on GitHub
               </button>
-              
+
               {canEdit && (
-                <button 
+                <button
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
                   onClick={handleModify}
                 >
@@ -345,10 +492,9 @@ export default function MCPServerDetail() {
                   Edit
                 </button>
               )}
-              
-              
+
               {canDelete && (
-                <button 
+                <button
                   className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center gap-2 disabled:opacity-50"
                   onClick={handleDelete}
                   disabled={isDeleting}

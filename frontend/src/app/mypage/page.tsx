@@ -15,6 +15,8 @@ interface Post {
   desc: string;
   date: string;
   status?: string; // status 추가
+  health_status?: string;
+  last_health_check?: string;
   author: {
     img: string;
     name: string;
@@ -262,6 +264,8 @@ export default function MyPage() {
                               status={server.status}
                               author={server.author}
                               id={server.id}
+                              healthStatus={server.health_status}
+                              lastHealthCheck={server.last_health_check}
                             />
                           ))}
                         </div>
@@ -286,6 +290,8 @@ export default function MyPage() {
                               status={server.status}
                               author={server.author}
                               id={server.id}
+                              healthStatus={server.health_status}
+                              lastHealthCheck={server.last_health_check}
                             />
                           ))}
                         </div>
@@ -326,6 +332,8 @@ export default function MyPage() {
                         date={server.date}
                         author={server.author}
                         id={server.id}
+                        healthStatus={server.health_status}
+                        lastHealthCheck={server.last_health_check}
                       />
                     ))}
                   </div>

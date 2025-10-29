@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { StarIcon } from "@heroicons/react/24/outline";
-import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
+import { StarIcon as StarIconSolid, CheckCircleIcon, XCircleIcon, QuestionMarkCircleIcon } from "@heroicons/react/24/solid";
 import TagList from "./tag-list";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -19,6 +19,8 @@ interface BlogPostCardProps {
   favoritesCount?: number; // 즐겨찾기 수 (초기값)
   onFavoriteChange?: () => void; // 즐겨찾기 상태 변경 콜백
   onTagClick?: (tag: string) => void; // 태그 클릭 콜백
+  healthStatus?: string; // 서버 헬스 상태
+  lastHealthCheck?: string; // 마지막 헬스 체크 시간
 }
 
 export function BlogPostCard({
@@ -33,6 +35,8 @@ export function BlogPostCard({
   favoritesCount: initialFavoritesCount = 0,
   onFavoriteChange,
   onTagClick,
+  healthStatus,
+  lastHealthCheck,
 }: BlogPostCardProps) {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
@@ -157,8 +161,8 @@ export function BlogPostCard({
           onClick={handleFavoriteClick}
           disabled={isLoading}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm font-medium transition-all duration-200 ${
-            isFavorite 
-              ? 'bg-yellow-50 border-yellow-300 text-yellow-700 hover:bg-yellow-100' 
+            isFavorite
+              ? 'bg-yellow-50 border-yellow-300 text-yellow-700 hover:bg-yellow-100'
               : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
           } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
@@ -172,10 +176,33 @@ export function BlogPostCard({
       </div>
 
       <div className="p-6 flex flex-col h-full">
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
           <h3 className="text-xl font-semibold text-gray-900 normal-case transition-colors hover:text-gray-700 cursor-pointer line-clamp-2">
             {title}
           </h3>
+
+          {/* Health Status Indicator - next to title */}
+          {healthStatus && (
+            <div className="flex items-center gap-1">
+              {healthStatus === 'healthy' ? (
+                <>
+                  <CheckCircleIcon className="h-4 w-4 text-green-500" />
+                  <span className="text-xs font-medium text-green-700">Active</span>
+                </>
+              ) : healthStatus === 'unhealthy' ? (
+                <>
+                  <XCircleIcon className="h-4 w-4 text-red-500" />
+                  <span className="text-xs font-medium text-red-700">Inactive</span>
+                </>
+              ) : (
+                <>
+                  <QuestionMarkCircleIcon className="h-4 w-4 text-gray-400" />
+                  <span className="text-xs font-medium text-gray-600">Unknown</span>
+                </>
+              )}
+            </div>
+          )}
+
           {status === 'pending' && (
             <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full whitespace-nowrap">
               {t('mypage.pendingBadge')}

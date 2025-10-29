@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ArrowSmallDownIcon, CheckIcon, PlusIcon } from "@heroicons/react/24/solid";
+import { ArrowSmallDownIcon, CheckIcon, PlusIcon, CheckCircleIcon, XCircleIcon, QuestionMarkCircleIcon } from "@heroicons/react/24/solid";
 import { useRouter } from "next/navigation";
 import BlogPostCard from "@/components/blog-post-card";
 import { MCPServer } from "@/types/mcp";
@@ -20,6 +20,8 @@ interface Post {
   };
   id?: string;
   favorites_count?: number;
+  health_status?: string;
+  last_health_check?: string;
 }
 
 interface PostsProps {
@@ -507,9 +509,9 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                     ))
                   ) : (
                     // Top 3 / 최신 등록 탭
-                    currentRankingPosts.map(({ category, tags, title, desc, date, author, id, favorites_count }, index) => (
-                      <div 
-                        key={`ranking-${id || title}-${refreshKey}`} 
+                    currentRankingPosts.map(({ category, tags, title, desc, date, author, id, favorites_count, health_status, last_health_check }, index) => (
+                      <div
+                        key={`ranking-${id || title}-${refreshKey}`}
                         onClick={() => handleViewMCP(id)}
                         className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-all cursor-pointer"
                       >
@@ -522,7 +524,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                           }`}>
                             {index + 1}
                           </div>
-                          
+
                           {/* 프로필 이미지 */}
                           <div className="relative flex-shrink-0">
                             <img
@@ -542,10 +544,33 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                               )
                             )}
                           </div>
-                          
+
                           {/* 서버 정보 */}
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-base font-semibold text-gray-900 mb-0.5 truncate">{String(title || '')}</h3>
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <h3 className="text-base font-semibold text-gray-900 truncate">{String(title || '')}</h3>
+                              {/* Health Status */}
+                              {health_status && (
+                                <div className="flex items-center gap-0.5 flex-shrink-0">
+                                  {health_status === 'healthy' ? (
+                                    <>
+                                      <CheckCircleIcon className="h-3.5 w-3.5 text-green-500" />
+                                      <span className="text-[10px] font-medium text-green-700">Active</span>
+                                    </>
+                                  ) : health_status === 'unhealthy' ? (
+                                    <>
+                                      <XCircleIcon className="h-3.5 w-3.5 text-red-500" />
+                                      <span className="text-[10px] font-medium text-red-700">Inactive</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <QuestionMarkCircleIcon className="h-3.5 w-3.5 text-gray-400" />
+                                      <span className="text-[10px] font-medium text-gray-600">Unknown</span>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                             <p className="text-xs text-gray-600 mb-1 truncate">{String(desc || '')}</p>
                             <div className="flex items-center space-x-3 text-xs text-gray-500">
                               <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs">
@@ -616,7 +641,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
             {allMCPPosts.length > 0 && (
               <div>
                 <div className="grid grid-cols-1 gap-x-8 gap-y-16 items-start lg:grid-cols-3">
-                  {visibleRemainingPosts.map(({ category, tags, title, desc, date, author, id, favorites_count }) => (
+                  {visibleRemainingPosts.map(({ category, tags, title, desc, date, author, id, favorites_count, health_status, last_health_check }) => (
                     <BlogPostCard
                       key={`${id || title}-${refreshKey}`}
                       category={category}
@@ -632,6 +657,8 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                       favoritesCount={favorites_count || 0}
                       onFavoriteChange={handleFavoriteChange}
                       onTagClick={handleTagClick}
+                      healthStatus={health_status}
+                      lastHealthCheck={last_health_check}
                     />
                   ))}
                 </div>

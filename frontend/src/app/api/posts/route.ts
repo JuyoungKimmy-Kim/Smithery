@@ -38,6 +38,8 @@ export async function GET() {
         desc: String(mcp.description || "No description available."),
         date: formattedDate,
         favorites_count: Number(mcp.favorites_count || 0),
+        health_status: mcp.health_status || 'unknown',
+        last_health_check: mcp.last_health_check || null,
         author: {
           img: String(mcp.owner?.avatar_url || "/image/avatar1.jpg"),
           name: String(mcp.owner?.username || "Unknown User"),

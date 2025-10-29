@@ -55,6 +55,8 @@ export interface MCPServer {
   tags?: string[];
   status?: string;
   announcement?: string;
+  health_status?: string;
+  last_health_check?: string;
   tools: MCPServerTool[];
   resources: MCPServerResource[];
   config?: any;

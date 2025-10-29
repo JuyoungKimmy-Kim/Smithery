@@ -53,6 +53,8 @@ export async function GET(request: NextRequest) {
       title: server.name,
       desc: server.description,
       date: new Date(server.created_at).toLocaleDateString(),
+      health_status: server.health_status || 'unknown',
+      last_health_check: server.last_health_check || null,
       author: {
         img: server.owner?.avatar_url || '/image/avatar1.jpg',
         name: server.owner?.username || 'Unknown'

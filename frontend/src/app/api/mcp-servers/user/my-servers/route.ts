@@ -54,6 +54,8 @@ export async function GET(request: NextRequest) {
       desc: server.description,
       date: new Date(server.created_at).toLocaleDateString(),
       status: server.status || 'approved', // status 추가
+      health_status: server.health_status || 'unknown',
+      last_health_check: server.last_health_check || null,
       author: {
         img: server.owner?.avatar_url || '/image/avatar1.jpg',
         name: server.owner?.username || 'Unknown'
