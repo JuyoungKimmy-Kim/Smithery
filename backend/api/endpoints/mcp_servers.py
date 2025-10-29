@@ -439,17 +439,31 @@ def delete_mcp_server_announcement(
 
 @router.post("/{mcp_server_id}/health-check")
 async def check_server_health(
+    request: Request,
     mcp_server_id: int,
     db: Session = Depends(get_db)
 ):
-    """MCP 서버의 헬스 체크를 수행합니다."""
-    mcp_service = MCPServerService(db)
-    result = await mcp_service.check_server_health(mcp_server_id)
+    """
+    MCP 서버의 헬스 체크를 수행합니다.
+    Rate limit: 3 requests per minute per IP
+    """
+    from slowapi import Limiter
+    from slowapi.util import get_remote_address
 
-    if "error" in result and result.get("error") == "Server not found":
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="MCP Server not found"
-        )
+    limiter = Limiter(key_func=get_remote_address)
 
-    return result
+    # Apply rate limiting: 3 requests per minute
+    @limiter.limit("3/minute")
+    async def _check_health():
+        mcp_service = MCPServerService(db)
+        result = await mcp_service.check_server_health(mcp_server_id)
+
+        if "error" in result and result.get("error") == "Server not found":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="MCP Server not found"
+            )
+
+        return result
+
+    return await _check_health(request)
