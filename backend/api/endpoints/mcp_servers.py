@@ -69,7 +69,14 @@ async def preview_mcp_tools(request: PreviewToolsRequest):
     HTTPS -> HTTP Mixed Content 문제와 CORS 문제를 해결하기 위한 프록시 엔드포인트
     """
     try:
-        result = await MCPProxyService.fetch_tools(request.url, request.protocol)
+        result = await MCPProxyService.fetch_tools(
+            request.url,
+            request.protocol,
+            request.command,
+            request.args,
+            request.cwd,
+            request.env
+        )
         return PreviewToolsResponse(
             tools=result.get("tools", []),
             success=result.get("success", False),

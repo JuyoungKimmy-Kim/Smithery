@@ -23,8 +23,20 @@ export default function SubmitMCPPage() {
     tags: "",
     protocol: "",
     url: "",
-    config: ""
+    config: "",
+    // stdio 전용 필드
+    command: "",
+    args: "",
+    cwd: ""
   });
+
+  // STDIO 선택적 필드 표시 상태
+  const [showStdioArgs, setShowStdioArgs] = useState(false);
+  const [showStdioCwd, setShowStdioCwd] = useState(false);
+  const [showStdioEnv, setShowStdioEnv] = useState(false);
+
+  // 환경 변수 관리
+  const [envVars, setEnvVars] = useState<{key: string, value: string}[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [allTags, setAllTags] = useState<string[]>([]);
   const [tagCounts, setTagCounts] = useState<{[key: string]: number}>({});
@@ -126,7 +138,7 @@ export default function SubmitMCPPage() {
       } catch (error) {
         console.error('자동 저장 실패:', error);
       }
-    }, 2000); // 2초 디바운스
+    }, 15000); // 2초 디바운스
 
     return () => clearTimeout(timeoutId);
   }, [formData, selectedTags, tools, isDataLoaded]);
@@ -352,18 +364,50 @@ export default function SubmitMCPPage() {
   };
 
 
-  const handleUrlChange = async (url: string, protocol: string) => {
-    if (!url.trim() || !protocol) {
-      setPreviewTools([]);
+  // 미리보기 버튼 클릭 핸들러
+  const handlePreviewClick = async () => {
+    if (!formData.protocol) {
       return;
     }
-    
+
     try {
-      console.log('MCP Server URL detected:', url, 'Transport Type:', protocol);
-      await detectAndPreviewTools({ url: url.trim(), protocol });
+      if (formData.protocol === TransportType.STDIO) {
+        // STDIO: Command 필수, Args/CWD 선택
+        if (!formData.command.trim()) {
+          return;
+        }
+        console.log('Previewing STDIO tools - Command:', formData.command, 'Args:', formData.args, 'CWD:', formData.cwd);
+        await detectAndPreviewTools({
+          url: '',
+          protocol: TransportType.STDIO
+        });
+      } else {
+        // SSE/HTTP: URL 필수
+        if (!formData.url.trim()) {
+          return;
+        }
+        console.log('Previewing tools - URL:', formData.url, 'Transport Type:', formData.protocol);
+        await detectAndPreviewTools({
+          url: formData.url.trim(),
+          protocol: formData.protocol
+        });
+      }
     } catch (error) {
-      console.error('URL 처리 실패:', error);
+      console.error('미리보기 실패:', error);
       setPreviewTools([]);
+    }
+  };
+
+  // 미리보기 버튼 활성화 조건
+  const canPreview = (): boolean => {
+    if (!formData.protocol) return false;
+
+    if (formData.protocol === TransportType.STDIO) {
+      // STDIO: Command 필수
+      return formData.command.trim().length > 0;
+    } else {
+      // SSE/HTTP: URL 필수
+      return formData.url.trim().length > 0;
     }
   };
 
@@ -371,17 +415,41 @@ export default function SubmitMCPPage() {
   const requestToolsList = async (config: any) => {
     try {
       console.log('Requesting tools via backend proxy:', config);
-      
+
       // 백엔드 프록시 API를 통해 tools 가져오기
+      // stdio일 때는 command, args, cwd도 함께 전달
+      const requestBody: any = {
+        url: config.url,
+        protocol: config.protocol
+      };
+
+      if (config.protocol === TransportType.STDIO) {
+        requestBody.command = formData.command;
+        requestBody.args = formData.args;
+        requestBody.cwd = formData.cwd;
+
+        // 환경 변수가 있으면 객체로 변환하여 전달
+        if (envVars.length > 0) {
+          const envObj: {[key: string]: string} = {};
+          envVars.forEach(env => {
+            if (env.key.trim()) {
+              envObj[env.key.trim()] = env.value;
+            }
+          });
+          if (Object.keys(envObj).length > 0) {
+            requestBody.env = envObj;
+          }
+        }
+      }
+
+      console.log('Request body being sent:', requestBody);
+
       const response = await fetch('/api/mcp-servers/preview-tools', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          url: config.url,
-          protocol: config.protocol
-        })
+        body: JSON.stringify(requestBody)
       });
       
       if (response.ok) {
@@ -891,13 +959,7 @@ export default function SubmitMCPPage() {
             <select
               required
               value={formData.protocol}
-              onChange={(e) => {
-                handleInputChange('protocol', e.target.value);
-                // Transport Type과 URL이 모두 있을 때 미리보기 시도
-                if (formData.url.trim()) {
-                  handleUrlChange(formData.url, e.target.value);
-                }
-              }}
+              onChange={(e) => handleInputChange('protocol', e.target.value)}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 validationErrors.protocol ? 'border-red-500' : 'border-gray-300'
               }`}
@@ -912,35 +974,232 @@ export default function SubmitMCPPage() {
             )}
           </div>
 
-          {/* URL */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              {t('submit.serverUrl')}
-            </label>
-            <input
-              type="url"
-              value={formData.url}
-              onChange={(e) => {
-                handleInputChange('url', e.target.value);
-                // Transport Type과 URL이 모두 있을 때 미리보기 시도
-                if (formData.protocol.trim()) {
-                  handleUrlChange(e.target.value, formData.protocol);
-                }
-              }}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                validationErrors.url ? 'border-red-500' : 'border-gray-300'
+          {/* URL - STDIO가 아닐 때만 표시 */}
+          {formData.protocol !== TransportType.STDIO && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {t('submit.serverUrl')}
+              </label>
+              <input
+                type="url"
+                value={formData.url}
+                onChange={(e) => handleInputChange('url', e.target.value)}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  validationErrors.url ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder={t('submit.serverUrlPlaceholderHttp')}
+              />
+              {validationErrors.url && (
+                <p className="mt-1 text-sm text-red-600">{validationErrors.url}</p>
+              )}
+              <p className="mt-1 text-xs text-gray-500">
+                {t('submit.serverUrlHelpHttp')}
+              </p>
+            </div>
+          )}
+
+          {/* STDIO 전용 필드들 */}
+          {formData.protocol === TransportType.STDIO && (
+            <>
+              {/* Command - 필수 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t('submit.command')} *
+                </label>
+                <input
+                  type="text"
+                  value={formData.command}
+                  onChange={(e) => handleInputChange('command', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                  placeholder={t('submit.commandPlaceholder')}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  {t('submit.commandHelp')}
+                </p>
+              </div>
+
+              {/* 선택적 필드 추가 버튼들 */}
+              <div className="flex flex-wrap gap-2">
+                {!showStdioArgs && (
+                  <button
+                    type="button"
+                    onClick={() => setShowStdioArgs(true)}
+                    className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+                  >
+                    + {t('submit.addArguments')}
+                  </button>
+                )}
+                {!showStdioCwd && (
+                  <button
+                    type="button"
+                    onClick={() => setShowStdioCwd(true)}
+                    className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+                  >
+                    + {t('submit.addCwd')}
+                  </button>
+                )}
+                {!showStdioEnv && (
+                  <button
+                    type="button"
+                    onClick={() => setShowStdioEnv(true)}
+                    className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+                  >
+                    + {t('submit.addEnv')}
+                  </button>
+                )}
+              </div>
+
+              {/* Arguments - 선택적 */}
+              {showStdioArgs && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      {t('submit.arguments')}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowStdioArgs(false);
+                        handleInputChange('args', '');
+                      }}
+                      className="text-xs text-red-600 hover:text-red-800"
+                    >
+                      {t('submit.remove')}
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={formData.args}
+                    onChange={(e) => handleInputChange('args', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                    placeholder={t('submit.argumentsPlaceholder')}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    {t('submit.argumentsHelp')}
+                  </p>
+                </div>
+              )}
+
+              {/* CWD - 선택적 */}
+              {showStdioCwd && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      {t('submit.cwd')}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowStdioCwd(false);
+                        handleInputChange('cwd', '');
+                      }}
+                      className="text-xs text-red-600 hover:text-red-800"
+                    >
+                      {t('submit.remove')}
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={formData.cwd}
+                    onChange={(e) => handleInputChange('cwd', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                    placeholder={t('submit.cwdPlaceholder')}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    {t('submit.cwdHelp')}
+                  </p>
+                </div>
+              )}
+
+              {/* Environment Variables - 선택적 */}
+              {showStdioEnv && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      {t('submit.envVars')}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowStdioEnv(false);
+                        setEnvVars([]);
+                      }}
+                      className="text-xs text-red-600 hover:text-red-800"
+                    >
+                      {t('submit.remove')}
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {envVars.map((env, index) => (
+                      <div key={index} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={env.key}
+                          onChange={(e) => {
+                            const newEnvVars = [...envVars];
+                            newEnvVars[index].key = e.target.value;
+                            setEnvVars(newEnvVars);
+                          }}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                          placeholder={t('submit.envKey')}
+                        />
+                        <input
+                          type="text"
+                          value={env.value}
+                          onChange={(e) => {
+                            const newEnvVars = [...envVars];
+                            newEnvVars[index].value = e.target.value;
+                            setEnvVars(newEnvVars);
+                          }}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                          placeholder={t('submit.envValue')}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setEnvVars(envVars.filter((_, i) => i !== index))}
+                          className="px-3 py-2 text-red-600 hover:text-red-800"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setEnvVars([...envVars, {key: '', value: ''}])}
+                      className="w-full px-3 py-2 text-sm border-2 border-dashed border-gray-300 text-gray-600 rounded-md hover:border-gray-400 hover:text-gray-800 transition-colors"
+                    >
+                      + {t('submit.addEnvVar')}
+                    </button>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {t('submit.envHelp')}
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* 미리보기 버튼 */}
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handlePreviewClick}
+              disabled={!canPreview() || isLoadingPreview}
+              className={`px-6 py-2.5 rounded-lg font-medium transition-colors ${
+                canPreview() && !isLoadingPreview
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
-              placeholder={formData.protocol === TransportType.STDIO ? t('submit.serverUrlPlaceholderStdio') : t('submit.serverUrlPlaceholderHttp')}
-            />
-            {validationErrors.url && (
-              <p className="mt-1 text-sm text-red-600">{validationErrors.url}</p>
-            )}
-            <p className="mt-1 text-xs text-gray-500">
-              {formData.protocol === TransportType.STDIO
-                ? t('submit.serverUrlHelpStdio')
-                : t('submit.serverUrlHelpHttp')
-              }
-            </p>
+            >
+              {isLoadingPreview ? (
+                <span className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  {t('submit.loadingTools')}
+                </span>
+              ) : (
+                t('submit.previewTools')
+              )}
+            </button>
           </div>
 
           {/* Server Config */}
@@ -1026,19 +1285,6 @@ export default function SubmitMCPPage() {
                 <span className="text-yellow-700 text-sm">
                   {t('submit.connectionError')}
                 </span>
-              </div>
-            </div>
-          )}
-
-          {formData.protocol === TransportType.STDIO && (
-            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-              <div className="flex items-center">
-                <div className="text-yellow-600 mr-2">⚠️</div>
-                <div className="text-yellow-700 text-sm">
-                  <p className="font-medium mb-1">{t('submit.stdioWarning')}</p>
-                  <p>{t('submit.stdioWarningDesc1')}</p>
-                  <p>{t('submit.stdioWarningDesc2')}</p>
-                </div>
               </div>
             </div>
           )}
