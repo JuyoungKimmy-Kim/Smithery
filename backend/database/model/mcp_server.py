@@ -14,6 +14,7 @@ class MCPServer(Base):
     category = Column(String(100), nullable=True)
     status = Column(String(20), default='pending')
     protocol = Column(String(20), nullable=False)
+    server_url = Column(String(500), nullable=True)
     config = Column(JSON, nullable=True)
     announcement = Column(Text, nullable=True)
     owner_id = Column(Integer, ForeignKey('users.id'), nullable=False)

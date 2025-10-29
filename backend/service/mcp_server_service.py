@@ -202,41 +202,71 @@ class MCPServerService:
     async def check_server_health(self, mcp_server_id: int) -> Dict[str, Any]:
         """
         MCP 서버의 헬스 체크를 수행합니다.
-        MCP SDK를 사용하여 Inspector와 동일한 방식으로 연결을 테스트합니다.
+        - STDIO 서버는 건너뜁니다 (health check 불필요)
+        - SSE, Streamable HTTP 서버만 server_url을 사용하여 체크합니다.
         """
         mcp_server = self.get_mcp_server_by_id(mcp_server_id)
         if not mcp_server:
             return {"error": "Server not found"}
+
+        transport_type = mcp_server.protocol.lower() if mcp_server.protocol else ""
+
+        # STDIO 서버는 health check 건너뛰기
+        if transport_type == "stdio":
+            return {
+                "id": mcp_server.id,
+                "health_status": "unknown",
+                "last_health_check": None,
+                "message": "Health check is not applicable for STDIO servers"
+            }
 
         health_status = "unknown"
         error_message = None
         extra_info = {}
 
         try:
-            # MCP Health Checker 생성 (MCP SDK 사용)
-            health_checker = MCPHealthChecker()
-
-            # 서버 설정 구성
-            config = mcp_server.config or {}
-            transport_type = mcp_server.protocol
-
-            # Health check 수행
-            result = await health_checker.check_server_health(
-                transport_type=transport_type,
-                config=config
-            )
-
-            # 결과 해석
-            if result.get("healthy"):
-                health_status = "healthy"
-                # 추가 정보 저장 (tools 개수, capabilities 등)
-                if "tools_count" in result:
-                    extra_info["tools_count"] = result["tools_count"]
-                if "capabilities" in result:
-                    extra_info["capabilities"] = result["capabilities"]
+            # server_url이 없으면 체크 불가
+            if not mcp_server.server_url:
+                health_status = "unknown"
+                error_message = "No server URL configured"
             else:
-                health_status = "unhealthy"
-                error_message = result.get("error", "Unknown error")
+                # MCP Health Checker 생성 (MCP SDK 사용)
+                health_checker = MCPHealthChecker()
+
+                # 서버 설정 구성 - server_url 사용
+                config = {
+                    "url": mcp_server.server_url,
+                    "headers": {}
+                }
+
+                # config에서 추가 헤더가 있으면 병합
+                if mcp_server.config and isinstance(mcp_server.config, dict):
+                    if "headers" in mcp_server.config:
+                        config["headers"].update(mcp_server.config["headers"])
+
+                # Health check 수행
+                # SSE와 Streamable HTTP만 지원
+                if transport_type in ("sse", "http-stream", "streamable-http"):
+                    result = await health_checker.check_sse_server(config)
+                elif transport_type == "http":
+                    result = await health_checker.check_http_server(config)
+                else:
+                    result = {
+                        "healthy": False,
+                        "error": f"Unsupported transport type: {transport_type}"
+                    }
+
+                # 결과 해석
+                if result.get("healthy"):
+                    health_status = "healthy"
+                    # 추가 정보 저장 (tools 개수, capabilities 등)
+                    if "tools_count" in result:
+                        extra_info["tools_count"] = result["tools_count"]
+                    if "capabilities" in result:
+                        extra_info["capabilities"] = result["capabilities"]
+                else:
+                    health_status = "unhealthy"
+                    error_message = result.get("error", "Unknown error")
 
         except Exception as e:
             health_status = "unhealthy"

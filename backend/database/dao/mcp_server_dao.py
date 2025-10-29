@@ -26,6 +26,7 @@ class MCPServerDAO:
             category=mcp_server_data.get('category'),
             status='pending',
             protocol=mcp_server_data.get('protocol', 'http'),
+            server_url=mcp_server_data.get('server_url'),
             config=mcp_server_data.get('config'),
             owner_id=owner_id,
             tags=tag_objects
@@ -102,7 +103,7 @@ class MCPServerDAO:
         if not mcp_server:
             return None
         
-        for field in ['name', 'description', 'category', 'protocol', 'config']:
+        for field in ['name', 'description', 'category', 'protocol', 'server_url', 'config']:
             if field in mcp_server_data and mcp_server_data[field] is not None:
                 setattr(mcp_server, field, mcp_server_data[field])
         

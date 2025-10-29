@@ -51,6 +51,7 @@ export interface MCPServer {
   description: string;
   transport: TransportType;
   protocol: ProtocolType;
+  server_url?: string;
   category?: string;
   tags?: string[];
   status?: string;
