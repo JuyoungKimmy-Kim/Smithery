@@ -51,10 +51,13 @@ export interface MCPServer {
   description: string;
   transport: TransportType;
   protocol: ProtocolType;
+  server_url?: string;
   category?: string;
   tags?: string[];
   status?: string;
   announcement?: string;
+  health_status?: string;
+  last_health_check?: string;
   tools: MCPServerTool[];
   resources: MCPServerResource[];
   config?: any;

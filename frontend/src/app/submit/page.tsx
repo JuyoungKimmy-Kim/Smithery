@@ -648,8 +648,6 @@ export default function SubmitMCPPage() {
         } catch (error) {
           throw new Error(t('submit.serverConfigInvalid'));
         }
-      } else if (formData.url.trim()) {
-        config = { url: formData.url.trim() };
       }
 
       const mcpServerData = {
@@ -658,6 +656,7 @@ export default function SubmitMCPPage() {
         description: formData.description.trim(),
         tags: selectedTags.join(', '),
         protocol: formData.protocol.trim(),
+        server_url: formData.url.trim() || null,
         config: config,
         tools: tools
       };

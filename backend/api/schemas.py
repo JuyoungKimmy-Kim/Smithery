@@ -44,6 +44,7 @@ class MCPServerCreate(BaseModel):
     description: str
     category: Optional[str] = None
     protocol: str
+    server_url: Optional[str] = None
     tags: Optional[str] = None
     config: Optional[Dict[str, Any]] = None
     tools: Optional[List[MCPServerToolCreate]] = []
@@ -53,6 +54,7 @@ class MCPServerUpdate(BaseModel):
     description: Optional[str] = None
     category: Optional[str] = None
     protocol: Optional[str] = None
+    server_url: Optional[str] = None
     tags: Optional[str] = None
     config: Optional[Dict[str, Any]] = None
     tools: Optional[List[MCPServerToolCreate]] = []
@@ -84,11 +86,14 @@ class MCPServerResponse(BaseModel):
     category: Optional[str] = None
     status: str
     protocol: str
+    server_url: Optional[str] = None
     config: Optional[Dict[str, Any]] = None
     owner_id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
     announcement: Optional[str] = None
+    health_status: str = "unknown"
+    last_health_check: Optional[datetime] = None
     tools: List[MCPServerToolResponse] = []
     tags: List['TagResponse'] = []
     owner: Optional[UserResponse] = None
