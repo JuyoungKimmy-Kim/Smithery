@@ -1,8 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
+import logging
 
 from backend.database import get_db
+
+logger = logging.getLogger(__name__)
 from backend.service import MCPServerService, UserService, MCPProxyService
 from backend.database.model import User
 from backend.api.schemas import (
@@ -439,24 +442,18 @@ def delete_mcp_server_announcement(
 
 @router.post("/{mcp_server_id}/health-check")
 async def check_server_health(
-    request: Request,
     mcp_server_id: int,
     db: Session = Depends(get_db)
 ):
     """
     MCP 서버의 헬스 체크를 수행합니다.
-    Rate limit: 3 requests per minute per IP
     """
-    from slowapi import Limiter
-    from slowapi.util import get_remote_address
-
-    limiter = Limiter(key_func=get_remote_address)
-
-    # Apply rate limiting: 3 requests per minute
-    @limiter.limit("3/minute")
-    async def _check_health():
+    try:
+        logger.info(f"Health check requested for server ID: {mcp_server_id}")
         mcp_service = MCPServerService(db)
         result = await mcp_service.check_server_health(mcp_server_id)
+
+        logger.info(f"Health check result: {result}")
 
         if "error" in result and result.get("error") == "Server not found":
             raise HTTPException(
@@ -465,5 +462,11 @@ async def check_server_health(
             )
 
         return result
-
-    return await _check_health(request)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Health check endpoint error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Health check failed: {str(e)}"
+        )
