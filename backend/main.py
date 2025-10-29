@@ -1,5 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import os
 import sys
 
@@ -9,12 +12,19 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.database import init_database
 from backend.api import auth_router, mcp_servers_router, comments_router
 
+# Rate limiter 설정
+limiter = Limiter(key_func=get_remote_address)
+
 # FastAPI 앱 생성
 app = FastAPI(
     title="MCP Server Marketplace",
     description="MCP Server 등록 및 관리 플랫폼",
     version="1.0.0"
 )
+
+# Rate limiter를 앱에 연결
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS 설정
 app.add_middleware(

@@ -17,6 +17,8 @@ class MCPServer(Base):
     config = Column(JSON, nullable=True)
     announcement = Column(Text, nullable=True)
     owner_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    health_status = Column(String(20), default='unknown')  # 'healthy', 'unhealthy', 'unknown'
+    last_health_check = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     

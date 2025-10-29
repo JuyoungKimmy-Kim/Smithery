@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from backend.database import get_db
 from backend.service import MCPServerService, UserService, MCPProxyService
@@ -14,6 +16,9 @@ from backend.api.schemas import (
 from backend.api.auth import get_current_user, get_current_admin_user
 
 router = APIRouter(prefix="/mcp-servers", tags=["mcp-servers"])
+
+# Rate limiter 인스턴스 생성
+limiter = Limiter(key_func=get_remote_address)
 
 @router.post("/", response_model=MCPServerResponse)
 def create_mcp_server(
@@ -442,4 +447,27 @@ def delete_mcp_server_announcement(
             detail="MCP Server not found"
         )
     
-    return updated_server 
+    return updated_server
+
+@router.post("/{mcp_server_id}/health-check")
+@limiter.limit("3/minute")  # 1분에 3회로 제한
+async def check_server_health(
+    request: Request,
+    mcp_server_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    MCP 서버의 헬스 체크를 수행합니다.
+    Rate limit: 3 requests per minute per IP
+    """
+    mcp_service = MCPServerService(db)
+
+    result = await mcp_service.check_server_health(mcp_server_id)
+
+    if "error" in result and result["error"] == "Server not found":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="MCP Server not found"
+        )
+
+    return result

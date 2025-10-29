@@ -89,11 +89,13 @@ class MCPServerResponse(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime] = None
     announcement: Optional[str] = None
+    health_status: str = "unknown"
+    last_health_check: Optional[datetime] = None
     tools: List[MCPServerToolResponse] = []
     tags: List['TagResponse'] = []
     owner: Optional[UserResponse] = None
     favorites_count: int = 0
-    
+
     class Config:
         from_attributes = True
 
