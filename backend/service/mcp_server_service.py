@@ -23,6 +23,8 @@ from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
 from backend.database.dao.mcp_server_dao import MCPServerDAO
 from backend.database.model import MCPServer, MCPServerTool, MCPServerProperty, Tag
+from datetime import datetime
+import pytz
 
 class MCPServerService:
     """
@@ -194,3 +196,71 @@ class MCPServerService:
     def update_mcp_server_announcement(self, mcp_server_id: int, announcement: Optional[str]) -> Optional[MCPServer]:
         """MCP 서버의 공지사항을 업데이트합니다."""
         return self.mcp_server_dao.update_mcp_server_announcement(mcp_server_id, announcement)
+
+    async def check_server_health(self, mcp_server_id: int) -> Dict[str, Any]:
+        """
+        MCP 서버의 헬스 체크를 수행합니다.
+        - STDIO 서버는 건너뜁니다 (원격 health check 불가)
+        - SSE/HTTP 서버만 server_url을 사용하여 체크합니다.
+        """
+        from backend.service.mcp_health_checker import MCPHealthChecker
+
+        mcp_server = self.get_mcp_server_by_id(mcp_server_id)
+        if not mcp_server:
+            return {"error": "Server not found"}
+
+        transport_type = mcp_server.protocol.lower() if mcp_server.protocol else ""
+
+        # STDIO 서버는 health check 건너뛰기
+        if transport_type == "stdio":
+            return {
+                "id": mcp_server.id,
+                "health_status": "unknown",
+                "last_health_check": None,
+                "message": "Health check is not applicable for STDIO servers"
+            }
+
+        health_status = "unknown"
+        error_message = None
+
+        try:
+            # server_url이 없으면 체크 불가
+            if not mcp_server.server_url:
+                health_status = "unknown"
+                error_message = "No server URL configured"
+            else:
+                # MCP Health Checker 생성 (MCP SDK 사용)
+                health_checker = MCPHealthChecker()
+
+                # Health check 수행
+                result = await health_checker.check_server_health(
+                    server_url=mcp_server.server_url,
+                    transport_type=transport_type
+                )
+
+                # 결과 해석
+                if result.get("healthy"):
+                    health_status = "healthy"
+                else:
+                    health_status = "unhealthy"
+                    error_message = result.get("error", "Unknown error")
+
+        except Exception as e:
+            health_status = "unhealthy"
+            error_message = f"Health check failed: {str(e)}"
+
+        # 데이터베이스 업데이트 - 한국 시간으로 저장
+        korea_tz = pytz.timezone('Asia/Seoul')
+        korea_time = datetime.now(korea_tz)
+
+        mcp_server.health_status = health_status
+        mcp_server.last_health_check = korea_time
+        self.db.commit()
+        self.db.refresh(mcp_server)
+
+        return {
+            "id": mcp_server.id,
+            "health_status": health_status,
+            "last_health_check": mcp_server.last_health_check.isoformat() if mcp_server.last_health_check else None,
+            "error": error_message
+        }

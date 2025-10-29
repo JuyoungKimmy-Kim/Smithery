@@ -435,4 +435,21 @@ def delete_mcp_server_announcement(
             detail="MCP Server not found"
         )
     
-    return updated_server 
+    return updated_server
+
+@router.post("/{mcp_server_id}/health-check")
+async def check_server_health(
+    mcp_server_id: int,
+    db: Session = Depends(get_db)
+):
+    """MCP 서버의 헬스 체크를 수행합니다."""
+    mcp_service = MCPServerService(db)
+    result = await mcp_service.check_server_health(mcp_server_id)
+
+    if "error" in result and result.get("error") == "Server not found":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="MCP Server not found"
+        )
+
+    return result
