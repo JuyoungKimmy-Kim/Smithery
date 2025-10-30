@@ -216,18 +216,35 @@ export default function MCPServerDetail() {
         // Poll for results (check every 2 seconds, max 10 times = 20 seconds)
         let pollCount = 0;
         const maxPolls = 10;
+        const initialLastCheck = mcp.last_health_check;
+
+        console.log('Starting polling with initial last_health_check:', initialLastCheck);
+
         const pollInterval = setInterval(async () => {
           pollCount++;
+          console.log(`Poll attempt ${pollCount}/${maxPolls}`);
 
           try {
             // Fetch updated server data
-            const serverResponse = await fetch(`/api/mcps/${mcp.id}`);
+            const serverResponse = await fetch(`/api/mcps/${mcp.id}`, {
+              cache: 'no-store',
+              headers: {
+                'Cache-Control': 'no-cache',
+              }
+            });
+
             if (serverResponse.ok) {
               const serverData = await serverResponse.json();
+              console.log('Polled server data:', {
+                health_status: serverData.health_status,
+                last_health_check: serverData.last_health_check,
+                initial_last_check: initialLastCheck,
+                changed: serverData.last_health_check !== initialLastCheck
+              });
 
-              // Check if health status was updated
-              if (serverData.last_health_check !== mcp.last_health_check) {
-                console.log('Health check completed:', serverData);
+              // Check if health status was updated (compare with initial value)
+              if (serverData.last_health_check && serverData.last_health_check !== initialLastCheck) {
+                console.log('Health check completed! Status:', serverData.health_status);
 
                 // Update MCP state with new health info
                 setMcp({
@@ -246,11 +263,14 @@ export default function MCPServerDetail() {
                 setRemainingCooldown(20000);
               } else if (pollCount >= maxPolls) {
                 // Timeout after max polls
-                console.log('Health check timeout');
+                console.log('Health check timeout - no update after', maxPolls, 'attempts');
+                console.log('Last backend response:', serverData);
                 clearInterval(pollInterval);
                 setIsCheckingHealth(false);
                 alert('Health check is taking longer than expected. Please refresh the page later.');
               }
+            } else {
+              console.error('Polling failed with status:', serverResponse.status);
             }
           } catch (pollError) {
             console.error('Polling error:', pollError);

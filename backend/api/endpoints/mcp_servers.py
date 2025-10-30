@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, B
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import logging
+import asyncio
 
 from backend.database import get_db
 
@@ -465,19 +466,21 @@ async def check_server_health(
 
         # 백그라운드 태스크로 health check 시작
         async def run_health_check():
+            logger.info(f"Starting background health check for server {mcp_server_id}")
             # 새로운 DB 세션 생성 (백그라운드 태스크용)
             from backend.database import SessionLocal
             bg_db = SessionLocal()
             try:
                 bg_service = MCPServerService(bg_db)
                 result = await bg_service.check_server_health(mcp_server_id)
-                logger.info(f"Background health check completed: {result}")
+                logger.info(f"Background health check completed for server {mcp_server_id}: {result}")
             except Exception as e:
-                logger.error(f"Background health check error: {str(e)}", exc_info=True)
+                logger.error(f"Background health check error for server {mcp_server_id}: {str(e)}", exc_info=True)
             finally:
                 bg_db.close()
 
-        background_tasks.add_task(run_health_check)
+        # asyncio task로 생성 (FastAPI background_tasks는 async를 제대로 처리 못함)
+        asyncio.create_task(run_health_check())
 
         # 즉시 응답 반환
         return {
