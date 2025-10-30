@@ -38,6 +38,8 @@ export async function GET() {
         desc: String(mcp.description || "No description available."),
         date: formattedDate,
         favorites_count: Number(mcp.favorites_count || 0),
+        health_status: mcp.health_status || 'unknown',
+        last_health_check: mcp.last_health_check || null,
         author: {
           img: String(mcp.owner?.avatar_url || "/image/avatar1.jpg"),
           name: String(mcp.owner?.username || "Unknown User"),
@@ -47,7 +49,11 @@ export async function GET() {
 
     console.log('Transformed posts data length:', posts.length);
     console.log('First post:', posts[0]);
-    console.log('Posts favorites_count:', posts.map((p: any) => ({ title: p.title, favorites_count: p.favorites_count })));
+    console.log('Posts health_status check:', posts.slice(0, 3).map((p: any) => ({
+      title: p.title,
+      health_status: p.health_status,
+      raw_health_status: mcps.find((m: any) => m.id === p.id)?.health_status
+    })));
     return NextResponse.json(posts);
   } catch (error) {
     console.error('Posts API error:', error);

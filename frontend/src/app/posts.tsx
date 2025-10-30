@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ArrowSmallDownIcon, CheckIcon, PlusIcon } from "@heroicons/react/24/solid";
+import { ArrowSmallDownIcon, CheckIcon, PlusIcon, CheckCircleIcon } from "@heroicons/react/24/solid";
 import { useRouter } from "next/navigation";
 import BlogPostCard from "@/components/blog-post-card";
 import { MCPServer } from "@/types/mcp";
@@ -20,6 +20,8 @@ interface Post {
   };
   id?: string;
   favorites_count?: number;
+  health_status?: string;
+  last_health_check?: string;
 }
 
 interface PostsProps {
@@ -62,10 +64,11 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
           console.log('Number of posts:', data.length); // 포스트 개수 확인
           console.log('First post structure:', data[0]); // 첫 번째 포스트 구조 확인
           
-          // favorites_count 확인
-          console.log('Posts with favorites_count:', data.map((p: Post) => ({ 
-            title: p.title, 
-            favorites_count: p.favorites_count 
+          // favorites_count와 health_status 확인
+          console.log('Posts with favorites_count:', data.map((p: Post) => ({
+            title: p.title,
+            favorites_count: p.favorites_count,
+            health_status: p.health_status
           })));
           
           // favorites_count 기준으로 정렬 (내림차순)
@@ -507,7 +510,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                     ))
                   ) : (
                     // Top 3 / 최신 등록 탭
-                    currentRankingPosts.map(({ category, tags, title, desc, date, author, id, favorites_count }, index) => (
+                    currentRankingPosts.map(({ category, tags, title, desc, date, author, id, favorites_count, health_status }, index) => (
                       <div 
                         key={`ranking-${id || title}-${refreshKey}`} 
                         onClick={() => handleViewMCP(id)}
@@ -545,7 +548,15 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                           
                           {/* 서버 정보 */}
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-base font-semibold text-gray-900 mb-0.5 truncate">{String(title || '')}</h3>
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <h3 className="text-base font-semibold text-gray-900 truncate">{String(title || '')}</h3>
+                              {health_status === 'healthy' && (
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                  <CheckCircleIcon className="h-4 w-4 text-green-500" />
+                                  <span className="text-xs font-medium text-green-700">Active</span>
+                                </div>
+                              )}
+                            </div>
                             <p className="text-xs text-gray-600 mb-1 truncate">{String(desc || '')}</p>
                             <div className="flex items-center space-x-3 text-xs text-gray-500">
                               <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs">
@@ -616,7 +627,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
             {allMCPPosts.length > 0 && (
               <div>
                 <div className="grid grid-cols-1 gap-x-8 gap-y-16 items-start lg:grid-cols-3">
-                  {visibleRemainingPosts.map(({ category, tags, title, desc, date, author, id, favorites_count }) => (
+                  {visibleRemainingPosts.map(({ category, tags, title, desc, date, author, id, favorites_count, health_status }) => (
                     <BlogPostCard
                       key={`${id || title}-${refreshKey}`}
                       category={category}
@@ -629,6 +640,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                         name: String(author?.name || 'Unknown Author'),
                       }}
                       id={id}
+                      healthStatus={health_status}
                       favoritesCount={favorites_count || 0}
                       onFavoriteChange={handleFavoriteChange}
                       onTagClick={handleTagClick}

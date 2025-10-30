@@ -14,7 +14,9 @@ import {
   ClipboardDocumentIcon,
   CheckIcon,
   MegaphoneIcon,
+  ArrowPathIcon,
 } from "@heroicons/react/24/outline";
+import { CheckCircleIcon, XCircleIcon, QuestionMarkCircleIcon } from "@heroicons/react/24/solid";
 import { MCPServer } from "@/types/mcp";
 import { useAuth } from "@/contexts/AuthContext";
 import Comments from "@/components/comments";
@@ -35,6 +37,9 @@ export default function MCPServerDetail() {
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
   const [announcementText, setAnnouncementText] = useState("");
   const [isUpdatingAnnouncement, setIsUpdatingAnnouncement] = useState(false);
+  const [isCheckingHealth, setIsCheckingHealth] = useState(false);
+  const [lastHealthCheckTime, setLastHealthCheckTime] = useState<number>(0);
+  const [remainingCooldown, setRemainingCooldown] = useState<number>(0);
 
   const toggleToolExpansion = (index: number) => {
     const newExpanded = new Set(expandedTools);
@@ -193,6 +198,116 @@ export default function MCPServerDetail() {
     }
   };
 
+  const handleHealthCheck = async () => {
+    if (!mcp || isCheckingHealth || remainingCooldown > 0) return;
+
+    setIsCheckingHealth(true);
+
+    try {
+      // Start health check (returns immediately)
+      const response = await fetch(`/api/mcp-servers/${mcp.id}/health-check`, {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Health check started:', result);
+
+        // Poll for results (check every 2 seconds, max 10 times = 20 seconds)
+        let pollCount = 0;
+        const maxPolls = 10;
+        const initialLastCheck = mcp.last_health_check;
+
+        console.log('Starting polling with initial last_health_check:', initialLastCheck);
+
+        const pollInterval = setInterval(async () => {
+          pollCount++;
+          console.log(`Poll attempt ${pollCount}/${maxPolls}`);
+
+          try {
+            // Fetch updated server data
+            const serverResponse = await fetch(`/api/mcps/${mcp.id}`, {
+              cache: 'no-store',
+              headers: {
+                'Cache-Control': 'no-cache',
+              }
+            });
+
+            if (serverResponse.ok) {
+              const serverData = await serverResponse.json();
+              console.log('Polled server data:', {
+                health_status: serverData.health_status,
+                last_health_check: serverData.last_health_check,
+                initial_last_check: initialLastCheck,
+                changed: serverData.last_health_check !== initialLastCheck
+              });
+
+              // Check if health status was updated (compare with initial value)
+              if (serverData.last_health_check && serverData.last_health_check !== initialLastCheck) {
+                console.log('Health check completed! Status:', serverData.health_status);
+
+                // Update MCP state with new health info
+                setMcp({
+                  ...mcp,
+                  health_status: serverData.health_status,
+                  last_health_check: serverData.last_health_check,
+                });
+
+                // Stop polling
+                clearInterval(pollInterval);
+                setIsCheckingHealth(false);
+
+                // Set cooldown (20 seconds)
+                const now = Date.now();
+                setLastHealthCheckTime(now);
+                setRemainingCooldown(20000);
+              } else if (pollCount >= maxPolls) {
+                // Timeout after max polls
+                console.log('Health check timeout - no update after', maxPolls, 'attempts');
+                console.log('Last backend response:', serverData);
+                clearInterval(pollInterval);
+                setIsCheckingHealth(false);
+                alert('Health check is taking longer than expected. Please refresh the page later.');
+              }
+            } else {
+              console.error('Polling failed with status:', serverResponse.status);
+            }
+          } catch (pollError) {
+            console.error('Polling error:', pollError);
+          }
+        }, 2000);
+
+      } else {
+        const errorData = await response.json();
+        alert(`Health check failed: ${errorData.detail || errorData.error || 'Unknown error'}`);
+        setIsCheckingHealth(false);
+      }
+    } catch (error) {
+      console.error('Health check error:', error);
+      alert('Failed to perform health check');
+      setIsCheckingHealth(false);
+    }
+  };
+
+  // Cooldown timer effect
+  useEffect(() => {
+    if (remainingCooldown <= 0) return;
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const elapsed = now - lastHealthCheckTime;
+      const remaining = Math.max(0, 20000 - elapsed);
+
+      setRemainingCooldown(remaining);
+
+      if (remaining === 0) {
+        clearInterval(interval);
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [remainingCooldown, lastHealthCheckTime]);
+
   const handleDelete = async () => {
     if (!mcp) return;
     
@@ -287,9 +402,55 @@ export default function MCPServerDetail() {
         <div className="bg-white rounded-lg shadow-sm p-8 mb-8">
           <div className="flex items-start justify-between mb-6">
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900 mb-4">
-                {mcp.name}
-              </h1>
+              <div className="flex items-center gap-3 mb-4">
+                <h1 className="text-3xl font-bold text-gray-900">
+                  {mcp.name}
+                </h1>
+                {/* Health Status - 모든 상태 표시 */}
+                {mcp.health_status && (
+                  <div className="flex items-center gap-2">
+                    {mcp.health_status === 'healthy' ? (
+                      <>
+                        <CheckCircleIcon className="h-5 w-5 text-green-500" />
+                        <span className="text-sm font-medium text-green-700">Active</span>
+                      </>
+                    ) : mcp.health_status === 'unhealthy' ? (
+                      <>
+                        <XCircleIcon className="h-5 w-5 text-red-500" />
+                        <span className="text-sm font-medium text-red-700">Inactive</span>
+                      </>
+                    ) : (
+                      <>
+                        <QuestionMarkCircleIcon className="h-5 w-5 text-gray-400" />
+                        <span className="text-sm font-medium text-gray-600">Unknown</span>
+                      </>
+                    )}
+                    <button
+                      onClick={handleHealthCheck}
+                      disabled={isCheckingHealth || remainingCooldown > 0}
+                      className={`p-1 rounded-full transition-colors ${
+                        isCheckingHealth || remainingCooldown > 0
+                          ? 'text-gray-300 cursor-not-allowed'
+                          : 'text-gray-500 hover:text-blue-600 hover:bg-blue-50'
+                      }`}
+                      title="Refresh health status"
+                    >
+                      <ArrowPathIcon className={`h-4 w-4 ${isCheckingHealth ? 'animate-spin' : ''}`} />
+                    </button>
+                    {remainingCooldown > 0 && (
+                      <span className="text-xs text-gray-500">
+                        ({Math.ceil(remainingCooldown / 1000)}s)
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+              {/* Last health check time */}
+              {mcp.last_health_check && (
+                <p className="text-xs text-gray-500 mb-4">
+                  Last checked: {new Date(mcp.last_health_check).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
+                </p>
+              )}
               <p className="text-lg text-gray-600 mb-6">
                 {mcp.description}
               </p>

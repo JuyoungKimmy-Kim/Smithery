@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { StarIcon } from "@heroicons/react/24/outline";
-import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
+import { StarIcon as StarIconSolid, CheckCircleIcon } from "@heroicons/react/24/solid";
 import TagList from "./tag-list";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -15,6 +15,7 @@ interface BlogPostCardProps {
   author: { name: string; img: string };
   date: string;
   status?: string; // 서버 상태 (pending, approved 등)
+  healthStatus?: string; // Health status (healthy, unhealthy, unknown)
   id?: string; // MCP 서버 ID 추가
   favoritesCount?: number; // 즐겨찾기 수 (초기값)
   onFavoriteChange?: () => void; // 즐겨찾기 상태 변경 콜백
@@ -29,6 +30,7 @@ export function BlogPostCard({
   author,
   date,
   status,
+  healthStatus,
   id,
   favoritesCount: initialFavoritesCount = 0,
   onFavoriteChange,
@@ -176,6 +178,13 @@ export function BlogPostCard({
           <h3 className="text-xl font-semibold text-gray-900 normal-case transition-colors hover:text-gray-700 cursor-pointer line-clamp-2">
             {title}
           </h3>
+          {/* Active 상태만 표시 */}
+          {healthStatus === 'healthy' && (
+            <div className="flex items-center gap-1">
+              <CheckCircleIcon className="h-4 w-4 text-green-500" />
+              <span className="text-xs font-medium text-green-700">Active</span>
+            </div>
+          )}
           {status === 'pending' && (
             <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full whitespace-nowrap">
               {t('mypage.pendingBadge')}

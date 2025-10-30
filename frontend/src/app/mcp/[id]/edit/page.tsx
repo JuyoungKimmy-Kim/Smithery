@@ -341,27 +341,14 @@ export default function EditMCPServerPage() {
           const data = await response.json();
           setMcp(data);
 
-          // config에서 url 추출
-          let urlValue = "";
-          let configObj = null;
-          try {
-            if (typeof data.config === 'string') {
-              configObj = JSON.parse(data.config);
-            } else if (data.config && typeof data.config === 'object') {
-              configObj = data.config;
-            }
-            urlValue = configObj?.url || "";
-          } catch (e) {
-            console.error('Failed to parse config:', e);
-          }
-
+          // server_url 직접 사용
           setFormData({
             name: data.name || "",
             github_link: data.github_link || "",
             description: data.description || "",
             tags: formatTagsToString(data.tags),
             protocol: data.protocol || "",
-            url: urlValue,
+            url: data.server_url || "",
             config: data.config ? (typeof data.config === 'string' ? data.config : JSON.stringify(data.config, null, 2)) : ""
           });
 
@@ -732,13 +719,12 @@ export default function EditMCPServerPage() {
         } catch (error) {
           throw new Error(t('edit.serverConfigInvalid'));
         }
-      } else if (formData.url.trim()) {
-        config = { url: formData.url.trim() };
       }
 
       const updateData = {
         description: formData.description.trim(),
         protocol: formData.protocol.trim(),
+        server_url: formData.url.trim() || null,
         tags: selectedTags.join(', '),
         config: config,
         tools: tools
