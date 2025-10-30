@@ -93,25 +93,17 @@ class MCPHealthChecker:
                         timeout=self.INITIALIZE_TIMEOUT
                     )
 
-                    logger.info(f"[Health Check] Session initialized successfully: {init_result}")
+                    logger.info(f"[Health Check] Session initialized successfully")
+                    logger.info(f"[Health Check] Server info: {init_result.serverInfo}")
+                    logger.info(f"[Health Check] Capabilities: {init_result.capabilities}")
 
-                    # Test actual functionality by listing tools (same as MCPProxyService)
-                    logger.info("[Health Check] Testing server by listing tools...")
-                    tools_result = await asyncio.wait_for(
-                        session.list_tools(),
-                        timeout=self.INITIALIZE_TIMEOUT
-                    )
-
-                    # Get server capabilities
-                    capabilities = session.get_server_capabilities()
-                    logger.info(f"[Health Check] Server capabilities: {capabilities}")
-                    logger.info(f"[Health Check] Tools count: {len(tools_result.tools)}")
-
-                    # Server is healthy if we got here and can list tools
+                    # Server is healthy if we can initialize (matching Inspector's connect logic)
+                    # Inspector doesn't list tools for health check, just connects and gets capabilities
                     return {
                         "healthy": True,
-                        "tools_count": len(tools_result.tools),
-                        "capabilities": str(capabilities) if capabilities else None
+                        "server_info": str(init_result.serverInfo) if init_result.serverInfo else None,
+                        "capabilities": str(init_result.capabilities) if init_result.capabilities else None,
+                        "protocol_version": init_result.protocolVersion
                     }
 
         except asyncio.TimeoutError:
@@ -160,25 +152,17 @@ class MCPHealthChecker:
                         timeout=self.INITIALIZE_TIMEOUT
                     )
 
-                    logger.info(f"[Health Check] Session initialized successfully: {init_result}")
+                    logger.info(f"[Health Check] Session initialized successfully")
+                    logger.info(f"[Health Check] Server info: {init_result.serverInfo}")
+                    logger.info(f"[Health Check] Capabilities: {init_result.capabilities}")
 
-                    # Test actual functionality by listing tools (same as MCPProxyService)
-                    logger.info("[Health Check] Testing server by listing tools...")
-                    tools_result = await asyncio.wait_for(
-                        session.list_tools(),
-                        timeout=self.INITIALIZE_TIMEOUT
-                    )
-
-                    # Get server capabilities
-                    capabilities = session.get_server_capabilities()
-                    logger.info(f"[Health Check] Server capabilities: {capabilities}")
-                    logger.info(f"[Health Check] Tools count: {len(tools_result.tools)}")
-
-                    # Server is healthy if we got here and can list tools
+                    # Server is healthy if we can initialize (matching Inspector's connect logic)
+                    # Inspector doesn't list tools for health check, just connects and gets capabilities
                     return {
                         "healthy": True,
-                        "tools_count": len(tools_result.tools),
-                        "capabilities": str(capabilities) if capabilities else None
+                        "server_info": str(init_result.serverInfo) if init_result.serverInfo else None,
+                        "capabilities": str(init_result.capabilities) if init_result.capabilities else None,
+                        "protocol_version": init_result.protocolVersion
                     }
 
         except asyncio.TimeoutError:
