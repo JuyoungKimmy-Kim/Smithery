@@ -204,15 +204,25 @@ class MCPServerService:
         - SSE/HTTP 서버만 server_url을 사용하여 체크합니다.
         """
         from backend.service.mcp_health_checker import MCPHealthChecker
+        import logging
+        logger = logging.getLogger(__name__)
 
         mcp_server = self.get_mcp_server_by_id(mcp_server_id)
         if not mcp_server:
+            logger.error(f"Server {mcp_server_id} not found in database")
             return {"error": "Server not found"}
 
         transport_type = mcp_server.protocol.lower() if mcp_server.protocol else ""
 
+        logger.info(f"Health check for server {mcp_server_id}:")
+        logger.info(f"  - Name: {mcp_server.name}")
+        logger.info(f"  - Protocol: {mcp_server.protocol}")
+        logger.info(f"  - Server URL: {mcp_server.server_url}")
+        logger.info(f"  - Transport type: {transport_type}")
+
         # STDIO 서버는 health check 건너뛰기
         if transport_type == "stdio":
+            logger.info(f"Skipping health check for STDIO server {mcp_server_id}")
             return {
                 "id": mcp_server.id,
                 "health_status": "unknown",
@@ -228,9 +238,12 @@ class MCPServerService:
             if not mcp_server.server_url:
                 health_status = "unknown"
                 error_message = "No server URL configured"
+                logger.warning(f"Server {mcp_server_id} has no server_url configured")
             else:
                 # MCP Health Checker 생성 (MCP SDK 사용)
                 health_checker = MCPHealthChecker()
+
+                logger.info(f"Starting health check for {mcp_server.server_url} with transport {transport_type}")
 
                 # Health check 수행
                 result = await health_checker.check_server_health(
@@ -238,25 +251,34 @@ class MCPServerService:
                     transport_type=transport_type
                 )
 
+                logger.info(f"Health check result: {result}")
+
                 # 결과 해석
                 if result.get("healthy"):
                     health_status = "healthy"
+                    logger.info(f"Server {mcp_server_id} is HEALTHY")
                 else:
                     health_status = "unhealthy"
                     error_message = result.get("error", "Unknown error")
+                    logger.warning(f"Server {mcp_server_id} is UNHEALTHY: {error_message}")
 
         except Exception as e:
             health_status = "unhealthy"
             error_message = f"Health check failed: {str(e)}"
+            logger.error(f"Health check exception for server {mcp_server_id}: {str(e)}", exc_info=True)
 
         # 데이터베이스 업데이트 - 한국 시간으로 저장
         korea_tz = pytz.timezone('Asia/Seoul')
         korea_time = datetime.now(korea_tz)
 
+        logger.info(f"Updating DB: health_status={health_status}, last_health_check={korea_time}")
+
         mcp_server.health_status = health_status
         mcp_server.last_health_check = korea_time
         self.db.commit()
         self.db.refresh(mcp_server)
+
+        logger.info(f"DB updated successfully for server {mcp_server_id}")
 
         return {
             "id": mcp_server.id,
