@@ -49,7 +49,11 @@ export async function GET() {
 
     console.log('Transformed posts data length:', posts.length);
     console.log('First post:', posts[0]);
-    console.log('Posts favorites_count:', posts.map((p: any) => ({ title: p.title, favorites_count: p.favorites_count })));
+    console.log('Posts health_status check:', posts.slice(0, 3).map((p: any) => ({
+      title: p.title,
+      health_status: p.health_status,
+      raw_health_status: mcps.find((m: any) => m.id === p.id)?.health_status
+    })));
     return NextResponse.json(posts);
   } catch (error) {
     console.error('Posts API error:', error);

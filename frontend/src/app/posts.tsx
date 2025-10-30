@@ -64,10 +64,11 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
           console.log('Number of posts:', data.length); // 포스트 개수 확인
           console.log('First post structure:', data[0]); // 첫 번째 포스트 구조 확인
           
-          // favorites_count 확인
-          console.log('Posts with favorites_count:', data.map((p: Post) => ({ 
-            title: p.title, 
-            favorites_count: p.favorites_count 
+          // favorites_count와 health_status 확인
+          console.log('Posts with favorites_count:', data.map((p: Post) => ({
+            title: p.title,
+            favorites_count: p.favorites_count,
+            health_status: p.health_status
           })));
           
           // favorites_count 기준으로 정렬 (내림차순)
