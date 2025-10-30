@@ -25,9 +25,9 @@ class MCPHealthChecker:
     Supports SSE and HTTP transports (STDIO not applicable for remote health checks).
     """
 
-    SSE_TIMEOUT = 5  # SSE connection timeout (matching Inspector default)
-    HTTP_TIMEOUT = 30  # Streamable HTTP timeout (matching Inspector default)
-    INITIALIZE_TIMEOUT = 10  # Session initialization timeout
+    # Timeout settings matching MCPProxyService (which works for tools preview)
+    CONNECTION_TIMEOUT = 120  # Connection timeout - same as MCPProxyService.DEFAULT_TIMEOUT
+    INITIALIZE_TIMEOUT = 120  # Session initialization timeout
 
     async def check_server_health(self, server_url: str, transport_type: str) -> Dict[str, Any]:
         """
@@ -80,7 +80,7 @@ class MCPHealthChecker:
         try:
             # Create SSE client connection (like Inspector's SSEClientTransport)
             logger.info(f"[Health Check] Creating SSE client connection to {url}")
-            async with sse_client(url, timeout=self.SSE_TIMEOUT) as (read, write):
+            async with sse_client(url, timeout=self.CONNECTION_TIMEOUT) as (read, write):
                 logger.info("[Health Check] SSE client connected, creating session...")
 
                 # Create MCP client session (like Inspector's Client.connect())
@@ -95,13 +95,22 @@ class MCPHealthChecker:
 
                     logger.info(f"[Health Check] Session initialized successfully: {init_result}")
 
-                    # Get server capabilities (like Inspector's getServerCapabilities())
+                    # Test actual functionality by listing tools (same as MCPProxyService)
+                    logger.info("[Health Check] Testing server by listing tools...")
+                    tools_result = await asyncio.wait_for(
+                        session.list_tools(),
+                        timeout=self.INITIALIZE_TIMEOUT
+                    )
+
+                    # Get server capabilities
                     capabilities = session.get_server_capabilities()
                     logger.info(f"[Health Check] Server capabilities: {capabilities}")
+                    logger.info(f"[Health Check] Tools count: {len(tools_result.tools)}")
 
-                    # Server is healthy if we got here
+                    # Server is healthy if we got here and can list tools
                     return {
                         "healthy": True,
+                        "tools_count": len(tools_result.tools),
                         "capabilities": str(capabilities) if capabilities else None
                     }
 
@@ -137,7 +146,8 @@ class MCPHealthChecker:
         try:
             # Create Streamable HTTP client connection (like Inspector's StreamableHTTPClientTransport)
             logger.info(f"[Health Check] Creating Streamable HTTP client connection to {url}")
-            async with streamablehttp_client(url, timeout=self.HTTP_TIMEOUT) as (read, write):
+            # streamablehttp_client returns (read, write, get_session_id)
+            async with streamablehttp_client(url, timeout=self.CONNECTION_TIMEOUT) as (read, write, _get_session_id):
                 logger.info("[Health Check] Streamable HTTP client connected, creating session...")
 
                 # Create MCP client session
@@ -152,13 +162,22 @@ class MCPHealthChecker:
 
                     logger.info(f"[Health Check] Session initialized successfully: {init_result}")
 
+                    # Test actual functionality by listing tools (same as MCPProxyService)
+                    logger.info("[Health Check] Testing server by listing tools...")
+                    tools_result = await asyncio.wait_for(
+                        session.list_tools(),
+                        timeout=self.INITIALIZE_TIMEOUT
+                    )
+
                     # Get server capabilities
                     capabilities = session.get_server_capabilities()
                     logger.info(f"[Health Check] Server capabilities: {capabilities}")
+                    logger.info(f"[Health Check] Tools count: {len(tools_result.tools)}")
 
-                    # Server is healthy if we got here
+                    # Server is healthy if we got here and can list tools
                     return {
                         "healthy": True,
+                        "tools_count": len(tools_result.tools),
                         "capabilities": str(capabilities) if capabilities else None
                     }
 
