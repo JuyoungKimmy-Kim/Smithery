@@ -10,6 +10,7 @@ from typing import Dict, Any
 try:
     from mcp import ClientSession
     from mcp.client.sse import sse_client
+    from mcp.client.streamable_http import streamablehttp_client
     MCP_SDK_AVAILABLE = True
 except ImportError:
     MCP_SDK_AVAILABLE = False
@@ -24,7 +25,9 @@ class MCPHealthChecker:
     Supports SSE and HTTP transports (STDIO not applicable for remote health checks).
     """
 
-    DEFAULT_TIMEOUT = 10  # 10 seconds timeout (reduced from 30)
+    SSE_TIMEOUT = 5  # SSE connection timeout (matching Inspector default)
+    HTTP_TIMEOUT = 30  # Streamable HTTP timeout (matching Inspector default)
+    INITIALIZE_TIMEOUT = 10  # Session initialization timeout
 
     async def check_server_health(self, server_url: str, transport_type: str) -> Dict[str, Any]:
         """
@@ -32,7 +35,7 @@ class MCPHealthChecker:
 
         Args:
             server_url: The MCP server URL
-            transport_type: "sse" or "http"
+            transport_type: "sse", "http", "http-stream", "streamable-http"
 
         Returns:
             Dict with 'healthy' (bool) and optional 'error' (str)
@@ -50,10 +53,17 @@ class MCPHealthChecker:
             }
 
         transport_type = transport_type.lower()
+        logger.info(f"[Health Check] Transport type: {transport_type}, Server URL: {server_url}")
 
-        # Only SSE and HTTP are supported for remote health checks
-        if transport_type in ("sse", "http-stream", "streamable-http", "http"):
+        # Map transport types to appropriate check method (matching Inspector's logic)
+        if transport_type == "sse":
+            # SSE transport
+            logger.info(f"[Health Check] Using SSEClientTransport")
             return await self._check_sse_server(server_url)
+        elif transport_type in ("http-stream", "streamable-http", "http"):
+            # Streamable HTTP transport (like Inspector's StreamableHTTPClientTransport)
+            logger.info(f"[Health Check] Using StreamableHTTPClientTransport")
+            return await self._check_streamable_http_server(server_url)
         else:
             return {
                 "healthy": False,
@@ -62,28 +72,32 @@ class MCPHealthChecker:
 
     async def _check_sse_server(self, url: str) -> Dict[str, Any]:
         """
-        Check SSE/HTTP MCP server health.
-        Based on Inspector's connect() method.
+        Check SSE MCP server health using SSEClientTransport.
+        Based on Inspector's connect() method for SSE.
         """
         logger.info(f"[Health Check] Checking SSE server: {url}")
 
         try:
             # Create SSE client connection (like Inspector's SSEClientTransport)
-            async with sse_client(url) as (read, write):
+            logger.info(f"[Health Check] Creating SSE client connection to {url}")
+            async with sse_client(url, timeout=self.SSE_TIMEOUT) as (read, write):
+                logger.info("[Health Check] SSE client connected, creating session...")
+
                 # Create MCP client session (like Inspector's Client.connect())
                 async with ClientSession(read, write) as session:
-                    logger.info("[Health Check] Initializing session...")
+                    logger.info("[Health Check] Session created, initializing...")
 
                     # Initialize session with timeout
-                    await asyncio.wait_for(
+                    init_result = await asyncio.wait_for(
                         session.initialize(),
-                        timeout=self.DEFAULT_TIMEOUT
+                        timeout=self.INITIALIZE_TIMEOUT
                     )
 
-                    logger.info("[Health Check] Session initialized successfully")
+                    logger.info(f"[Health Check] Session initialized successfully: {init_result}")
 
                     # Get server capabilities (like Inspector's getServerCapabilities())
                     capabilities = session.get_server_capabilities()
+                    logger.info(f"[Health Check] Server capabilities: {capabilities}")
 
                     # Server is healthy if we got here
                     return {
@@ -92,7 +106,14 @@ class MCPHealthChecker:
                     }
 
         except asyncio.TimeoutError:
-            error_msg = f"Timeout after {self.DEFAULT_TIMEOUT}s"
+            error_msg = f"Timeout after {self.INITIALIZE_TIMEOUT}s - server did not respond"
+            logger.error(f"[Health Check] {error_msg}")
+            return {
+                "healthy": False,
+                "error": error_msg
+            }
+        except ConnectionError as e:
+            error_msg = f"Connection failed: {str(e)}"
             logger.error(f"[Health Check] {error_msg}")
             return {
                 "healthy": False,
@@ -100,7 +121,64 @@ class MCPHealthChecker:
             }
         except Exception as e:
             error_msg = f"{type(e).__name__}: {str(e)}"
-            logger.error(f"[Health Check] Failed: {error_msg}")
+            logger.error(f"[Health Check] Failed with exception: {error_msg}", exc_info=True)
+            return {
+                "healthy": False,
+                "error": error_msg
+            }
+
+    async def _check_streamable_http_server(self, url: str) -> Dict[str, Any]:
+        """
+        Check Streamable HTTP MCP server health using StreamableHTTPClientTransport.
+        Based on Inspector's connect() method for streamable-http.
+        """
+        logger.info(f"[Health Check] Checking Streamable HTTP server: {url}")
+
+        try:
+            # Create Streamable HTTP client connection (like Inspector's StreamableHTTPClientTransport)
+            logger.info(f"[Health Check] Creating Streamable HTTP client connection to {url}")
+            async with streamablehttp_client(url, timeout=self.HTTP_TIMEOUT) as (read, write):
+                logger.info("[Health Check] Streamable HTTP client connected, creating session...")
+
+                # Create MCP client session
+                async with ClientSession(read, write) as session:
+                    logger.info("[Health Check] Session created, initializing...")
+
+                    # Initialize session with timeout
+                    init_result = await asyncio.wait_for(
+                        session.initialize(),
+                        timeout=self.INITIALIZE_TIMEOUT
+                    )
+
+                    logger.info(f"[Health Check] Session initialized successfully: {init_result}")
+
+                    # Get server capabilities
+                    capabilities = session.get_server_capabilities()
+                    logger.info(f"[Health Check] Server capabilities: {capabilities}")
+
+                    # Server is healthy if we got here
+                    return {
+                        "healthy": True,
+                        "capabilities": str(capabilities) if capabilities else None
+                    }
+
+        except asyncio.TimeoutError:
+            error_msg = f"Timeout after {self.INITIALIZE_TIMEOUT}s - server did not respond"
+            logger.error(f"[Health Check] {error_msg}")
+            return {
+                "healthy": False,
+                "error": error_msg
+            }
+        except ConnectionError as e:
+            error_msg = f"Connection failed: {str(e)}"
+            logger.error(f"[Health Check] {error_msg}")
+            return {
+                "healthy": False,
+                "error": error_msg
+            }
+        except Exception as e:
+            error_msg = f"{type(e).__name__}: {str(e)}"
+            logger.error(f"[Health Check] Failed with exception: {error_msg}", exc_info=True)
             return {
                 "healthy": False,
                 "error": error_msg
