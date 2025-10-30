@@ -12,6 +12,7 @@ import {
   CheckIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
+import { StarIcon as StarSolid } from "@heroicons/react/24/solid";
 
 interface Comment {
   id: number;
@@ -22,6 +23,7 @@ interface Comment {
   updated_at: string;
   user_nickname: string;
   user_avatar_url: string;
+  rating: number;
 }
 
 interface CommentsProps {
@@ -33,10 +35,12 @@ export default function Comments({ mcpServerId }: CommentsProps) {
   const { t, language } = useLanguage();
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
+  const [newRating, setNewRating] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
   const [editingContent, setEditingContent] = useState("");
+  const [editingRating, setEditingRating] = useState<number>(0);
   const [commentCount, setCommentCount] = useState(0);
 
   // 댓글 목록 조회
@@ -76,6 +80,12 @@ export default function Comments({ mcpServerId }: CommentsProps) {
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim() || !isAuthenticated) return;
+    // 0~5, 0.5 단위 검증
+    const isHalfStep = Math.abs(newRating * 2 - Math.round(newRating * 2)) < 1e-9;
+    if (newRating < 0 || newRating > 5 || !isHalfStep) {
+      alert(t('comments.writeErrorUnknown'));
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -85,11 +95,12 @@ export default function Comments({ mcpServerId }: CommentsProps) {
           "Content-Type": "application/json",
         },
         requiresAuth: true,
-        body: JSON.stringify({ content: newComment.trim() }),
+        body: JSON.stringify({ content: newComment.trim(), rating: newRating }),
       });
 
       if (response.ok) {
         setNewComment("");
+        setNewRating(0);
         fetchComments();
         fetchCommentCount();
       } else {
@@ -107,6 +118,11 @@ export default function Comments({ mcpServerId }: CommentsProps) {
   // 댓글 수정
   const handleEditComment = async (commentId: number) => {
     if (!editingContent.trim()) return;
+    const isHalfStep = Math.abs(editingRating * 2 - Math.round(editingRating * 2)) < 1e-9;
+    if (editingRating < 0 || editingRating > 5 || !isHalfStep) {
+      alert(t('comments.editErrorUnknown'));
+      return;
+    }
 
     try {
       const response = await apiFetch(`/api/comments/${commentId}`, {
@@ -115,12 +131,13 @@ export default function Comments({ mcpServerId }: CommentsProps) {
           "Content-Type": "application/json",
         },
         requiresAuth: true,
-        body: JSON.stringify({ content: editingContent.trim() }),
+        body: JSON.stringify({ content: editingContent.trim(), rating: editingRating }),
       });
 
       if (response.ok) {
         setEditingCommentId(null);
         setEditingContent("");
+        setEditingRating(0);
         fetchComments();
       } else {
         const errorData = await response.json();
@@ -159,6 +176,7 @@ export default function Comments({ mcpServerId }: CommentsProps) {
   const startEditing = (comment: Comment) => {
     setEditingCommentId(comment.id);
     setEditingContent(comment.content);
+    setEditingRating(comment.rating ?? 0);
   };
 
   // 수정 취소
@@ -195,6 +213,9 @@ export default function Comments({ mcpServerId }: CommentsProps) {
         <form onSubmit={handleSubmitComment} className="mb-6">
           <div className="flex gap-3">
             <div className="flex-1">
+              <div className="mb-2">
+                <StarRatingInput value={newRating} onChange={setNewRating} />
+              </div>
               <textarea
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
@@ -251,6 +272,9 @@ export default function Comments({ mcpServerId }: CommentsProps) {
                     <span className="font-medium text-gray-900">
                       {comment.user_nickname}
                     </span>
+                    <span className="flex items-center ml-1">
+                      <StarRatingDisplay value={comment.rating} />
+                    </span>
                     <span className="text-sm text-gray-500">
                       {formatDate(comment.created_at)}
                     </span>
@@ -261,6 +285,7 @@ export default function Comments({ mcpServerId }: CommentsProps) {
                   
                   {editingCommentId === comment.id ? (
                     <div className="space-y-2">
+                    <StarRatingInput value={editingRating} onChange={setEditingRating} />
                       <textarea
                         value={editingContent}
                         onChange={(e) => setEditingContent(e.target.value)}
@@ -320,6 +345,57 @@ export default function Comments({ mcpServerId }: CommentsProps) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function StarRatingDisplay({ value }: { value: number }) {
+  const percentage = Math.max(0, Math.min(100, (value / 5) * 100));
+  return (
+    <div className="relative inline-block align-middle leading-none" aria-label={`rating ${value.toFixed(1)} / 5`}>
+      <div className="flex text-gray-300 leading-none">
+        {Array.from({ length: 5 }).map((_, idx) => (
+          <StarSolid key={idx} className="h-4 w-4 shrink-0" />
+        ))}
+      </div>
+      <div className="absolute inset-0 overflow-hidden" style={{ width: `${percentage}%` }}>
+        <div className="flex text-yellow-400 leading-none pointer-events-none">
+          {Array.from({ length: 5 }).map((_, idx) => (
+            <StarSolid key={idx} className="h-4 w-4 shrink-0" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StarRatingInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const percentage = Math.max(0, Math.min(100, (value / 5) * 100));
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const ratio = x / rect.width; // 0..1
+    const steps = Math.round(ratio * 10); // 0..10
+    const newVal = Math.min(10, Math.max(0, steps)) / 2; // 0..5 step 0.5
+    onChange(newVal);
+  };
+  return (
+    <div className="inline-block select-none align-middle leading-none">
+      <div className="relative inline-block cursor-pointer align-middle leading-none" onClick={handleClick} title={`${value.toFixed(1)}/5`}>
+        <div className="flex text-gray-300 leading-none">
+          {Array.from({ length: 5 }).map((_, idx) => (
+            <StarSolid key={idx} className="h-6 w-6 shrink-0" />
+          ))}
+        </div>
+        <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ width: `${percentage}%` }}>
+          <div className="flex text-yellow-400 leading-none">
+            {Array.from({ length: 5 }).map((_, idx) => (
+              <StarSolid key={idx} className="h-6 w-6 shrink-0" />
+            ))}
+          </div>
+        </div>
+      </div>
+      <span className="ml-2 align-middle text-sm text-gray-600">{value.toFixed(1)}</span>
     </div>
   );
 }
