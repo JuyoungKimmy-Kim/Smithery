@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import logging
@@ -442,26 +442,52 @@ def delete_mcp_server_announcement(
 
 @router.post("/{mcp_server_id}/health-check")
 async def check_server_health(
+    background_tasks: BackgroundTasks,
     mcp_server_id: int,
     db: Session = Depends(get_db)
 ):
     """
-    MCP 서버의 헬스 체크를 수행합니다.
+    MCP 서버의 헬스 체크를 백그라운드에서 시작합니다.
+    즉시 응답을 반환하고, GET /{id}로 결과를 확인할 수 있습니다.
     """
     try:
         logger.info(f"Health check requested for server ID: {mcp_server_id}")
+
+        # 서버 존재 확인
         mcp_service = MCPServerService(db)
-        result = await mcp_service.check_server_health(mcp_server_id)
+        mcp_server = mcp_service.get_mcp_server_by_id(mcp_server_id)
 
-        logger.info(f"Health check result: {result}")
-
-        if "error" in result and result.get("error") == "Server not found":
+        if not mcp_server:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="MCP Server not found"
             )
 
-        return result
+        # 백그라운드 태스크로 health check 시작
+        async def run_health_check():
+            # 새로운 DB 세션 생성 (백그라운드 태스크용)
+            from backend.database import SessionLocal
+            bg_db = SessionLocal()
+            try:
+                bg_service = MCPServerService(bg_db)
+                result = await bg_service.check_server_health(mcp_server_id)
+                logger.info(f"Background health check completed: {result}")
+            except Exception as e:
+                logger.error(f"Background health check error: {str(e)}", exc_info=True)
+            finally:
+                bg_db.close()
+
+        background_tasks.add_task(run_health_check)
+
+        # 즉시 응답 반환
+        return {
+            "id": mcp_server_id,
+            "message": "Health check started",
+            "status": "checking",
+            "current_health_status": mcp_server.health_status,
+            "last_health_check": mcp_server.last_health_check.isoformat() if mcp_server.last_health_check else None
+        }
+
     except HTTPException:
         raise
     except Exception as e:

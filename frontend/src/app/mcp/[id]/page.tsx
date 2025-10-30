@@ -204,32 +204,67 @@ export default function MCPServerDetail() {
     setIsCheckingHealth(true);
 
     try {
+      // Start health check (returns immediately)
       const response = await fetch(`/api/mcp-servers/${mcp.id}/health-check`, {
         method: 'POST',
       });
 
       if (response.ok) {
         const result = await response.json();
+        console.log('Health check started:', result);
 
-        // Update MCP state with new health info
-        setMcp({
-          ...mcp,
-          health_status: result.health_status,
-          last_health_check: result.last_health_check,
-        });
+        // Poll for results (check every 2 seconds, max 10 times = 20 seconds)
+        let pollCount = 0;
+        const maxPolls = 10;
+        const pollInterval = setInterval(async () => {
+          pollCount++;
 
-        // Set cooldown (20 seconds)
-        const now = Date.now();
-        setLastHealthCheckTime(now);
-        setRemainingCooldown(20000);
+          try {
+            // Fetch updated server data
+            const serverResponse = await fetch(`/api/mcps/${mcp.id}`);
+            if (serverResponse.ok) {
+              const serverData = await serverResponse.json();
+
+              // Check if health status was updated
+              if (serverData.last_health_check !== mcp.last_health_check) {
+                console.log('Health check completed:', serverData);
+
+                // Update MCP state with new health info
+                setMcp({
+                  ...mcp,
+                  health_status: serverData.health_status,
+                  last_health_check: serverData.last_health_check,
+                });
+
+                // Stop polling
+                clearInterval(pollInterval);
+                setIsCheckingHealth(false);
+
+                // Set cooldown (20 seconds)
+                const now = Date.now();
+                setLastHealthCheckTime(now);
+                setRemainingCooldown(20000);
+              } else if (pollCount >= maxPolls) {
+                // Timeout after max polls
+                console.log('Health check timeout');
+                clearInterval(pollInterval);
+                setIsCheckingHealth(false);
+                alert('Health check is taking longer than expected. Please refresh the page later.');
+              }
+            }
+          } catch (pollError) {
+            console.error('Polling error:', pollError);
+          }
+        }, 2000);
+
       } else {
         const errorData = await response.json();
         alert(`Health check failed: ${errorData.detail || errorData.error || 'Unknown error'}`);
+        setIsCheckingHealth(false);
       }
     } catch (error) {
       console.error('Health check error:', error);
       alert('Failed to perform health check');
-    } finally {
       setIsCheckingHealth(false);
     }
   };

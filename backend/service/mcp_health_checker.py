@@ -24,7 +24,7 @@ class MCPHealthChecker:
     Supports SSE and HTTP transports (STDIO not applicable for remote health checks).
     """
 
-    DEFAULT_TIMEOUT = 30  # 30 seconds timeout
+    DEFAULT_TIMEOUT = 10  # 10 seconds timeout (reduced from 30)
 
     async def check_server_health(self, server_url: str, transport_type: str) -> Dict[str, Any]:
         """
