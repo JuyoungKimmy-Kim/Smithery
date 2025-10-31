@@ -223,6 +223,7 @@ class MCPProxyService:
         Streamable HTTP transport - Inspector의 StreamableHTTPClientTransport와 동일
         """
         logger.info(f"[Streamable HTTP] Connecting to: {url}")
+        logger.info(f"[Streamable HTTP] HAS_STREAMABLE_HTTP = {HAS_STREAMABLE_HTTP}")
 
         try:
             if not url.startswith("http://") and not url.startswith("https://"):
@@ -234,10 +235,17 @@ class MCPProxyService:
                 return await MCPProxyService._fetch_sse(url)
 
             logger.info(f"[Streamable HTTP] Creating client for {url}")
+            logger.info(f"[Streamable HTTP] streamablehttp_client function: {streamablehttp_client}")
 
             # Inspector: new StreamableHTTPClientTransport(new URL(url), {fetch...})
             # Python: streamablehttp_client(url)
-            async with streamablehttp_client(url) as (read, write, _):
+            logger.info(f"[Streamable HTTP] About to call streamablehttp_client({url})")
+            async with streamablehttp_client(url) as transport_tuple:
+                logger.info(f"[Streamable HTTP] streamablehttp_client returned, unpacking...")
+                logger.info(f"[Streamable HTTP] transport_tuple type: {type(transport_tuple)}")
+                read, write, _ = transport_tuple
+                logger.info(f"[Streamable HTTP] Successfully unpacked: read={type(read)}, write={type(write)}")
+
                 async with ClientSession(read, write) as session:
                     logger.info("[Streamable HTTP] Session created, initializing...")
 

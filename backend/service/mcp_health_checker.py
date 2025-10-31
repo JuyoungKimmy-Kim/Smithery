@@ -139,7 +139,7 @@ class MCPHealthChecker:
             # Create Streamable HTTP client connection (like Inspector's StreamableHTTPClientTransport)
             logger.info(f"[Health Check] Creating Streamable HTTP client connection to {url}")
             # streamablehttp_client returns (read, write, get_session_id)
-            async with streamablehttp_client(url, timeout=self.CONNECTION_TIMEOUT) as (read, write, _get_session_id):
+            async with streamablehttp_client(url) as (read, write, _get_session_id):
                 logger.info("[Health Check] Streamable HTTP client connected, creating session...")
 
                 # Create MCP client session
