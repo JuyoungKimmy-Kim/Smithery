@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from pydantic import BaseModel
+from typing import Optional
 
 from backend.database import get_db
 from backend.database.model import User, Comment
@@ -13,9 +14,11 @@ router = APIRouter(prefix="/comments", tags=["comments"])
 # Pydantic 스키마
 class CommentCreate(BaseModel):
     content: str
+    rating: float
 
 class CommentUpdate(BaseModel):
     content: str
+    rating: Optional[float] = None
 
 class CommentResponse(BaseModel):
     id: int
@@ -26,6 +29,7 @@ class CommentResponse(BaseModel):
     updated_at: str
     user_nickname: str
     user_avatar_url: str
+    rating: float
     
     class Config:
         from_attributes = True
@@ -40,11 +44,18 @@ async def create_comment(
     """MCP 서버에 댓글을 생성합니다."""
     comment_dao = CommentDAO(db)
     
+    # rating 검증 (0~5, 0.5 단위)
+    if comment_data.rating < 0 or comment_data.rating > 5:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="rating must be between 0 and 5")
+    if abs((comment_data.rating * 2) - round(comment_data.rating * 2)) > 1e-9:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="rating must be in 0.5 increments")
+
     # 댓글 생성
     comment = comment_dao.create_comment(
         mcp_server_id=mcp_server_id,
         user_id=current_user.id,
-        content=comment_data.content
+        content=comment_data.content,
+        rating=comment_data.rating
     )
     
     return CommentResponse(
@@ -56,6 +67,7 @@ async def create_comment(
         updated_at=comment.updated_at.isoformat() if comment.updated_at else comment.created_at.isoformat(),
         user_nickname=current_user.nickname,
         user_avatar_url=current_user.avatar_url or '/image/avatar1.jpg'
+        , rating=float(comment.rating)
     )
 
 @router.get("/mcp-servers/{mcp_server_id}/comments", response_model=List[CommentResponse])
@@ -83,7 +95,8 @@ async def get_comments(
             created_at=comment.created_at.isoformat(),
             updated_at=comment.updated_at.isoformat() if comment.updated_at else comment.created_at.isoformat(),
             user_nickname=comment.user.nickname,
-            user_avatar_url=comment.user.avatar_url or '/image/avatar1.jpg'
+            user_avatar_url=comment.user.avatar_url or '/image/avatar1.jpg',
+            rating=float(comment.rating)
         )
         for comment in comments
     ]
@@ -98,11 +111,19 @@ async def update_comment(
     """댓글을 수정합니다. (작성자만 수정 가능)"""
     comment_dao = CommentDAO(db)
     
+    # rating 검증 (선택 입력)
+    if comment_data.rating is not None:
+        if comment_data.rating < 0 or comment_data.rating > 5:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="rating must be between 0 and 5")
+        if abs((comment_data.rating * 2) - round(comment_data.rating * 2)) > 1e-9:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="rating must be in 0.5 increments")
+
     # 댓글 수정
     comment = comment_dao.update_comment(
         comment_id=comment_id,
         content=comment_data.content,
-        user_id=current_user.id
+        user_id=current_user.id,
+        rating=comment_data.rating
     )
     
     if not comment:
@@ -119,7 +140,8 @@ async def update_comment(
         created_at=comment.created_at.isoformat(),
         updated_at=comment.updated_at.isoformat() if comment.updated_at else comment.created_at.isoformat(),
         user_nickname=current_user.nickname,
-        user_avatar_url=current_user.avatar_url or '/image/avatar1.jpg'
+        user_avatar_url=current_user.avatar_url or '/image/avatar1.jpg',
+        rating=float(comment.rating)
     )
 
 @router.delete("/{comment_id}")

@@ -7,12 +7,13 @@ class CommentDAO:
     def __init__(self, db: Session):
         self.db = db
     
-    def create_comment(self, mcp_server_id: int, user_id: int, content: str) -> Comment:
+    def create_comment(self, mcp_server_id: int, user_id: int, content: str, rating: float) -> Comment:
         """새 댓글을 생성합니다."""
         comment = Comment(
             mcp_server_id=mcp_server_id,
             user_id=user_id,
-            content=content
+            content=content,
+            rating=rating
         )
         
         self.db.add(comment)
@@ -37,7 +38,7 @@ class CommentDAO:
             joinedload(Comment.user)
         ).filter(Comment.id == comment_id).first()
     
-    def update_comment(self, comment_id: int, content: str, user_id: int) -> Optional[Comment]:
+    def update_comment(self, comment_id: int, content: str, user_id: int, rating: Optional[float] = None) -> Optional[Comment]:
         """댓글을 수정합니다. (작성자만 수정 가능)"""
         comment = self.db.query(Comment).filter(
             Comment.id == comment_id,
@@ -47,6 +48,8 @@ class CommentDAO:
         
         if comment:
             comment.content = content
+            if rating is not None:
+                comment.rating = rating
             self.db.commit()
             self.db.refresh(comment)
         
