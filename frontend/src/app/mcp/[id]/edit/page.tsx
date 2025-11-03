@@ -1751,6 +1751,57 @@ export default function EditMCPServerPage() {
                   </div>
                 )}
 
+                {/* Tools Preview */}
+                {previewTools.length > 0 && (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-medium text-green-800">
+                        Found {previewTools.length} Tools
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={handleUsePreviewTools}
+                        className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors"
+                      >
+                        Add All Tools
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {previewTools.map((tool: any, index: number) => (
+                        <div key={index} className="bg-white rounded-lg p-3 border border-green-200">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-medium text-green-900 text-sm">{tool.name}</h4>
+                              <p className="text-xs text-green-700 mt-1">{tool.description || 'No description'}</p>
+
+                              {/* Parameters 정보 표시 */}
+                              {tool.inputSchema?.properties && (
+                                <div className="mt-2">
+                                  <p className="text-xs font-medium text-gray-700 mb-1">Parameters:</p>
+                                  <div className="space-y-1">
+                                    {Object.entries(tool.inputSchema.properties).map(([paramName, paramInfo]: [string, any]) => (
+                                      <div key={paramName} className="text-xs text-gray-600 flex items-center gap-2">
+                                        <span className="font-medium">{paramName}</span>
+                                        <span className="text-blue-600">({paramInfo.type || 'any'})</span>
+                                        {tool.inputSchema?.required?.includes(paramName) && (
+                                          <span className="text-red-600 text-xs">Required</span>
+                                        )}
+                                        {paramInfo.description && (
+                                          <span className="text-gray-500">- {paramInfo.description}</span>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Tools not found warning */}
                 {!isLoadingPreview && toolsSearchAttempted && previewTools.length === 0 && (
                   <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
@@ -1859,6 +1910,30 @@ export default function EditMCPServerPage() {
                         Add All Prompts
                       </button>
                     </div>
+                    <div className="space-y-2">
+                      {previewPrompts.map((prompt: any, index: number) => (
+                        <div key={index} className="bg-white rounded-lg p-3 border border-purple-200">
+                          <h4 className="font-medium text-purple-900 text-sm">{prompt.name}</h4>
+                          {prompt.description && (
+                            <p className="text-xs text-purple-700 mt-1">{prompt.description}</p>
+                          )}
+                          {prompt.arguments && prompt.arguments.length > 0 && (
+                            <div className="mt-2">
+                              <p className="text-xs font-medium text-gray-700 mb-1">Arguments:</p>
+                              <div className="space-y-1">
+                                {prompt.arguments.map((arg: any, argIdx: number) => (
+                                  <div key={argIdx} className="text-xs text-gray-600">
+                                    <span className="font-medium">{arg.name}</span>
+                                    {arg.required && <span className="text-red-600 ml-1">*</span>}
+                                    {arg.description && <span className="text-gray-500"> - {arg.description}</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -1958,6 +2033,20 @@ export default function EditMCPServerPage() {
                       >
                         Add All Resources
                       </button>
+                    </div>
+                    <div className="space-y-2">
+                      {previewResources.map((resource: any, index: number) => (
+                        <div key={index} className="bg-white rounded-lg p-3 border border-green-200">
+                          <h4 className="font-medium text-green-900 text-sm">{resource.name}</h4>
+                          <p className="text-xs text-green-700 mt-1">URI: {resource.uri}</p>
+                          {resource.description && (
+                            <p className="text-xs text-gray-600 mt-1">{resource.description}</p>
+                          )}
+                          {resource.mimeType && (
+                            <p className="text-xs text-blue-600 mt-1">Type: {resource.mimeType}</p>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
