@@ -628,6 +628,7 @@ export default function EditMCPServerPage() {
         // 중복 없으면 바로 추가
         setPrompts([...prompts, ...newPromptsOnly]);
         setPreviewPrompts([]);
+        setPromptsSearchAttempted(false);
         alert(`${newPromptsOnly.length}개의 Prompt가 추가되었습니다.`);
       }
     }
@@ -666,6 +667,7 @@ export default function EditMCPServerPage() {
         // 중복 없으면 바로 추가
         setResources([...resources, ...newResourcesOnly]);
         setPreviewResources([]);
+        setResourcesSearchAttempted(false);
         alert(`${newResourcesOnly.length}개의 Resource가 추가되었습니다.`);
       }
     }
@@ -723,6 +725,7 @@ export default function EditMCPServerPage() {
         // 중복 없으면 바로 추가
         setTools([...tools, ...newToolsOnly]);
         setPreviewTools([]);
+        setToolsSearchAttempted(false);
         alert(t('edit.toolsAdded', { count: String(newToolsOnly.length) }));
       }
     }
@@ -752,6 +755,7 @@ export default function EditMCPServerPage() {
     const filteredTools = tools.filter(t => !duplicateNamesToReplace.has(t.name));
     setTools([...filteredTools, ...toolsToAdd, ...pendingNewTools]);
     setPreviewTools([]);
+    setToolsSearchAttempted(false);
 
     setShowDuplicateModal(false);
     const totalAdded = toolsToAdd.length + pendingNewTools.length;
@@ -785,6 +789,7 @@ export default function EditMCPServerPage() {
     const filteredPrompts = prompts.filter(p => !duplicateNamesToReplace.has(p.name));
     setPrompts([...filteredPrompts, ...promptsToAdd, ...pendingNewPrompts]);
     setPreviewPrompts([]);
+    setPromptsSearchAttempted(false);
 
     setShowDuplicatePromptsModal(false);
     const totalAdded = promptsToAdd.length + pendingNewPrompts.length;
@@ -818,6 +823,7 @@ export default function EditMCPServerPage() {
     const filteredResources = resources.filter(r => !duplicateUrisToReplace.has(r.uri));
     setResources([...filteredResources, ...resourcesToAdd, ...pendingNewResources]);
     setPreviewResources([]);
+    setResourcesSearchAttempted(false);
 
     setShowDuplicateResourcesModal(false);
     const totalAdded = resourcesToAdd.length + pendingNewResources.length;
