@@ -529,9 +529,9 @@ export default function MCPServerDetail() {
 
 
         {/* Tools, Prompts & Resources Tabs Section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-          {/* Capabilities Tabs (Left - 2 columns) */}
-          <div className="md:col-span-2">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-8 mb-8">
+          {/* Capabilities Tabs (Left - 3 columns) */}
+          <div className="md:col-span-3">
             <MCPCapabilitiesTabs
               tools={mcp.tools || []}
               prompts={mcp.prompts || []}
@@ -539,8 +539,8 @@ export default function MCPServerDetail() {
             />
           </div>
 
-          {/* Config (Right - 1 column) */}
-          <div>
+          {/* Config (Right - 2 columns) */}
+          <div className="md:col-span-2">
             <div className="bg-white rounded-lg shadow-sm p-8">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
