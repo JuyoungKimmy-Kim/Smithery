@@ -30,10 +30,17 @@ export interface MCPServerTool {
   };
 }
 
+export interface MCPServerPrompt {
+  name: string;
+  description?: string;
+  arguments?: MCPServerProperty[];
+}
+
 export interface MCPServerResource {
   name: string;
-  description: string;
-  url: string;
+  description?: string;
+  uri: string;
+  mimeType?: string;
 }
 
 export interface User {
@@ -59,6 +66,7 @@ export interface MCPServer {
   health_status?: string;
   last_health_check?: string;
   tools: MCPServerTool[];
+  prompts?: MCPServerPrompt[];
   resources: MCPServerResource[];
   config?: any;
   created_at?: string;

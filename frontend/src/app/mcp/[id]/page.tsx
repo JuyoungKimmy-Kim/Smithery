@@ -20,6 +20,7 @@ import { CheckCircleIcon, XCircleIcon, QuestionMarkCircleIcon } from "@heroicons
 import { MCPServer } from "@/types/mcp";
 import { useAuth } from "@/contexts/AuthContext";
 import Comments from "@/components/comments";
+import MCPCapabilitiesTabs from "@/components/mcp-capabilities-tabs";
 import { apiFetch } from "@/lib/api-client";
 
 export default function MCPServerDetail() {
@@ -30,9 +31,6 @@ export default function MCPServerDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set());
-  const [currentToolPage, setCurrentToolPage] = useState(1);
-  const toolsPerPage = 3;
   const [isConfigCopied, setIsConfigCopied] = useState(false);
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
   const [announcementText, setAnnouncementText] = useState("");
@@ -40,27 +38,6 @@ export default function MCPServerDetail() {
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
   const [lastHealthCheckTime, setLastHealthCheckTime] = useState<number>(0);
   const [remainingCooldown, setRemainingCooldown] = useState<number>(0);
-
-  const toggleToolExpansion = (index: number) => {
-    const newExpanded = new Set(expandedTools);
-    if (newExpanded.has(index)) {
-      newExpanded.delete(index);
-    } else {
-      newExpanded.add(index);
-    }
-    setExpandedTools(newExpanded);
-  };
-
-  // Tools 페이지네이션 계산
-  const totalToolPages = Math.ceil((mcp?.tools?.length || 0) / toolsPerPage);
-  const startToolIndex = (currentToolPage - 1) * toolsPerPage;
-  const endToolIndex = startToolIndex + toolsPerPage;
-  const currentTools = mcp?.tools?.slice(startToolIndex, endToolIndex) || [];
-
-  const handleToolPageChange = (page: number) => {
-    setCurrentToolPage(page);
-    setExpandedTools(new Set()); // 페이지 변경 시 모든 도구 접기
-  };
 
   const handleCopyConfig = async () => {
     if (!mcp?.config) return;
@@ -551,116 +528,18 @@ export default function MCPServerDetail() {
         </div>
 
 
-        {/* Tools & Config Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-          {/* Tools (Left) */}
-          <div>
-            {mcp.tools && mcp.tools.length > 0 && (
-              <div className="bg-white rounded-lg shadow-sm p-8">
-                <div className="flex items-center gap-2 mb-6">
-                  <WrenchScrewdriverIcon className="h-6 w-6 text-blue-500" />
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Tools ({mcp.tools.length})
-                  </h2>
-                </div>
-                <div className="grid gap-4">
-                  {currentTools.map((tool, index) => {
-                    const actualIndex = startToolIndex + index;
-                    return (
-                      <div 
-                        key={actualIndex} 
-                        className="border border-gray-200 rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                        onClick={() => toggleToolExpansion(actualIndex)}
-                      >
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                          {tool.name}
-                        </h3>
-                        <div className="text-sm text-gray-600 mb-3">
-                          <p 
-                            className={`${tool.description.length > 100 ? (expandedTools.has(actualIndex) ? '' : 'overflow-hidden') : ''}`}
-                            style={{
-                              display: tool.description.length > 100 && !expandedTools.has(actualIndex) ? '-webkit-box' : 'block',
-                              WebkitLineClamp: tool.description.length > 100 && !expandedTools.has(actualIndex) ? 2 : 'unset',
-                              WebkitBoxOrient: 'vertical'
-                            }}
-                          >
-                            {tool.description}
-                          </p>
-                        </div>
-                        {tool.parameters && tool.parameters.length > 0 && (
-                          <div 
-                            className={`transition-all duration-300 ease-in-out ${
-                              !expandedTools.has(actualIndex) 
-                                ? 'max-h-0 overflow-hidden opacity-0' 
-                                : 'max-h-96 opacity-100'
-                            }`}
-                          >
-                            <p className="text-sm font-medium text-gray-900 mb-2">
-                              Input Properties:
-                            </p>
-                            <div className="space-y-1">
-                              {tool.parameters.map((prop, propIndex) => (
-                                <div key={propIndex} className="flex items-center gap-2 text-xs">
-                                  <span className="font-medium">{prop.name}</span>
-                                  {prop.type && (
-                                    <span className="px-1 py-0.5 bg-blue-100 text-blue-800 text-xs rounded">
-                                      {prop.type}
-                                    </span>
-                                  )}
-                                  {prop.required && (
-                                    <span className="px-1 py-0.5 bg-red-100 text-red-800 text-xs rounded">Required</span>
-                                  )}
-                                  {prop.description && (
-                                    <span className="text-gray-600">- {prop.description}</span>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                
-                {/* Tools 페이지네이션 */}
-                {totalToolPages > 1 && (
-                  <div className="flex justify-center items-center gap-2 mt-6">
-                    <button
-                      onClick={() => handleToolPageChange(currentToolPage - 1)}
-                      disabled={currentToolPage === 1}
-                      className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      이전
-                    </button>
-                    
-                    {Array.from({ length: totalToolPages }, (_, i) => i + 1).map((page) => (
-                      <button
-                        key={page}
-                        onClick={() => handleToolPageChange(page)}
-                        className={`px-3 py-2 text-sm font-medium rounded-md ${
-                          currentToolPage === page
-                            ? 'bg-blue-600 text-white'
-                            : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    ))}
-                    
-                    <button
-                      onClick={() => handleToolPageChange(currentToolPage + 1)}
-                      disabled={currentToolPage === totalToolPages}
-                      className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      다음
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+        {/* Tools, Prompts & Resources Tabs Section */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+          {/* Capabilities Tabs (Left - 2 columns) */}
+          <div className="md:col-span-2">
+            <MCPCapabilitiesTabs
+              tools={mcp.tools || []}
+              prompts={mcp.prompts || []}
+              resources={mcp.resources || []}
+            />
           </div>
-          {/* Config (Right) */}
+
+          {/* Config (Right - 1 column) */}
           <div>
             <div className="bg-white rounded-lg shadow-sm p-8">
               <div className="flex items-center justify-between mb-6">
@@ -698,37 +577,6 @@ export default function MCPServerDetail() {
             </div>
           </div>
         </div>
-
-        {/* Resources Section */}
-        {mcp.resources && mcp.resources.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm p-8 mb-8">
-            <div className="flex items-center gap-2 mb-6">
-              <BookOpenIcon className="h-6 w-6 text-blue-500" />
-              <h2 className="text-2xl font-bold text-gray-900">
-                Resources ({mcp.resources.length})
-              </h2>
-            </div>
-            
-            <div className="grid gap-4">
-              {mcp.resources.map((resource, index) => (
-                <div key={index} className="border border-gray-200 rounded-lg p-4">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    {resource.name}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-3">
-                    {resource.description}
-                  </p>
-                  <button
-                    className="text-blue-600 hover:text-blue-800 text-sm hover:underline"
-                    onClick={() => window.open(resource.url, '_blank')}
-                  >
-                    {resource.url}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Metadata Section */}
         <div className="bg-white rounded-lg shadow-sm p-8">
