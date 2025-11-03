@@ -521,13 +521,17 @@ const translations: Record<Language, Record<string, string>> = {
 };
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<Language>('ko');
+  const [language, setLanguageState] = useState<Language>('en');
 
   useEffect(() => {
     // 페이지 로드 시 localStorage에서 언어 설정 복원
     const storedLanguage = localStorage.getItem('language') as Language;
     if (storedLanguage && (storedLanguage === 'ko' || storedLanguage === 'en')) {
       setLanguageState(storedLanguage);
+    } else {
+      // localStorage에 저장된 언어가 없으면 영어를 기본값으로 설정
+      setLanguageState('en');
+      localStorage.setItem('language', 'en');
     }
   }, []);
 
