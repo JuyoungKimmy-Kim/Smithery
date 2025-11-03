@@ -1,6 +1,9 @@
 from .base import Base
 from .user import User, UserFavorite
-from .mcp_server import MCPServer, MCPServerTool, MCPServerProperty
+from .mcp_server import (
+    MCPServer, MCPServerTool, MCPServerProperty,
+    MCPServerPrompt, MCPServerPromptArgument, MCPServerResource
+)
 from .tag import Tag, mcp_server_tags
 from .comment import Comment
 
@@ -11,6 +14,9 @@ __all__ = [
     'MCPServer',
     'MCPServerTool',
     'MCPServerProperty',
+    'MCPServerPrompt',
+    'MCPServerPromptArgument',
+    'MCPServerResource',
     'Tag',
     'mcp_server_tags',
     'Comment'

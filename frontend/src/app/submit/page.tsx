@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { MCPServer, TransportType, MCPServerTool, MCPServerProperty } from "../../types/mcp";
+import { MCPServer, TransportType, MCPServerTool, MCPServerProperty, MCPServerPrompt, MCPServerResource } from "../../types/mcp";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { PlusIcon, TrashIcon, PencilIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
@@ -32,10 +32,16 @@ export default function SubmitMCPPage() {
   const [error, setError] = useState("");
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
   const [previewTools, setPreviewTools] = useState<any[]>([]);
+  const [previewPrompts, setPreviewPrompts] = useState<any[]>([]);
+  const [previewResources, setPreviewResources] = useState<any[]>([]);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [isLoadingPrompts, setIsLoadingPrompts] = useState(false);
+  const [isLoadingResources, setIsLoadingResources] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  
+
   const [tools, setTools] = useState<MCPServerTool[]>([]);
+  const [prompts, setPrompts] = useState<MCPServerPrompt[]>([]);
+  const [resources, setResources] = useState<MCPServerResource[]>([]);
   const [showAddTool, setShowAddTool] = useState(false);
   const [editingToolIndex, setEditingToolIndex] = useState<number | null>(null);
   const [toolForm, setToolForm] = useState({
@@ -340,30 +346,13 @@ export default function SubmitMCPPage() {
       ...prev,
       [field]: value
     }));
-    
+
     // 입력 시 해당 필드의 validation error 제거
     if (validationErrors[field]) {
       setValidationErrors(prev => ({
         ...prev,
         [field]: ""
       }));
-    }
-
-  };
-
-
-  const handleUrlChange = async (url: string, protocol: string) => {
-    if (!url.trim() || !protocol) {
-      setPreviewTools([]);
-      return;
-    }
-    
-    try {
-      console.log('MCP Server URL detected:', url, 'Transport Type:', protocol);
-      await detectAndPreviewTools({ url: url.trim(), protocol });
-    } catch (error) {
-      console.error('URL 처리 실패:', error);
-      setPreviewTools([]);
     }
   };
 
@@ -405,9 +394,79 @@ export default function SubmitMCPPage() {
   };
 
 
+  const requestPromptsList = async (config: any) => {
+    try {
+      console.log('Requesting prompts via backend proxy:', config);
+
+      const response = await fetch('/api/mcp-servers/preview-prompts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          url: config.url,
+          protocol: config.protocol
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Prompts response:', data);
+
+        if (data.success && data.prompts && data.prompts.length > 0) {
+          setPreviewPrompts(data.prompts);
+        } else {
+          console.log('No prompts found:', data.message);
+          setPreviewPrompts([]);
+        }
+      } else {
+        console.error('Prompts request failed:', response.status);
+        setPreviewPrompts([]);
+      }
+    } catch (error) {
+      console.error('Prompts request failed:', error);
+      setPreviewPrompts([]);
+    }
+  };
+
+  const requestResourcesList = async (config: any) => {
+    try {
+      console.log('Requesting resources via backend proxy:', config);
+
+      const response = await fetch('/api/mcp-servers/preview-resources', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          url: config.url,
+          protocol: config.protocol
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Resources response:', data);
+
+        if (data.success && data.resources && data.resources.length > 0) {
+          setPreviewResources(data.resources);
+        } else {
+          console.log('No resources found:', data.message);
+          setPreviewResources([]);
+        }
+      } else {
+        console.error('Resources request failed:', response.status);
+        setPreviewResources([]);
+      }
+    } catch (error) {
+      console.error('Resources request failed:', error);
+      setPreviewResources([]);
+    }
+  };
+
   const detectAndPreviewTools = async (config: any) => {
     setIsLoadingPreview(true);
-    
+
     try {
       console.log('Fetching tools from MCP Server:', config.url, 'Transport Type:', config.protocol);
       await requestToolsList(config);
@@ -417,6 +476,55 @@ export default function SubmitMCPPage() {
     } finally {
       setIsLoadingPreview(false);
     }
+  };
+
+  const detectAndPreviewPrompts = async (config: any) => {
+    setIsLoadingPrompts(true);
+
+    try {
+      console.log('Fetching prompts from MCP Server:', config.url, 'Transport Type:', config.protocol);
+      await requestPromptsList(config);
+    } catch (error) {
+      console.error('MCP Server prompts 가져오기 실패:', error);
+      setPreviewPrompts([]);
+    } finally {
+      setIsLoadingPrompts(false);
+    }
+  };
+
+  const detectAndPreviewResources = async (config: any) => {
+    setIsLoadingResources(true);
+
+    try {
+      console.log('Fetching resources from MCP Server:', config.url, 'Transport Type:', config.protocol);
+      await requestResourcesList(config);
+    } catch (error) {
+      console.error('MCP Server resources 가져오기 실패:', error);
+      setPreviewResources([]);
+    } finally {
+      setIsLoadingResources(false);
+    }
+  };
+
+  const handleAddAllPrompts = () => {
+    const promptsToAdd = previewPrompts.map(p => ({
+      name: p.name,
+      description: p.description || '',
+      arguments: p.arguments || []
+    }));
+    setPrompts([...prompts, ...promptsToAdd]);
+    setPreviewPrompts([]);
+  };
+
+  const handleAddAllResources = () => {
+    const resourcesToAdd = previewResources.map(r => ({
+      uri: r.uri,
+      name: r.name,
+      description: r.description || '',
+      mimeType: r.mimeType || r.mime_type || ''
+    }));
+    setResources([...resources, ...resourcesToAdd]);
+    setPreviewResources([]);
   };
 
   const handleAddTool = () => {
@@ -658,7 +766,9 @@ export default function SubmitMCPPage() {
         protocol: formData.protocol.trim(),
         server_url: formData.url.trim() || null,
         config: config,
-        tools: tools
+        tools: tools,
+        prompts: prompts,
+        resources: resources
       };
 
 
@@ -892,10 +1002,6 @@ export default function SubmitMCPPage() {
               value={formData.protocol}
               onChange={(e) => {
                 handleInputChange('protocol', e.target.value);
-                // Transport Type과 URL이 모두 있을 때 미리보기 시도
-                if (formData.url.trim()) {
-                  handleUrlChange(formData.url, e.target.value);
-                }
               }}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 validationErrors.protocol ? 'border-red-500' : 'border-gray-300'
@@ -921,10 +1027,6 @@ export default function SubmitMCPPage() {
               value={formData.url}
               onChange={(e) => {
                 handleInputChange('url', e.target.value);
-                // Transport Type과 URL이 모두 있을 때 미리보기 시도
-                if (formData.protocol.trim()) {
-                  handleUrlChange(e.target.value, formData.protocol);
-                }
               }}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 validationErrors.url ? 'border-red-500' : 'border-gray-300'
@@ -958,6 +1060,36 @@ export default function SubmitMCPPage() {
               {t('submit.serverConfigHelp')}
             </p>
           </div>
+
+          {/* Search Buttons for Tools, Prompts, Resources */}
+          {formData.protocol && formData.url && (
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => detectAndPreviewTools({ url: formData.url, protocol: formData.protocol })}
+                disabled={isLoadingPreview}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isLoadingPreview ? 'Searching Tools...' : 'Search Tools'}
+              </button>
+              <button
+                type="button"
+                onClick={() => detectAndPreviewPrompts({ url: formData.url, protocol: formData.protocol })}
+                disabled={isLoadingPrompts}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isLoadingPrompts ? 'Searching Prompts...' : 'Search Prompts'}
+              </button>
+              <button
+                type="button"
+                onClick={() => detectAndPreviewResources({ url: formData.url, protocol: formData.protocol })}
+                disabled={isLoadingResources}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isLoadingResources ? 'Searching Resources...' : 'Search Resources'}
+              </button>
+            </div>
+          )}
 
           {isLoadingPreview && (
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
@@ -1012,6 +1144,80 @@ export default function SubmitMCPPage() {
                         )}
                       </div>
                     </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Prompts Preview */}
+          {previewPrompts.length > 0 && (
+            <div className="p-4 bg-purple-50 border border-purple-200 rounded-md">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-purple-800">
+                  Found {previewPrompts.length} Prompts
+                </h3>
+                <button
+                  type="button"
+                  onClick={handleAddAllPrompts}
+                  className="px-3 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 transition-colors"
+                >
+                  Add All Prompts
+                </button>
+              </div>
+              <div className="space-y-2">
+                {previewPrompts.map((prompt: any, index: number) => (
+                  <div key={index} className="bg-white rounded-lg p-3 border border-purple-200">
+                    <h4 className="font-medium text-purple-900 text-sm">{prompt.name}</h4>
+                    {prompt.description && (
+                      <p className="text-xs text-purple-700 mt-1">{prompt.description}</p>
+                    )}
+                    {prompt.arguments && prompt.arguments.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-xs font-medium text-gray-700 mb-1">Arguments:</p>
+                        <div className="space-y-1">
+                          {prompt.arguments.map((arg: any, argIdx: number) => (
+                            <div key={argIdx} className="text-xs text-gray-600">
+                              <span className="font-medium">{arg.name}</span>
+                              {arg.required && <span className="text-red-600 ml-1">*</span>}
+                              {arg.description && <span className="text-gray-500"> - {arg.description}</span>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Resources Preview */}
+          {previewResources.length > 0 && (
+            <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-green-800">
+                  Found {previewResources.length} Resources
+                </h3>
+                <button
+                  type="button"
+                  onClick={handleAddAllResources}
+                  className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors"
+                >
+                  Add All Resources
+                </button>
+              </div>
+              <div className="space-y-2">
+                {previewResources.map((resource: any, index: number) => (
+                  <div key={index} className="bg-white rounded-lg p-3 border border-green-200">
+                    <h4 className="font-medium text-green-900 text-sm">{resource.name}</h4>
+                    <p className="text-xs text-green-700 mt-1">URI: {resource.uri}</p>
+                    {resource.description && (
+                      <p className="text-xs text-gray-600 mt-1">{resource.description}</p>
+                    )}
+                    {resource.mimeType && (
+                      <p className="text-xs text-blue-600 mt-1">Type: {resource.mimeType}</p>
+                    )}
                   </div>
                 ))}
               </div>

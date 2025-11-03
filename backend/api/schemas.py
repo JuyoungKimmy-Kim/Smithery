@@ -38,6 +38,22 @@ class MCPServerToolCreate(BaseModel):
     description: str
     parameters: List[MCPServerPropertyCreate] = []
 
+class MCPServerPromptArgumentCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    required: bool = False
+
+class MCPServerPromptCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    arguments: List[MCPServerPromptArgumentCreate] = []
+
+class MCPServerResourceCreate(BaseModel):
+    uri: str
+    name: str
+    description: Optional[str] = None
+    mime_type: Optional[str] = None
+
 class MCPServerCreate(BaseModel):
     name: str
     github_link: str
@@ -48,6 +64,8 @@ class MCPServerCreate(BaseModel):
     tags: Optional[str] = None
     config: Optional[Dict[str, Any]] = None
     tools: Optional[List[MCPServerToolCreate]] = []
+    prompts: Optional[List[MCPServerPromptCreate]] = []
+    resources: Optional[List[MCPServerResourceCreate]] = []
 
 class MCPServerUpdate(BaseModel):
     name: Optional[str] = None
@@ -58,6 +76,8 @@ class MCPServerUpdate(BaseModel):
     tags: Optional[str] = None
     config: Optional[Dict[str, Any]] = None
     tools: Optional[List[MCPServerToolCreate]] = []
+    prompts: Optional[List[MCPServerPromptCreate]] = []
+    resources: Optional[List[MCPServerResourceCreate]] = []
 
 class MCPServerToolResponse(BaseModel):
     id: int
@@ -74,7 +94,35 @@ class MCPServerPropertyResponse(BaseModel):
     description: Optional[str] = None
     type: Optional[str] = None
     required: bool = False
-    
+
+    class Config:
+        from_attributes = True
+
+class MCPServerPromptArgumentResponse(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    required: bool = False
+
+    class Config:
+        from_attributes = True
+
+class MCPServerPromptResponse(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    arguments: List[MCPServerPromptArgumentResponse] = []
+
+    class Config:
+        from_attributes = True
+
+class MCPServerResourceResponse(BaseModel):
+    id: int
+    uri: str
+    name: str
+    description: Optional[str] = None
+    mime_type: Optional[str] = None
+
     class Config:
         from_attributes = True
 
@@ -95,10 +143,12 @@ class MCPServerResponse(BaseModel):
     health_status: str = "unknown"
     last_health_check: Optional[datetime] = None
     tools: List[MCPServerToolResponse] = []
+    prompts: List[MCPServerPromptResponse] = []
+    resources: List[MCPServerResourceResponse] = []
     tags: List['TagResponse'] = []
     owner: Optional[UserResponse] = None
     favorites_count: int = 0
-    
+
     class Config:
         from_attributes = True
 
