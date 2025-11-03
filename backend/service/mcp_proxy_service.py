@@ -57,7 +57,7 @@ class MCPProxyService:
         }
 
     @staticmethod
-    async def fetch_tools(url: str, protocol: str) -> Dict[str, Any]:
+    async def fetch_tools(url: str, protocol: str, command: str = None, args: str = None, cwd: str = None, env: Dict[str, str] = None) -> Dict[str, Any]:
         """
         MCP 서버에서 tools 목록을 가져옵니다
         Inspector의 createTransport와 동일한 패턴
@@ -65,11 +65,15 @@ class MCPProxyService:
         Args:
             url: MCP 서버 URL 또는 명령어
             protocol: 프로토콜 타입 (stdio, sse, streamable-http)
+            command: stdio용 실행 명령어 (optional)
+            args: stdio용 인자 (optional)
+            cwd: stdio용 작업 디렉토리 (optional)
+            env: stdio용 환경 변수 (optional)
 
         Returns:
             Dict containing tools list and status
         """
-        logger.info(f"[MCP Proxy] Fetching tools - URL: {url}, Protocol: {protocol}")
+        logger.info(f"[MCP Proxy] Fetching tools - URL: {url}, Protocol: {protocol}, Command: {command}, Args: {args}, CWD: {cwd}, ENV: {env}")
 
         if not MCP_SDK_AVAILABLE:
             logger.error("MCP SDK is not installed")
@@ -83,7 +87,7 @@ class MCPProxyService:
 
             # Inspector의 createTransport처럼 프로토콜에 따라 분기
             if normalized_protocol == "stdio":
-                return await MCPProxyService._fetch_stdio(url)
+                return await MCPProxyService._fetch_stdio(command or url, args, cwd, env)
             elif normalized_protocol == "sse":
                 return await MCPProxyService._fetch_sse(url)
             else:
@@ -111,27 +115,51 @@ class MCPProxyService:
             return "streamable-http"
 
     @staticmethod
-    async def _fetch_stdio(command: str) -> Dict[str, Any]:
+    async def _fetch_stdio(command: str, args_str: str = None, cwd: str = None, env_vars: Dict[str, str] = None) -> Dict[str, Any]:
         """
         STDIO transport - Inspector의 StdioClientTransport와 동일
+
+        Args:
+            command: 실행할 명령어 (예: "node", "python")
+            args_str: 공백으로 구분된 인자 문자열 (예: "build/index.js --port 3000")
+            cwd: 작업 디렉토리 (선택사항)
+            env_vars: 사용자 정의 환경 변수 (선택사항)
         """
-        logger.info(f"[STDIO] Starting with command: {command}")
+        logger.info(f"[STDIO] Starting - Command: {command}, Args: {args_str}, CWD: {cwd}, ENV: {env_vars}")
 
         try:
-            parts = command.split()
-            if not parts:
+            # command가 비어있으면 에러
+            if not command or not command.strip():
                 return MCPProxyService._create_error_response("Empty command")
 
-            cmd = parts[0]
-            args = parts[1:] if len(parts) > 1 else []
+            cmd = command.strip()
 
+            # args 파싱 - Inspector처럼 공백으로 분리
+            args = []
+            if args_str and args_str.strip():
+                args = args_str.strip().split()
+
+            # 환경 변수 설정
+            # Inspector처럼 기본 환경 변수에 CWD와 사용자 정의 환경 변수 추가
+            import os
+            env = os.environ.copy()
+            if cwd and cwd.strip():
+                env['PWD'] = cwd.strip()
+                logger.info(f"[STDIO] Setting PWD environment variable to: {cwd}")
+
+            # 사용자 정의 환경 변수 추가
+            if env_vars:
+                env.update(env_vars)
+                logger.info(f"[STDIO] Adding custom environment variables: {list(env_vars.keys())}")
+
+            # StdioServerParameters 생성
             server_params = StdioServerParameters(
                 command=cmd,
                 args=args,
-                env=None
+                env=env
             )
 
-            logger.info(f"[STDIO] Command={cmd}, Args={args}")
+            logger.info(f"[STDIO] Command={cmd}, Args={args}, CWD={cwd}")
 
             # Inspector: await transport.start()
             # Python: async with stdio_client
