@@ -1298,56 +1298,6 @@ export default function EditMCPServerPage() {
             </div>
           )}
 
-          {previewTools.length > 0 && (
-            <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-green-800">
-                  {t('edit.toolsPreview', { count: String(previewTools.length) })}
-                </h3>
-                <button
-                  type="button"
-                  onClick={handleUsePreviewTools}
-                  className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors"
-                >
-                  모두 추가
-                </button>
-              </div>
-              <div className="space-y-3">
-                {previewTools.map((tool: any, index: number) => (
-                  <div key={index} className="bg-white rounded-lg p-3 border border-green-200">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-green-900 text-sm">{tool.name}</h4>
-                        <p className="text-xs text-green-700 mt-1">{tool.description || t('edit.noDescription')}</p>
-
-                        {/* Parameters 정보 표시 */}
-                        {tool.inputSchema?.properties && (
-                          <div className="mt-2">
-                            <p className="text-xs font-medium text-gray-700 mb-1">Parameters:</p>
-                            <div className="space-y-1">
-                              {Object.entries(tool.inputSchema.properties).map(([paramName, paramInfo]: [string, any]) => (
-                                <div key={paramName} className="text-xs text-gray-600 flex items-center gap-2">
-                                  <span className="font-medium">{paramName}</span>
-                                  <span className="text-blue-600">({paramInfo.type || 'any'})</span>
-                                  {tool.inputSchema?.required?.includes(paramName) && (
-                                    <span className="text-red-600 text-xs">{t('edit.required')}</span>
-                                  )}
-                                  {paramInfo.description && (
-                                    <span className="text-gray-500">- {paramInfo.description}</span>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {formData.protocol === TransportType.STDIO && (
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
               <div className="flex items-center">
