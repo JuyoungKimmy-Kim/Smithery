@@ -100,8 +100,8 @@ const roadmapDataKo: Version[] = [
   },
   {
     version: 'v1.5',
-    releaseDate: '2025년 10월 23일 (예정)',
-    status: 'in-progress',
+    releaseDate: '2025년 10월 23일',
+    status: 'released',
     description: '커뮤니티 기능 강화 및 사용자 경험 개선을 위한 업데이트입니다.',
     features: [
       {
@@ -117,12 +117,12 @@ const roadmapDataKo: Version[] = [
       {
         title: 'Ranking 시스템',
         description: '인기 MCP 서버 랭킹(좋아요 수 기준)과 기여도 높은 사용자 랭킹(등록한 서버 수 기준)을 제공합니다. 메인 페이지에서 인기 콘텐츠를 한눈에 확인할 수 있습니다.',
-        status: 'on-hold'
+        status: 'completed'
       },
       {
         title: '다국어 지원 (한국어/영어)',
         description: '한국어와 영어를 지원하여 글로벌 사용자들이 편리하게 이용할 수 있습니다. 언어는 navbar에서 쉽게 전환할 수 있습니다.',
-        status: 'in-progress'
+        status: 'on-hold'
       },
       {
         title: 'Wiki 섹션',
@@ -142,20 +142,31 @@ const roadmapDataKo: Version[] = [
   },
   {
     version: 'v1.7',
-    releaseDate: '2025년 11월 7일 (예정)',
-    status: 'planned',
-    description: 'MCP 서버 등록 시 tools 자동 수집 기능을 모든 프로토콜에 적용 가능하도록 개선하는 업데이트입니다.',
+    releaseDate: '2025년 11월 3일',
+    status: 'released',
+    description: 'MCP 서버 등록 시 tools 자동 수집 기능을 모든 프로토콜에 적용 가능하도록 개선하고, Prompt와 Resources 자동 수집 및 Health check 기능을 추가하는 업데이트입니다.',
     features: [
       {
         title: '범용 Tools 자동 수집 시스템',
         description: '현재 JSON-RPC를 이용한 tools 자동 수집이 모든 MCP 프로토콜에 적용되지 않는 문제를 해결합니다. 다양한 MCP 프로토콜과 서버 구현 방식에 맞춰 tools 정보를 자동으로 가져올 수 있도록 범용적으로 개선합니다.',
         implementation: '다양한 MCP 프로토콜 지원, 서버별 맞춤형 연결 방식 구현, 에러 처리 및 폴백 메커니즘 강화',
-        status: 'planned'
+        status: 'completed'
+      },
+      {
+        title: 'Prompt, Resources 자동 수집 기능',
+        description: 'MCP 서버 등록 시 tools와 함께 prompts와 resources 정보도 자동으로 수집하여 서버의 전체 기능을 더욱 상세하게 파악할 수 있도록 합니다.',
+        status: 'completed'
+      },
+      {
+        title: 'MCP Health check 기능',
+        description: '등록된 MCP 서버의 상태를 주기적으로 확인하고, 서버 접속 가능 여부와 응답 시간을 모니터링합니다. 서버 상세 페이지에서 실시간 상태를 확인할 수 있습니다.',
+        status: 'completed'
       }
     ],
     improvements: [
       'Tools 수집 성공률 향상',
       '지원 프로토콜 확장',
+      '서버 정보 자동 수집 범위 확대'
     ],
     bugFixes: [
       '특정 MCP 서버에서 tools 수집 실패 문제 해결',
@@ -163,8 +174,33 @@ const roadmapDataKo: Version[] = [
     ]
   },
   {
+    version: 'v1.8',
+    expectedDate: '2025년 11월 7일 (예정)',
+    status: 'in-progress',
+    description: 'mcp hub 자체를 MCP 서버로 제공하고, MCP playground를 통해 서버를 바로 테스트할 수 있는 기능을 추가하는 업데이트입니다.',
+    features: [
+      {
+        title: 'mcp hub MCP 서버',
+        description: 'mcp hub 자체를 MCP 서버로 제공하여 외부 AI 클라이언트에서 직접 MCP 서버 정보를 조회하고 검색할 수 있습니다. roocode 등에서 mcp hub의 데이터를 활용할 수 있습니다.',
+        implementation: 'MCP 서버 프로토콜 구현, 서버 검색/조회 API 제공, MCP 클라이언트 연동 가이드 제공',
+        status: 'planned'
+      },
+      {
+        title: 'MCP Playground',
+        description: 'MCP 서버 상세 페이지에서 바로 해당 MCP 서버를 테스트해볼 수 있는 playground를 제공합니다. tools 호출, prompts 테스트, resources 조회 등을 웹 인터페이스에서 직접 실행해볼 수 있습니다.',
+        implementation: '브라우저 기반 MCP 클라이언트 구현, 서버 연결 및 통신 처리, 실시간 결과 표시',
+        status: 'planned'
+      }
+    ],
+    improvements: [
+      '서버 테스트 편의성 향상',
+      'MCP 서버 직접 체험 가능',
+      '외부 AI 도구와의 연동 지원'
+    ]
+  },
+  {
     version: 'v2.0',
-    expectedDate: '2025년 11월 14일 (예정)',
+    expectedDate: '2025년 11월 21일 (예정)',
     status: 'planned',
     description: '데이터 분석 및 사용자 행동 추적 시스템을 도입하는 업데이트입니다.',
     features: [
@@ -196,7 +232,7 @@ const roadmapDataKo: Version[] = [
     version: 'v3.0',
     expectedDate: '2025년 11월 28일 (예정)',
     status: 'planned',
-    description: 'AI 기반 추천 시스템과 mcp hub 자체의 MCP 서버를 도입하는 업데이트입니다.',
+    description: 'AI 기반 추천 시스템과 MCP 서버 자동 생성 도구를 도입하는 업데이트입니다.',
     features: [
       {
         title: 'AI 서버 추천',
@@ -206,12 +242,6 @@ const roadmapDataKo: Version[] = [
       {
         title: '자동 문서 생성',
         description: 'Repository를 분석하여 기본적인 description과 Server Config 등을 자동으로 생성합니다.',
-        status: 'planned'
-      },
-      {
-        title: 'mcp hub MCP 서버',
-        description: 'mcp hub 자체를 MCP 서버로 제공하여 외부 AI 클라이언트에서 직접 MCP 서버 정보를 조회하고 검색할 수 있습니다. roocode 등에서 mcp hub의 데이터를 활용할 수 있습니다.',
-        implementation: 'MCP 서버 프로토콜 구현, 서버 검색/조회 API 제공, MCP 클라이언트 연동 가이드 제공',
         status: 'planned'
       },
       {
@@ -302,8 +332,8 @@ const roadmapDataEn: Version[] = [
   },
   {
     version: 'v1.5',
-    releaseDate: 'October 23, 2025 (Expected)',
-    status: 'in-progress',
+    releaseDate: 'October 23, 2025',
+    status: 'released',
     description: 'An update for community feature enhancement and user experience improvement.',
     features: [
       {
@@ -319,12 +349,12 @@ const roadmapDataEn: Version[] = [
       {
         title: 'Ranking System',
         description: 'Provides popular MCP server rankings (based on likes) and high-contributing user rankings (based on number of registered servers). You can check popular content at a glance on the main page.',
-        status: 'on-hold'
+        status: 'completed'
       },
       {
         title: 'Multi-language Support (Korean/English)',
         description: 'Supports Korean and English for convenient use by global users. Language can be easily switched in the navbar.',
-        status: 'in-progress'
+        status: 'on-hold'
       },
       {
         title: 'Wiki Section',
@@ -344,20 +374,31 @@ const roadmapDataEn: Version[] = [
   },
   {
     version: 'v1.7',
-    releaseDate: 'November 7, 2025 (Expected)',
-    status: 'planned',
-    description: 'An update to improve the automatic tools collection feature for all protocols when registering MCP servers.',
+    releaseDate: 'November 3, 2025',
+    status: 'released',
+    description: 'An update to improve the automatic tools collection feature for all protocols when registering MCP servers, and add automatic Prompt and Resources collection along with Health check functionality.',
     features: [
       {
         title: 'Universal Tools Automatic Collection System',
         description: 'Solves the problem that current JSON-RPC-based tools automatic collection does not apply to all MCP protocols. Universally improved to automatically fetch tools information according to various MCP protocols and server implementation methods.',
         implementation: 'Support for various MCP protocols, implementation of customized connection methods for each server, strengthened error handling and fallback mechanisms',
-        status: 'planned'
+        status: 'completed'
+      },
+      {
+        title: 'Prompt and Resources Automatic Collection Feature',
+        description: 'When registering MCP servers, automatically collects prompts and resources information along with tools, allowing for a more detailed understanding of the server\'s full capabilities.',
+        status: 'completed'
+      },
+      {
+        title: 'MCP Health Check Feature',
+        description: 'Periodically checks the status of registered MCP servers and monitors server accessibility and response time. Real-time status can be checked on the server detail page.',
+        status: 'completed'
       }
     ],
     improvements: [
       'Improved tools collection success rate',
       'Expanded supported protocols',
+      'Extended automatic server information collection scope'
     ],
     bugFixes: [
       'Fixed tools collection failure issue on specific MCP servers',
@@ -365,8 +406,33 @@ const roadmapDataEn: Version[] = [
     ]
   },
   {
+    version: 'v1.8',
+    expectedDate: 'November 7, 2025 (Expected)',
+    status: 'in-progress',
+    description: 'An update that provides MCP Hub itself as an MCP server and adds MCP playground functionality to test servers immediately.',
+    features: [
+      {
+        title: 'MCP Hub MCP Server',
+        description: 'Provides MCP Hub itself as an MCP server so external AI clients can directly query and search MCP server information. MCP Hub data can be used in roocode, etc.',
+        implementation: 'Implement MCP server protocol, provide server search/query API, provide MCP client integration guide',
+        status: 'planned'
+      },
+      {
+        title: 'MCP Playground',
+        description: 'Provides a playground on the MCP server detail page where you can immediately test the MCP server. You can directly execute tools calls, test prompts, query resources, etc. through the web interface.',
+        implementation: 'Browser-based MCP client implementation, server connection and communication handling, real-time result display',
+        status: 'planned'
+      }
+    ],
+    improvements: [
+      'Enhanced server testing convenience',
+      'Direct MCP server experience',
+      'Integration support with external AI tools'
+    ]
+  },
+  {
     version: 'v2.0',
-    expectedDate: 'November 14, 2025 (Expected)',
+    expectedDate: 'November 21, 2025 (Expected)',
     status: 'planned',
     description: 'An update introducing data analysis and user behavior tracking systems.',
     features: [
@@ -398,7 +464,7 @@ const roadmapDataEn: Version[] = [
     version: 'v3.0',
     expectedDate: 'November 28, 2025 (Expected)',
     status: 'planned',
-    description: 'An update introducing an AI-based recommendation system and MCP Hub\'s own MCP server.',
+    description: 'An update introducing an AI-based recommendation system and automatic MCP server creation tool.',
     features: [
       {
         title: 'AI Server Recommendations',
@@ -408,12 +474,6 @@ const roadmapDataEn: Version[] = [
       {
         title: 'Automatic Documentation Generation',
         description: 'Analyzes repositories to automatically generate basic descriptions and Server Config.',
-        status: 'planned'
-      },
-      {
-        title: 'MCP Hub MCP Server',
-        description: 'Provides MCP Hub itself as an MCP server so external AI clients can directly query and search MCP server information. MCP Hub data can be used in roocode, etc.',
-        implementation: 'Implement MCP server protocol, provide server search/query API, provide MCP client integration guide',
         status: 'planned'
       },
       {
@@ -458,7 +518,7 @@ function FeatureStatusIcon({ status }: { status?: 'completed' | 'in-progress' | 
 }
 
 export default function RoadmapPage() {
-  const [expandedVersion, setExpandedVersion] = useState<string | null>('v1.5');
+  const [expandedVersion, setExpandedVersion] = useState<string | null>('v1.8');
   const { language } = useLanguage();
   
   const roadmapData = language === 'en' ? roadmapDataEn : roadmapDataKo;
