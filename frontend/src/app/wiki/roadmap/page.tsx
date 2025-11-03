@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { ChevronDownIcon, ChevronUpIcon, CheckCircleIcon, ClockIcon, SparklesIcon, PauseIcon } from '@heroicons/react/24/solid';
+import { ChevronDownIcon, ChevronUpIcon, CheckCircleIcon, ClockIcon, SparklesIcon, PauseIcon, LanguageIcon } from '@heroicons/react/24/solid';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Feature {
@@ -519,7 +519,7 @@ function FeatureStatusIcon({ status }: { status?: 'completed' | 'in-progress' | 
 
 export default function RoadmapPage() {
   const [expandedVersion, setExpandedVersion] = useState<string | null>('v1.8');
-  const { language } = useLanguage();
+  const { language, setLanguage } = useLanguage();
   
   const roadmapData = language === 'en' ? roadmapDataEn : roadmapDataKo;
 
@@ -527,10 +527,24 @@ export default function RoadmapPage() {
     setExpandedVersion(expandedVersion === version ? null : version);
   };
 
+  const handleLanguageToggle = () => {
+    setLanguage(language === 'ko' ? 'en' : 'ko');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-5xl mx-auto">
+          {/* Language Toggle Button */}
+          <div className="flex justify-end mb-6">
+            <button
+              onClick={handleLanguageToggle}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            >
+              <LanguageIcon className="h-5 w-5" />
+              {language === 'ko' ? '한국어 (KO)' : 'English (EN)'}
+            </button>
+          </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Roadmap</h1>
           <p className="text-lg text-gray-600 mb-12">
             {language === 'en' 

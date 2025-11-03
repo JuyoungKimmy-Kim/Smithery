@@ -3,11 +3,16 @@
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { LanguageIcon } from '@heroicons/react/24/solid';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function HowToUsePage() {
   const [markdown, setMarkdown] = useState('');
-  const { language } = useLanguage();
+  const { language, setLanguage } = useLanguage();
+
+  const handleLanguageToggle = () => {
+    setLanguage(language === 'ko' ? 'en' : 'ko');
+  };
 
   useEffect(() => {
     const fileName = language === 'en' ? 'how-to-use.en.md' : 'how-to-use.md';
@@ -21,6 +26,16 @@ export default function HowToUsePage() {
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-12">
         <div className="bg-white rounded-lg shadow-md p-8 max-w-4xl mx-auto">
+          {/* Language Toggle Button */}
+          <div className="flex justify-end mb-6">
+            <button
+              onClick={handleLanguageToggle}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            >
+              <LanguageIcon className="h-5 w-5" />
+              {language === 'ko' ? '한국어 (KO)' : 'English (EN)'}
+            </button>
+          </div>
           <article className="prose prose-lg max-w-none">
             <ReactMarkdown 
               remarkPlugins={[remarkGfm]}
