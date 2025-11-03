@@ -39,20 +39,20 @@ class MCPProxyService:
     DEFAULT_TIMEOUT = 120
 
     @staticmethod
-    def _create_success_response(tools: List[Dict[str, Any]], message: str = "Tools fetched successfully") -> Dict[str, Any]:
-        """성공 응답 생성"""
+    def _create_success_response(data: List[Dict[str, Any]], message: str = "Success", data_key: str = "tools") -> Dict[str, Any]:
+        """성공 응답 생성 - tools, prompts, resources 모두 지원"""
         return {
             "success": True,
-            "tools": tools,
+            data_key: data,
             "message": message
         }
 
     @staticmethod
-    def _create_error_response(message: str) -> Dict[str, Any]:
-        """에러 응답 생성"""
+    def _create_error_response(message: str, data_key: str = "tools") -> Dict[str, Any]:
+        """에러 응답 생성 - tools, prompts, resources 모두 지원"""
         return {
             "success": False,
-            "tools": [],
+            data_key: [],
             "message": message
         }
 
@@ -296,3 +296,363 @@ class MCPProxyService:
                 tool_dict["inputSchema"] = tool.inputSchema
             tools.append(tool_dict)
         return tools
+
+    @staticmethod
+    def _convert_prompts(prompts_list) -> List[Dict[str, Any]]:
+        """Prompt 객체를 딕셔너리로 변환"""
+        prompts = []
+        for prompt in prompts_list:
+            prompt_dict = {
+                "name": prompt.name,
+                "description": getattr(prompt, 'description', None),
+            }
+            if hasattr(prompt, 'arguments') and prompt.arguments:
+                prompt_dict["arguments"] = prompt.arguments
+            prompts.append(prompt_dict)
+        return prompts
+
+    @staticmethod
+    def _convert_resources(resources_list) -> List[Dict[str, Any]]:
+        """Resource 객체를 딕셔너리로 변환"""
+        resources = []
+        for resource in resources_list:
+            resource_dict = {
+                "uri": resource.uri,
+                "name": resource.name,
+                "description": getattr(resource, 'description', None),
+            }
+            if hasattr(resource, 'mimeType') and resource.mimeType:
+                resource_dict["mimeType"] = resource.mimeType
+            resources.append(resource_dict)
+        return resources
+
+    @staticmethod
+    def _convert_resource_templates(templates_list) -> List[Dict[str, Any]]:
+        """Resource Template 객체를 딕셔너리로 변환"""
+        templates = []
+        for template in templates_list:
+            template_dict = {
+                "uriTemplate": template.uriTemplate,
+                "name": template.name,
+                "description": getattr(template, 'description', None),
+            }
+            if hasattr(template, 'mimeType') and template.mimeType:
+                template_dict["mimeType"] = template.mimeType
+            templates.append(template_dict)
+        return templates
+
+    # ==================== PROMPTS METHODS ====================
+
+    @staticmethod
+    async def fetch_prompts(url: str, protocol: str) -> Dict[str, Any]:
+        """
+        MCP 서버에서 prompts 목록을 가져옵니다
+        Inspector의 listPrompts()와 동일한 패턴
+
+        Args:
+            url: MCP 서버 URL 또는 명령어
+            protocol: 프로토콜 타입 (stdio, sse, streamable-http)
+
+        Returns:
+            Dict containing prompts list and status
+        """
+        logger.info(f"[MCP Proxy] Fetching prompts - URL: {url}, Protocol: {protocol}")
+
+        if not MCP_SDK_AVAILABLE:
+            logger.error("MCP SDK is not installed")
+            return MCPProxyService._create_error_response(
+                "MCP SDK is not installed. Please install with: pip install mcp[cli]",
+                data_key="prompts"
+            )
+
+        try:
+            normalized_protocol = MCPProxyService._normalize_protocol(protocol)
+
+            if normalized_protocol == "stdio":
+                return await MCPProxyService._fetch_prompts_stdio(url)
+            elif normalized_protocol == "sse":
+                return await MCPProxyService._fetch_prompts_sse(url)
+            else:
+                return await MCPProxyService._fetch_prompts_streamable_http(url)
+
+        except Exception as e:
+            logger.error(f"[MCP Proxy] Failed to fetch prompts: {str(e)}", exc_info=True)
+            return MCPProxyService._create_error_response(f"Failed to fetch prompts: {str(e)}", data_key="prompts")
+
+    @staticmethod
+    async def _fetch_prompts_stdio(command: str) -> Dict[str, Any]:
+        """STDIO를 통해 prompts 가져오기"""
+        logger.info(f"[STDIO] Fetching prompts with command: {command}")
+
+        try:
+            parts = command.split()
+            if not parts:
+                return MCPProxyService._create_error_response("Empty command", data_key="prompts")
+
+            cmd = parts[0]
+            args = parts[1:] if len(parts) > 1 else []
+
+            server_params = StdioServerParameters(command=cmd, args=args, env=None)
+
+            async with stdio_client(server_params) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await asyncio.wait_for(session.initialize(), timeout=MCPProxyService.DEFAULT_TIMEOUT)
+
+                    result = await asyncio.wait_for(
+                        session.list_prompts(),
+                        timeout=MCPProxyService.DEFAULT_TIMEOUT
+                    )
+
+                    prompts = MCPProxyService._convert_prompts(result.prompts)
+                    logger.info(f"[STDIO] Success: {len(prompts)} prompts")
+
+                    return MCPProxyService._create_success_response(
+                        prompts,
+                        f"Fetched {len(prompts)} prompts via STDIO",
+                        data_key="prompts"
+                    )
+
+        except asyncio.TimeoutError:
+            return MCPProxyService._create_error_response(
+                f"STDIO timeout after {MCPProxyService.DEFAULT_TIMEOUT}s",
+                data_key="prompts"
+            )
+        except Exception as e:
+            logger.error(f"[STDIO] Failed: {str(e)}", exc_info=True)
+            return MCPProxyService._create_error_response(f"STDIO failed: {str(e)}", data_key="prompts")
+
+    @staticmethod
+    async def _fetch_prompts_sse(url: str) -> Dict[str, Any]:
+        """SSE를 통해 prompts 가져오기"""
+        logger.info(f"[SSE] Fetching prompts from: {url}")
+
+        try:
+            if not url.startswith("http://") and not url.startswith("https://"):
+                return MCPProxyService._create_error_response(f"Invalid URL: {url}", data_key="prompts")
+
+            async with sse_client(url) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await asyncio.wait_for(session.initialize(), timeout=MCPProxyService.DEFAULT_TIMEOUT)
+
+                    result = await asyncio.wait_for(
+                        session.list_prompts(),
+                        timeout=MCPProxyService.DEFAULT_TIMEOUT
+                    )
+
+                    prompts = MCPProxyService._convert_prompts(result.prompts)
+                    logger.info(f"[SSE] Success: {len(prompts)} prompts")
+
+                    return MCPProxyService._create_success_response(
+                        prompts,
+                        f"Fetched {len(prompts)} prompts via SSE",
+                        data_key="prompts"
+                    )
+
+        except asyncio.TimeoutError:
+            return MCPProxyService._create_error_response(
+                f"SSE timeout after {MCPProxyService.DEFAULT_TIMEOUT}s",
+                data_key="prompts"
+            )
+        except Exception as e:
+            logger.error(f"[SSE] Failed: {str(e)}", exc_info=True)
+            return MCPProxyService._create_error_response(f"SSE failed: {str(e)}", data_key="prompts")
+
+    @staticmethod
+    async def _fetch_prompts_streamable_http(url: str) -> Dict[str, Any]:
+        """Streamable HTTP를 통해 prompts 가져오기"""
+        logger.info(f"[Streamable HTTP] Fetching prompts from: {url}")
+
+        try:
+            if not url.startswith("http://") and not url.startswith("https://"):
+                return MCPProxyService._create_error_response(f"Invalid URL: {url}", data_key="prompts")
+
+            if not HAS_STREAMABLE_HTTP:
+                logger.warning("[Streamable HTTP] Not available, trying SSE")
+                return await MCPProxyService._fetch_prompts_sse(url)
+
+            async with streamablehttp_client(url) as transport_tuple:
+                read, write, _ = transport_tuple
+
+                async with ClientSession(read, write) as session:
+                    await asyncio.wait_for(session.initialize(), timeout=MCPProxyService.DEFAULT_TIMEOUT)
+
+                    result = await asyncio.wait_for(
+                        session.list_prompts(),
+                        timeout=MCPProxyService.DEFAULT_TIMEOUT
+                    )
+
+                    prompts = MCPProxyService._convert_prompts(result.prompts)
+                    logger.info(f"[Streamable HTTP] Success: {len(prompts)} prompts")
+
+                    return MCPProxyService._create_success_response(
+                        prompts,
+                        f"Fetched {len(prompts)} prompts via Streamable HTTP",
+                        data_key="prompts"
+                    )
+
+        except asyncio.TimeoutError:
+            return MCPProxyService._create_error_response(
+                f"Streamable HTTP timeout after {MCPProxyService.DEFAULT_TIMEOUT}s",
+                data_key="prompts"
+            )
+        except Exception as e:
+            logger.error(f"[Streamable HTTP] Failed: {str(e)}", exc_info=True)
+            return MCPProxyService._create_error_response(f"Streamable HTTP failed: {str(e)}", data_key="prompts")
+
+    # ==================== RESOURCES METHODS ====================
+
+    @staticmethod
+    async def fetch_resources(url: str, protocol: str) -> Dict[str, Any]:
+        """
+        MCP 서버에서 resources 목록을 가져옵니다
+        Inspector의 listResources()와 동일한 패턴
+
+        Args:
+            url: MCP 서버 URL 또는 명령어
+            protocol: 프로토콜 타입 (stdio, sse, streamable-http)
+
+        Returns:
+            Dict containing resources list and status
+        """
+        logger.info(f"[MCP Proxy] Fetching resources - URL: {url}, Protocol: {protocol}")
+
+        if not MCP_SDK_AVAILABLE:
+            logger.error("MCP SDK is not installed")
+            return MCPProxyService._create_error_response(
+                "MCP SDK is not installed. Please install with: pip install mcp[cli]",
+                data_key="resources"
+            )
+
+        try:
+            normalized_protocol = MCPProxyService._normalize_protocol(protocol)
+
+            if normalized_protocol == "stdio":
+                return await MCPProxyService._fetch_resources_stdio(url)
+            elif normalized_protocol == "sse":
+                return await MCPProxyService._fetch_resources_sse(url)
+            else:
+                return await MCPProxyService._fetch_resources_streamable_http(url)
+
+        except Exception as e:
+            logger.error(f"[MCP Proxy] Failed to fetch resources: {str(e)}", exc_info=True)
+            return MCPProxyService._create_error_response(f"Failed to fetch resources: {str(e)}", data_key="resources")
+
+    @staticmethod
+    async def _fetch_resources_stdio(command: str) -> Dict[str, Any]:
+        """STDIO를 통해 resources 가져오기"""
+        logger.info(f"[STDIO] Fetching resources with command: {command}")
+
+        try:
+            parts = command.split()
+            if not parts:
+                return MCPProxyService._create_error_response("Empty command", data_key="resources")
+
+            cmd = parts[0]
+            args = parts[1:] if len(parts) > 1 else []
+
+            server_params = StdioServerParameters(command=cmd, args=args, env=None)
+
+            async with stdio_client(server_params) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await asyncio.wait_for(session.initialize(), timeout=MCPProxyService.DEFAULT_TIMEOUT)
+
+                    result = await asyncio.wait_for(
+                        session.list_resources(),
+                        timeout=MCPProxyService.DEFAULT_TIMEOUT
+                    )
+
+                    resources = MCPProxyService._convert_resources(result.resources)
+                    logger.info(f"[STDIO] Success: {len(resources)} resources")
+
+                    return MCPProxyService._create_success_response(
+                        resources,
+                        f"Fetched {len(resources)} resources via STDIO",
+                        data_key="resources"
+                    )
+
+        except asyncio.TimeoutError:
+            return MCPProxyService._create_error_response(
+                f"STDIO timeout after {MCPProxyService.DEFAULT_TIMEOUT}s",
+                data_key="resources"
+            )
+        except Exception as e:
+            logger.error(f"[STDIO] Failed: {str(e)}", exc_info=True)
+            return MCPProxyService._create_error_response(f"STDIO failed: {str(e)}", data_key="resources")
+
+    @staticmethod
+    async def _fetch_resources_sse(url: str) -> Dict[str, Any]:
+        """SSE를 통해 resources 가져오기"""
+        logger.info(f"[SSE] Fetching resources from: {url}")
+
+        try:
+            if not url.startswith("http://") and not url.startswith("https://"):
+                return MCPProxyService._create_error_response(f"Invalid URL: {url}", data_key="resources")
+
+            async with sse_client(url) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await asyncio.wait_for(session.initialize(), timeout=MCPProxyService.DEFAULT_TIMEOUT)
+
+                    result = await asyncio.wait_for(
+                        session.list_resources(),
+                        timeout=MCPProxyService.DEFAULT_TIMEOUT
+                    )
+
+                    resources = MCPProxyService._convert_resources(result.resources)
+                    logger.info(f"[SSE] Success: {len(resources)} resources")
+
+                    return MCPProxyService._create_success_response(
+                        resources,
+                        f"Fetched {len(resources)} resources via SSE",
+                        data_key="resources"
+                    )
+
+        except asyncio.TimeoutError:
+            return MCPProxyService._create_error_response(
+                f"SSE timeout after {MCPProxyService.DEFAULT_TIMEOUT}s",
+                data_key="resources"
+            )
+        except Exception as e:
+            logger.error(f"[SSE] Failed: {str(e)}", exc_info=True)
+            return MCPProxyService._create_error_response(f"SSE failed: {str(e)}", data_key="resources")
+
+    @staticmethod
+    async def _fetch_resources_streamable_http(url: str) -> Dict[str, Any]:
+        """Streamable HTTP를 통해 resources 가져오기"""
+        logger.info(f"[Streamable HTTP] Fetching resources from: {url}")
+
+        try:
+            if not url.startswith("http://") and not url.startswith("https://"):
+                return MCPProxyService._create_error_response(f"Invalid URL: {url}", data_key="resources")
+
+            if not HAS_STREAMABLE_HTTP:
+                logger.warning("[Streamable HTTP] Not available, trying SSE")
+                return await MCPProxyService._fetch_resources_sse(url)
+
+            async with streamablehttp_client(url) as transport_tuple:
+                read, write, _ = transport_tuple
+
+                async with ClientSession(read, write) as session:
+                    await asyncio.wait_for(session.initialize(), timeout=MCPProxyService.DEFAULT_TIMEOUT)
+
+                    result = await asyncio.wait_for(
+                        session.list_resources(),
+                        timeout=MCPProxyService.DEFAULT_TIMEOUT
+                    )
+
+                    resources = MCPProxyService._convert_resources(result.resources)
+                    logger.info(f"[Streamable HTTP] Success: {len(resources)} resources")
+
+                    return MCPProxyService._create_success_response(
+                        resources,
+                        f"Fetched {len(resources)} resources via Streamable HTTP",
+                        data_key="resources"
+                    )
+
+        except asyncio.TimeoutError:
+            return MCPProxyService._create_error_response(
+                f"Streamable HTTP timeout after {MCPProxyService.DEFAULT_TIMEOUT}s",
+                data_key="resources"
+            )
+        except Exception as e:
+            logger.error(f"[Streamable HTTP] Failed: {str(e)}", exc_info=True)
+            return MCPProxyService._create_error_response(f"Streamable HTTP failed: {str(e)}", data_key="resources")

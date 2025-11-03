@@ -11,13 +11,17 @@ class UserDAO:
     def __init__(self, db: Session):
         self.db = db
     
-    def create_user(self, username: str, email: str, password: str, is_admin: str = "user") -> User:
+    def create_user(self, username: str, email: str, password: str, nickname: str = None, is_admin: str = "user") -> User:
         """새 사용자를 생성합니다."""
         hashed_password = pwd_context.hash(password)
+        # nickname이 제공되지 않으면 username을 사용
+        if nickname is None:
+            nickname = username
         user = User(
             username=username,
             email=email,
             password_hash=hashed_password,
+            nickname=nickname,
             is_admin=is_admin
         )
         self.db.add(user)

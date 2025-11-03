@@ -145,9 +145,40 @@ class PreviewToolsResponse(BaseModel):
 
 class AnnouncementRequest(BaseModel):
     announcement: Optional[str] = None
-    
+
     @validator('announcement')
     def validate_announcement_length(cls, v):
         if v is not None and len(v) > 1000:
             raise ValueError('Announcement must be 1000 characters or less')
         return v
+
+# ==================== PROMPTS & RESOURCES SCHEMAS ====================
+
+class PreviewPromptsRequest(BaseModel):
+    url: str
+    protocol: str
+
+class PreviewPromptResponse(BaseModel):
+    name: str
+    description: Optional[str] = None
+    arguments: Optional[List[Dict[str, Any]]] = None
+
+class PreviewPromptsResponse(BaseModel):
+    prompts: List[PreviewPromptResponse]
+    success: bool
+    message: Optional[str] = None
+
+class PreviewResourcesRequest(BaseModel):
+    url: str
+    protocol: str
+
+class PreviewResourceResponse(BaseModel):
+    uri: str
+    name: str
+    description: Optional[str] = None
+    mimeType: Optional[str] = None
+
+class PreviewResourcesResponse(BaseModel):
+    resources: List[PreviewResourceResponse]
+    success: bool
+    message: Optional[str] = None

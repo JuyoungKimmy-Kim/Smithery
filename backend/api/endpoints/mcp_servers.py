@@ -13,7 +13,8 @@ from backend.api.schemas import (
     MCPServerCreate, MCPServerResponse, MCPServerUpdate,
     SearchRequest, SearchResponse, FavoriteRequest, FavoriteResponse,
     AdminApprovalRequest, TagResponse, PreviewToolsRequest, PreviewToolsResponse,
-    AnnouncementRequest
+    AnnouncementRequest, PreviewPromptsRequest, PreviewPromptsResponse,
+    PreviewResourcesRequest, PreviewResourcesResponse
 )
 from backend.api.auth import get_current_user, get_current_admin_user
 
@@ -84,6 +85,46 @@ async def preview_mcp_tools(request: PreviewToolsRequest):
             tools=[],
             success=False,
             message=f"Failed to preview tools: {str(e)}"
+        )
+
+@router.post("/preview-prompts", response_model=PreviewPromptsResponse)
+async def preview_mcp_prompts(request: PreviewPromptsRequest):
+    """
+    MCP 서버에서 prompts를 미리보기합니다.
+    HTTPS -> HTTP Mixed Content 문제와 CORS 문제를 해결하기 위한 프록시 엔드포인트
+    """
+    try:
+        result = await MCPProxyService.fetch_prompts(request.url, request.protocol)
+        return PreviewPromptsResponse(
+            prompts=result.get("prompts", []),
+            success=result.get("success", False),
+            message=result.get("message")
+        )
+    except Exception as e:
+        return PreviewPromptsResponse(
+            prompts=[],
+            success=False,
+            message=f"Failed to preview prompts: {str(e)}"
+        )
+
+@router.post("/preview-resources", response_model=PreviewResourcesResponse)
+async def preview_mcp_resources(request: PreviewResourcesRequest):
+    """
+    MCP 서버에서 resources를 미리보기합니다.
+    HTTPS -> HTTP Mixed Content 문제와 CORS 문제를 해결하기 위한 프록시 엔드포인트
+    """
+    try:
+        result = await MCPProxyService.fetch_resources(request.url, request.protocol)
+        return PreviewResourcesResponse(
+            resources=result.get("resources", []),
+            success=result.get("success", False),
+            message=result.get("message")
+        )
+    except Exception as e:
+        return PreviewResourcesResponse(
+            resources=[],
+            success=False,
+            message=f"Failed to preview resources: {str(e)}"
         )
 
 @router.get("/", response_model=List[MCPServerResponse])
