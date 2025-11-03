@@ -81,6 +81,10 @@ export default function EditMCPServerPage() {
     description: "",
     arguments: [] as MCPServerProperty[]
   });
+  const [showDuplicatePromptsModal, setShowDuplicatePromptsModal] = useState(false);
+  const [duplicatePrompts, setDuplicatePrompts] = useState<{existing: MCPServerPrompt[], new: MCPServerPrompt[]}>({existing: [], new: []});
+  const [pendingNewPrompts, setPendingNewPrompts] = useState<MCPServerPrompt[]>([]);
+  const [selectedPromptChoices, setSelectedPromptChoices] = useState<('existing' | 'new')[]>([]);
 
   // Resources 관련 상태
   const [resources, setResources] = useState<MCPServerResource[]>([]);
@@ -95,6 +99,10 @@ export default function EditMCPServerPage() {
     description: "",
     mimeType: ""
   });
+  const [showDuplicateResourcesModal, setShowDuplicateResourcesModal] = useState(false);
+  const [duplicateResources, setDuplicateResources] = useState<{existing: MCPServerResource[], new: MCPServerResource[]}>({existing: [], new: []});
+  const [pendingNewResources, setPendingNewResources] = useState<MCPServerResource[]>([]);
+  const [selectedResourceChoices, setSelectedResourceChoices] = useState<('existing' | 'new')[]>([]);
 
   // 폼에 내용이 있는지 확인하는 함수
   const hasFormContent = (): boolean => {
@@ -589,24 +597,78 @@ export default function EditMCPServerPage() {
   };
 
   const handleAddAllPrompts = () => {
-    const promptsToAdd = previewPrompts.map(p => ({
-      name: p.name,
-      description: p.description || '',
-      arguments: p.arguments || []
-    }));
-    setPrompts([...prompts, ...promptsToAdd]);
-    setPreviewPrompts([]);
+    if (previewPrompts.length > 0) {
+      const convertedPrompts = previewPrompts.map(p => ({
+        name: p.name,
+        description: p.description || '',
+        arguments: p.arguments || []
+      }));
+
+      // 중복된 prompt 찾기
+      const duplicates: {existing: MCPServerPrompt[], new: MCPServerPrompt[]} = {existing: [], new: []};
+      const newPromptsOnly: MCPServerPrompt[] = [];
+
+      convertedPrompts.forEach(newPrompt => {
+        const existingPrompt = prompts.find(p => p.name === newPrompt.name);
+        if (existingPrompt) {
+          duplicates.existing.push(existingPrompt);
+          duplicates.new.push(newPrompt);
+        } else {
+          newPromptsOnly.push(newPrompt);
+        }
+      });
+
+      // 중복이 있으면 모달 표시
+      if (duplicates.existing.length > 0) {
+        setDuplicatePrompts(duplicates);
+        setPendingNewPrompts(newPromptsOnly);
+        setSelectedPromptChoices(new Array(duplicates.existing.length).fill('existing'));
+        setShowDuplicatePromptsModal(true);
+      } else {
+        // 중복 없으면 바로 추가
+        setPrompts([...prompts, ...newPromptsOnly]);
+        setPreviewPrompts([]);
+        alert(`${newPromptsOnly.length}개의 Prompt가 추가되었습니다.`);
+      }
+    }
   };
 
   const handleAddAllResources = () => {
-    const resourcesToAdd = previewResources.map(r => ({
-      uri: r.uri,
-      name: r.name,
-      description: r.description || '',
-      mimeType: r.mimeType || r.mime_type || ''
-    }));
-    setResources([...resources, ...resourcesToAdd]);
-    setPreviewResources([]);
+    if (previewResources.length > 0) {
+      const convertedResources = previewResources.map(r => ({
+        uri: r.uri,
+        name: r.name,
+        description: r.description || '',
+        mimeType: r.mimeType || r.mime_type || ''
+      }));
+
+      // 중복된 resource 찾기 (uri 기준)
+      const duplicates: {existing: MCPServerResource[], new: MCPServerResource[]} = {existing: [], new: []};
+      const newResourcesOnly: MCPServerResource[] = [];
+
+      convertedResources.forEach(newResource => {
+        const existingResource = resources.find(r => r.uri === newResource.uri);
+        if (existingResource) {
+          duplicates.existing.push(existingResource);
+          duplicates.new.push(newResource);
+        } else {
+          newResourcesOnly.push(newResource);
+        }
+      });
+
+      // 중복이 있으면 모달 표시
+      if (duplicates.existing.length > 0) {
+        setDuplicateResources(duplicates);
+        setPendingNewResources(newResourcesOnly);
+        setSelectedResourceChoices(new Array(duplicates.existing.length).fill('existing'));
+        setShowDuplicateResourcesModal(true);
+      } else {
+        // 중복 없으면 바로 추가
+        setResources([...resources, ...newResourcesOnly]);
+        setPreviewResources([]);
+        alert(`${newResourcesOnly.length}개의 Resource가 추가되었습니다.`);
+      }
+    }
   };
 
   const convertMCPToolsToMCPServerTools = (mcpTools: any[]): MCPServerTool[] => {
@@ -660,6 +722,7 @@ export default function EditMCPServerPage() {
       } else {
         // 중복 없으면 바로 추가
         setTools([...tools, ...newToolsOnly]);
+        setPreviewTools([]);
         alert(t('edit.toolsAdded', { count: String(newToolsOnly.length) }));
       }
     }
@@ -688,6 +751,7 @@ export default function EditMCPServerPage() {
     // 교체할 tool 제거 후 새로운 것 추가
     const filteredTools = tools.filter(t => !duplicateNamesToReplace.has(t.name));
     setTools([...filteredTools, ...toolsToAdd, ...pendingNewTools]);
+    setPreviewTools([]);
 
     setShowDuplicateModal(false);
     const totalAdded = toolsToAdd.length + pendingNewTools.length;
@@ -696,6 +760,72 @@ export default function EditMCPServerPage() {
 
   const handleCancelDuplicate = () => {
     setShowDuplicateModal(false);
+  };
+
+  // Prompts 중복 처리 핸들러
+  const handleTogglePromptChoice = (index: number) => {
+    setSelectedPromptChoices(prev => {
+      const newChoices = [...prev];
+      newChoices[index] = newChoices[index] === 'existing' ? 'new' : 'existing';
+      return newChoices;
+    });
+  };
+
+  const handleApplyPromptChoices = () => {
+    const duplicateNamesToReplace = new Set<string>();
+    const promptsToAdd: MCPServerPrompt[] = [];
+
+    selectedPromptChoices.forEach((choice, index) => {
+      if (choice === 'new') {
+        duplicateNamesToReplace.add(duplicatePrompts.existing[index].name);
+        promptsToAdd.push(duplicatePrompts.new[index]);
+      }
+    });
+
+    const filteredPrompts = prompts.filter(p => !duplicateNamesToReplace.has(p.name));
+    setPrompts([...filteredPrompts, ...promptsToAdd, ...pendingNewPrompts]);
+    setPreviewPrompts([]);
+
+    setShowDuplicatePromptsModal(false);
+    const totalAdded = promptsToAdd.length + pendingNewPrompts.length;
+    alert(`${totalAdded}개의 Prompt가 추가되었습니다.`);
+  };
+
+  const handleCancelDuplicatePrompts = () => {
+    setShowDuplicatePromptsModal(false);
+  };
+
+  // Resources 중복 처리 핸들러
+  const handleToggleResourceChoice = (index: number) => {
+    setSelectedResourceChoices(prev => {
+      const newChoices = [...prev];
+      newChoices[index] = newChoices[index] === 'existing' ? 'new' : 'existing';
+      return newChoices;
+    });
+  };
+
+  const handleApplyResourceChoices = () => {
+    const duplicateUrisToReplace = new Set<string>();
+    const resourcesToAdd: MCPServerResource[] = [];
+
+    selectedResourceChoices.forEach((choice, index) => {
+      if (choice === 'new') {
+        duplicateUrisToReplace.add(duplicateResources.existing[index].uri);
+        resourcesToAdd.push(duplicateResources.new[index]);
+      }
+    });
+
+    const filteredResources = resources.filter(r => !duplicateUrisToReplace.has(r.uri));
+    setResources([...filteredResources, ...resourcesToAdd, ...pendingNewResources]);
+    setPreviewResources([]);
+
+    setShowDuplicateResourcesModal(false);
+    const totalAdded = resourcesToAdd.length + pendingNewResources.length;
+    alert(`${totalAdded}개의 Resource가 추가되었습니다.`);
+  };
+
+  const handleCancelDuplicateResources = () => {
+    setShowDuplicateResourcesModal(false);
   };
 
   const handleAddTool = () => {
@@ -1117,6 +1247,244 @@ export default function EditMCPServerPage() {
         </div>
       )}
 
+      {/* Duplicate Prompts Modal */}
+      {showDuplicatePromptsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 transform transition-all max-h-[85vh] overflow-y-auto">
+            <div className="p-8">
+              <div className="flex items-center mb-6">
+                <div className="flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 mr-4">
+                  <svg className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">
+                    중복된 Prompts가 발견되었습니다
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    각 Prompt에 대해 기존 것을 유지할지, 새로운 것으로 교체할지 선택해주세요.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                {duplicatePrompts.existing.map((existingPrompt, index) => {
+                  const isExistingSelected = selectedPromptChoices[index] === 'existing';
+                  const isNewSelected = selectedPromptChoices[index] === 'new';
+
+                  return (
+                    <div key={index} className="border-2 border-gray-300 rounded-lg p-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* 기존 Prompt */}
+                        <div
+                          className={`border-r pr-4 cursor-pointer transition-all ${
+                            isExistingSelected ? 'opacity-100' : 'opacity-50'
+                          }`}
+                          onClick={() => handleTogglePromptChoice(index)}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-semibold text-blue-700">기존 Prompt</h4>
+                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                              isExistingSelected
+                                ? 'border-blue-600 bg-blue-600'
+                                : 'border-gray-300 bg-white'
+                            }`}>
+                              {isExistingSelected && (
+                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                          <div className={`p-3 rounded ${
+                            isExistingSelected ? 'bg-blue-100 border-2 border-blue-500' : 'bg-blue-50'
+                          }`}>
+                            <p className="font-medium text-gray-900">{existingPrompt.name}</p>
+                            <p className="text-sm text-gray-600 mt-1">{existingPrompt.description}</p>
+                            {existingPrompt.arguments && existingPrompt.arguments.length > 0 && (
+                              <div className="mt-2">
+                                <p className="text-xs font-medium text-gray-700">Arguments: {existingPrompt.arguments.length}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 새로운 Prompt */}
+                        <div
+                          className={`pl-4 cursor-pointer transition-all ${
+                            isNewSelected ? 'opacity-100' : 'opacity-50'
+                          }`}
+                          onClick={() => handleTogglePromptChoice(index)}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-semibold text-green-700">새로운 Prompt</h4>
+                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                              isNewSelected
+                                ? 'border-green-600 bg-green-600'
+                                : 'border-gray-300 bg-white'
+                            }`}>
+                              {isNewSelected && (
+                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                          <div className={`p-3 rounded ${
+                            isNewSelected ? 'bg-green-100 border-2 border-green-500' : 'bg-green-50'
+                          }`}>
+                            <p className="font-medium text-gray-900">{duplicatePrompts.new[index].name}</p>
+                            <p className="text-sm text-gray-600 mt-1">{duplicatePrompts.new[index].description}</p>
+                            {duplicatePrompts.new[index].arguments && duplicatePrompts.new[index].arguments.length > 0 && (
+                              <div className="mt-2">
+                                <p className="text-xs font-medium text-gray-700">Arguments: {duplicatePrompts.new[index].arguments.length}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleApplyPromptChoices}
+                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  선택 적용
+                </button>
+                <button
+                  onClick={handleCancelDuplicatePrompts}
+                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Duplicate Resources Modal */}
+      {showDuplicateResourcesModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 transform transition-all max-h-[85vh] overflow-y-auto">
+            <div className="p-8">
+              <div className="flex items-center mb-6">
+                <div className="flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 mr-4">
+                  <svg className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">
+                    중복된 Resources가 발견되었습니다
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    각 Resource에 대해 기존 것을 유지할지, 새로운 것으로 교체할지 선택해주세요.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                {duplicateResources.existing.map((existingResource, index) => {
+                  const isExistingSelected = selectedResourceChoices[index] === 'existing';
+                  const isNewSelected = selectedResourceChoices[index] === 'new';
+
+                  return (
+                    <div key={index} className="border-2 border-gray-300 rounded-lg p-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* 기존 Resource */}
+                        <div
+                          className={`border-r pr-4 cursor-pointer transition-all ${
+                            isExistingSelected ? 'opacity-100' : 'opacity-50'
+                          }`}
+                          onClick={() => handleToggleResourceChoice(index)}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-semibold text-blue-700">기존 Resource</h4>
+                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                              isExistingSelected
+                                ? 'border-blue-600 bg-blue-600'
+                                : 'border-gray-300 bg-white'
+                            }`}>
+                              {isExistingSelected && (
+                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                          <div className={`p-3 rounded ${
+                            isExistingSelected ? 'bg-blue-100 border-2 border-blue-500' : 'bg-blue-50'
+                          }`}>
+                            <p className="font-medium text-gray-900">{existingResource.name}</p>
+                            <p className="text-xs text-gray-600 mt-1">URI: {existingResource.uri}</p>
+                            {existingResource.description && (
+                              <p className="text-sm text-gray-600 mt-1">{existingResource.description}</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 새로운 Resource */}
+                        <div
+                          className={`pl-4 cursor-pointer transition-all ${
+                            isNewSelected ? 'opacity-100' : 'opacity-50'
+                          }`}
+                          onClick={() => handleToggleResourceChoice(index)}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-semibold text-green-700">새로운 Resource</h4>
+                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                              isNewSelected
+                                ? 'border-green-600 bg-green-600'
+                                : 'border-gray-300 bg-white'
+                            }`}>
+                              {isNewSelected && (
+                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                          <div className={`p-3 rounded ${
+                            isNewSelected ? 'bg-green-100 border-2 border-green-500' : 'bg-green-50'
+                          }`}>
+                            <p className="font-medium text-gray-900">{duplicateResources.new[index].name}</p>
+                            <p className="text-xs text-gray-600 mt-1">URI: {duplicateResources.new[index].uri}</p>
+                            {duplicateResources.new[index].description && (
+                              <p className="text-sm text-gray-600 mt-1">{duplicateResources.new[index].description}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleApplyResourceChoices}
+                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  선택 적용
+                </button>
+                <button
+                  onClick={handleCancelDuplicateResources}
+                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Success Modal */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -1288,15 +1656,6 @@ export default function EditMCPServerPage() {
               }
             </p>
           </div>
-
-          {isLoadingPreview && (
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
-              <div className="flex items-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                <span className="text-blue-700">{t('edit.loadingTools')}</span>
-              </div>
-            </div>
-          )}
 
           {formData.protocol === TransportType.STDIO && (
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
