@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { MCPServer, TransportType, MCPServerTool, MCPServerProperty } from "../../../../types/mcp";
+import { MCPServer, TransportType, MCPServerTool, MCPServerProperty, MCPServerPrompt, MCPServerResource } from "../../../../types/mcp";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { PlusIcon, TrashIcon, PencilIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
@@ -57,13 +57,52 @@ export default function EditMCPServerPage() {
   });
   const [editingParameterIndex, setEditingParameterIndex] = useState<number | null>(null);
 
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'tools' | 'prompts' | 'resources'>('tools');
+
   // Tool 미리보기 관련 상태
   const [previewTools, setPreviewTools] = useState<any[]>([]);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [toolsSearchAttempted, setToolsSearchAttempted] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [duplicateTools, setDuplicateTools] = useState<{existing: MCPServerTool[], new: MCPServerTool[]}>({existing: [], new: []});
   const [pendingNewTools, setPendingNewTools] = useState<MCPServerTool[]>([]);
   const [selectedChoices, setSelectedChoices] = useState<('existing' | 'new')[]>([]);
+
+  // Prompts 관련 상태
+  const [prompts, setPrompts] = useState<MCPServerPrompt[]>([]);
+  const [previewPrompts, setPreviewPrompts] = useState<any[]>([]);
+  const [isLoadingPrompts, setIsLoadingPrompts] = useState(false);
+  const [promptsSearchAttempted, setPromptsSearchAttempted] = useState(false);
+  const [showAddPrompt, setShowAddPrompt] = useState(false);
+  const [editingPromptIndex, setEditingPromptIndex] = useState<number | null>(null);
+  const [promptForm, setPromptForm] = useState({
+    name: "",
+    description: "",
+    arguments: [] as MCPServerProperty[]
+  });
+  const [showDuplicatePromptsModal, setShowDuplicatePromptsModal] = useState(false);
+  const [duplicatePrompts, setDuplicatePrompts] = useState<{existing: MCPServerPrompt[], new: MCPServerPrompt[]}>({existing: [], new: []});
+  const [pendingNewPrompts, setPendingNewPrompts] = useState<MCPServerPrompt[]>([]);
+  const [selectedPromptChoices, setSelectedPromptChoices] = useState<('existing' | 'new')[]>([]);
+
+  // Resources 관련 상태
+  const [resources, setResources] = useState<MCPServerResource[]>([]);
+  const [previewResources, setPreviewResources] = useState<any[]>([]);
+  const [isLoadingResources, setIsLoadingResources] = useState(false);
+  const [resourcesSearchAttempted, setResourcesSearchAttempted] = useState(false);
+  const [showAddResource, setShowAddResource] = useState(false);
+  const [editingResourceIndex, setEditingResourceIndex] = useState<number | null>(null);
+  const [resourceForm, setResourceForm] = useState({
+    uri: "",
+    name: "",
+    description: "",
+    mimeType: ""
+  });
+  const [showDuplicateResourcesModal, setShowDuplicateResourcesModal] = useState(false);
+  const [duplicateResources, setDuplicateResources] = useState<{existing: MCPServerResource[], new: MCPServerResource[]}>({existing: [], new: []});
+  const [pendingNewResources, setPendingNewResources] = useState<MCPServerResource[]>([]);
+  const [selectedResourceChoices, setSelectedResourceChoices] = useState<('existing' | 'new')[]>([]);
 
   // 폼에 내용이 있는지 확인하는 함수
   const hasFormContent = (): boolean => {
@@ -360,6 +399,8 @@ export default function EditMCPServerPage() {
           }
           
           setTools(data.tools || []);
+          setPrompts(data.prompts || []);
+          setResources(data.resources || []);
         } else {
           setError("MCP server not found");
         }
@@ -442,6 +483,7 @@ export default function EditMCPServerPage() {
 
   const detectAndPreviewTools = async (config: any) => {
     setIsLoadingPreview(true);
+    setToolsSearchAttempted(true);
 
     try {
       console.log('Fetching tools from MCP Server:', config.url, 'Transport Type:', config.protocol);
@@ -451,6 +493,183 @@ export default function EditMCPServerPage() {
       setPreviewTools([]);
     } finally {
       setIsLoadingPreview(false);
+    }
+  };
+
+  const requestPromptsList = async (config: any) => {
+    try {
+      console.log('Requesting prompts via backend proxy:', config);
+
+      const response = await fetch('/api/mcp-servers/preview-prompts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          url: config.url,
+          protocol: config.protocol
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Prompts response:', data);
+
+        if (data.success && data.prompts && data.prompts.length > 0) {
+          setPreviewPrompts(data.prompts);
+        } else {
+          console.log('No prompts found:', data.message);
+          setPreviewPrompts([]);
+        }
+      } else {
+        console.error('Prompts request failed:', response.status);
+        setPreviewPrompts([]);
+      }
+    } catch (error) {
+      console.error('Prompts request failed:', error);
+      setPreviewPrompts([]);
+    }
+  };
+
+  const detectAndPreviewPrompts = async (config: any) => {
+    setIsLoadingPrompts(true);
+    setPromptsSearchAttempted(true);
+
+    try {
+      console.log('Fetching prompts from MCP Server:', config.url, 'Transport Type:', config.protocol);
+      await requestPromptsList(config);
+    } catch (error) {
+      console.error('MCP Server prompts 가져오기 실패:', error);
+      setPreviewPrompts([]);
+    } finally {
+      setIsLoadingPrompts(false);
+    }
+  };
+
+  const requestResourcesList = async (config: any) => {
+    try {
+      console.log('Requesting resources via backend proxy:', config);
+
+      const response = await fetch('/api/mcp-servers/preview-resources', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          url: config.url,
+          protocol: config.protocol
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Resources response:', data);
+
+        if (data.success && data.resources && data.resources.length > 0) {
+          setPreviewResources(data.resources);
+        } else {
+          console.log('No resources found:', data.message);
+          setPreviewResources([]);
+        }
+      } else {
+        console.error('Resources request failed:', response.status);
+        setPreviewResources([]);
+      }
+    } catch (error) {
+      console.error('Resources request failed:', error);
+      setPreviewResources([]);
+    }
+  };
+
+  const detectAndPreviewResources = async (config: any) => {
+    setIsLoadingResources(true);
+    setResourcesSearchAttempted(true);
+
+    try {
+      console.log('Fetching resources from MCP Server:', config.url, 'Transport Type:', config.protocol);
+      await requestResourcesList(config);
+    } catch (error) {
+      console.error('MCP Server resources 가져오기 실패:', error);
+      setPreviewResources([]);
+    } finally {
+      setIsLoadingResources(false);
+    }
+  };
+
+  const handleAddAllPrompts = () => {
+    if (previewPrompts.length > 0) {
+      const convertedPrompts = previewPrompts.map(p => ({
+        name: p.name,
+        description: p.description || '',
+        arguments: p.arguments || []
+      }));
+
+      // 중복된 prompt 찾기
+      const duplicates: {existing: MCPServerPrompt[], new: MCPServerPrompt[]} = {existing: [], new: []};
+      const newPromptsOnly: MCPServerPrompt[] = [];
+
+      convertedPrompts.forEach(newPrompt => {
+        const existingPrompt = prompts.find(p => p.name === newPrompt.name);
+        if (existingPrompt) {
+          duplicates.existing.push(existingPrompt);
+          duplicates.new.push(newPrompt);
+        } else {
+          newPromptsOnly.push(newPrompt);
+        }
+      });
+
+      // 중복이 있으면 모달 표시
+      if (duplicates.existing.length > 0) {
+        setDuplicatePrompts(duplicates);
+        setPendingNewPrompts(newPromptsOnly);
+        setSelectedPromptChoices(new Array(duplicates.existing.length).fill('existing'));
+        setShowDuplicatePromptsModal(true);
+      } else {
+        // 중복 없으면 바로 추가
+        setPrompts([...prompts, ...newPromptsOnly]);
+        setPreviewPrompts([]);
+        setPromptsSearchAttempted(false);
+        alert(`${newPromptsOnly.length}개의 Prompt가 추가되었습니다.`);
+      }
+    }
+  };
+
+  const handleAddAllResources = () => {
+    if (previewResources.length > 0) {
+      const convertedResources = previewResources.map(r => ({
+        uri: r.uri,
+        name: r.name,
+        description: r.description || '',
+        mimeType: r.mimeType || r.mime_type || ''
+      }));
+
+      // 중복된 resource 찾기 (uri 기준)
+      const duplicates: {existing: MCPServerResource[], new: MCPServerResource[]} = {existing: [], new: []};
+      const newResourcesOnly: MCPServerResource[] = [];
+
+      convertedResources.forEach(newResource => {
+        const existingResource = resources.find(r => r.uri === newResource.uri);
+        if (existingResource) {
+          duplicates.existing.push(existingResource);
+          duplicates.new.push(newResource);
+        } else {
+          newResourcesOnly.push(newResource);
+        }
+      });
+
+      // 중복이 있으면 모달 표시
+      if (duplicates.existing.length > 0) {
+        setDuplicateResources(duplicates);
+        setPendingNewResources(newResourcesOnly);
+        setSelectedResourceChoices(new Array(duplicates.existing.length).fill('existing'));
+        setShowDuplicateResourcesModal(true);
+      } else {
+        // 중복 없으면 바로 추가
+        setResources([...resources, ...newResourcesOnly]);
+        setPreviewResources([]);
+        setResourcesSearchAttempted(false);
+        alert(`${newResourcesOnly.length}개의 Resource가 추가되었습니다.`);
+      }
     }
   };
 
@@ -505,6 +724,8 @@ export default function EditMCPServerPage() {
       } else {
         // 중복 없으면 바로 추가
         setTools([...tools, ...newToolsOnly]);
+        setPreviewTools([]);
+        setToolsSearchAttempted(false);
         alert(t('edit.toolsAdded', { count: String(newToolsOnly.length) }));
       }
     }
@@ -533,6 +754,8 @@ export default function EditMCPServerPage() {
     // 교체할 tool 제거 후 새로운 것 추가
     const filteredTools = tools.filter(t => !duplicateNamesToReplace.has(t.name));
     setTools([...filteredTools, ...toolsToAdd, ...pendingNewTools]);
+    setPreviewTools([]);
+    setToolsSearchAttempted(false);
 
     setShowDuplicateModal(false);
     const totalAdded = toolsToAdd.length + pendingNewTools.length;
@@ -541,6 +764,74 @@ export default function EditMCPServerPage() {
 
   const handleCancelDuplicate = () => {
     setShowDuplicateModal(false);
+  };
+
+  // Prompts 중복 처리 핸들러
+  const handleTogglePromptChoice = (index: number) => {
+    setSelectedPromptChoices(prev => {
+      const newChoices = [...prev];
+      newChoices[index] = newChoices[index] === 'existing' ? 'new' : 'existing';
+      return newChoices;
+    });
+  };
+
+  const handleApplyPromptChoices = () => {
+    const duplicateNamesToReplace = new Set<string>();
+    const promptsToAdd: MCPServerPrompt[] = [];
+
+    selectedPromptChoices.forEach((choice, index) => {
+      if (choice === 'new') {
+        duplicateNamesToReplace.add(duplicatePrompts.existing[index].name);
+        promptsToAdd.push(duplicatePrompts.new[index]);
+      }
+    });
+
+    const filteredPrompts = prompts.filter(p => !duplicateNamesToReplace.has(p.name));
+    setPrompts([...filteredPrompts, ...promptsToAdd, ...pendingNewPrompts]);
+    setPreviewPrompts([]);
+    setPromptsSearchAttempted(false);
+
+    setShowDuplicatePromptsModal(false);
+    const totalAdded = promptsToAdd.length + pendingNewPrompts.length;
+    alert(`${totalAdded}개의 Prompt가 추가되었습니다.`);
+  };
+
+  const handleCancelDuplicatePrompts = () => {
+    setShowDuplicatePromptsModal(false);
+  };
+
+  // Resources 중복 처리 핸들러
+  const handleToggleResourceChoice = (index: number) => {
+    setSelectedResourceChoices(prev => {
+      const newChoices = [...prev];
+      newChoices[index] = newChoices[index] === 'existing' ? 'new' : 'existing';
+      return newChoices;
+    });
+  };
+
+  const handleApplyResourceChoices = () => {
+    const duplicateUrisToReplace = new Set<string>();
+    const resourcesToAdd: MCPServerResource[] = [];
+
+    selectedResourceChoices.forEach((choice, index) => {
+      if (choice === 'new') {
+        duplicateUrisToReplace.add(duplicateResources.existing[index].uri);
+        resourcesToAdd.push(duplicateResources.new[index]);
+      }
+    });
+
+    const filteredResources = resources.filter(r => !duplicateUrisToReplace.has(r.uri));
+    setResources([...filteredResources, ...resourcesToAdd, ...pendingNewResources]);
+    setPreviewResources([]);
+    setResourcesSearchAttempted(false);
+
+    setShowDuplicateResourcesModal(false);
+    const totalAdded = resourcesToAdd.length + pendingNewResources.length;
+    alert(`${totalAdded}개의 Resource가 추가되었습니다.`);
+  };
+
+  const handleCancelDuplicateResources = () => {
+    setShowDuplicateResourcesModal(false);
   };
 
   const handleAddTool = () => {
@@ -727,7 +1018,9 @@ export default function EditMCPServerPage() {
         server_url: formData.url.trim() || null,
         tags: selectedTags.join(', '),
         config: config,
-        tools: tools
+        tools: tools,
+        prompts: prompts,
+        resources: resources
       };
 
       const response = await apiFetch(`/api/mcps/${params.id}`, {
@@ -960,6 +1253,244 @@ export default function EditMCPServerPage() {
         </div>
       )}
 
+      {/* Duplicate Prompts Modal */}
+      {showDuplicatePromptsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 transform transition-all max-h-[85vh] overflow-y-auto">
+            <div className="p-8">
+              <div className="flex items-center mb-6">
+                <div className="flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 mr-4">
+                  <svg className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">
+                    중복된 Prompts가 발견되었습니다
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    각 Prompt에 대해 기존 것을 유지할지, 새로운 것으로 교체할지 선택해주세요.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                {duplicatePrompts.existing.map((existingPrompt, index) => {
+                  const isExistingSelected = selectedPromptChoices[index] === 'existing';
+                  const isNewSelected = selectedPromptChoices[index] === 'new';
+
+                  return (
+                    <div key={index} className="border-2 border-gray-300 rounded-lg p-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* 기존 Prompt */}
+                        <div
+                          className={`border-r pr-4 cursor-pointer transition-all ${
+                            isExistingSelected ? 'opacity-100' : 'opacity-50'
+                          }`}
+                          onClick={() => handleTogglePromptChoice(index)}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-semibold text-blue-700">기존 Prompt</h4>
+                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                              isExistingSelected
+                                ? 'border-blue-600 bg-blue-600'
+                                : 'border-gray-300 bg-white'
+                            }`}>
+                              {isExistingSelected && (
+                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                          <div className={`p-3 rounded ${
+                            isExistingSelected ? 'bg-blue-100 border-2 border-blue-500' : 'bg-blue-50'
+                          }`}>
+                            <p className="font-medium text-gray-900">{existingPrompt.name}</p>
+                            <p className="text-sm text-gray-600 mt-1">{existingPrompt.description}</p>
+                            {existingPrompt.arguments && existingPrompt.arguments.length > 0 && (
+                              <div className="mt-2">
+                                <p className="text-xs font-medium text-gray-700">Arguments: {existingPrompt.arguments.length}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 새로운 Prompt */}
+                        <div
+                          className={`pl-4 cursor-pointer transition-all ${
+                            isNewSelected ? 'opacity-100' : 'opacity-50'
+                          }`}
+                          onClick={() => handleTogglePromptChoice(index)}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-semibold text-green-700">새로운 Prompt</h4>
+                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                              isNewSelected
+                                ? 'border-green-600 bg-green-600'
+                                : 'border-gray-300 bg-white'
+                            }`}>
+                              {isNewSelected && (
+                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                          <div className={`p-3 rounded ${
+                            isNewSelected ? 'bg-green-100 border-2 border-green-500' : 'bg-green-50'
+                          }`}>
+                            <p className="font-medium text-gray-900">{duplicatePrompts.new[index].name}</p>
+                            <p className="text-sm text-gray-600 mt-1">{duplicatePrompts.new[index].description}</p>
+                            {duplicatePrompts.new[index].arguments && duplicatePrompts.new[index].arguments.length > 0 && (
+                              <div className="mt-2">
+                                <p className="text-xs font-medium text-gray-700">Arguments: {duplicatePrompts.new[index].arguments.length}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleApplyPromptChoices}
+                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  선택 적용
+                </button>
+                <button
+                  onClick={handleCancelDuplicatePrompts}
+                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Duplicate Resources Modal */}
+      {showDuplicateResourcesModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 transform transition-all max-h-[85vh] overflow-y-auto">
+            <div className="p-8">
+              <div className="flex items-center mb-6">
+                <div className="flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 mr-4">
+                  <svg className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">
+                    중복된 Resources가 발견되었습니다
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    각 Resource에 대해 기존 것을 유지할지, 새로운 것으로 교체할지 선택해주세요.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                {duplicateResources.existing.map((existingResource, index) => {
+                  const isExistingSelected = selectedResourceChoices[index] === 'existing';
+                  const isNewSelected = selectedResourceChoices[index] === 'new';
+
+                  return (
+                    <div key={index} className="border-2 border-gray-300 rounded-lg p-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* 기존 Resource */}
+                        <div
+                          className={`border-r pr-4 cursor-pointer transition-all ${
+                            isExistingSelected ? 'opacity-100' : 'opacity-50'
+                          }`}
+                          onClick={() => handleToggleResourceChoice(index)}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-semibold text-blue-700">기존 Resource</h4>
+                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                              isExistingSelected
+                                ? 'border-blue-600 bg-blue-600'
+                                : 'border-gray-300 bg-white'
+                            }`}>
+                              {isExistingSelected && (
+                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                          <div className={`p-3 rounded ${
+                            isExistingSelected ? 'bg-blue-100 border-2 border-blue-500' : 'bg-blue-50'
+                          }`}>
+                            <p className="font-medium text-gray-900">{existingResource.name}</p>
+                            <p className="text-xs text-gray-600 mt-1">URI: {existingResource.uri}</p>
+                            {existingResource.description && (
+                              <p className="text-sm text-gray-600 mt-1">{existingResource.description}</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 새로운 Resource */}
+                        <div
+                          className={`pl-4 cursor-pointer transition-all ${
+                            isNewSelected ? 'opacity-100' : 'opacity-50'
+                          }`}
+                          onClick={() => handleToggleResourceChoice(index)}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-semibold text-green-700">새로운 Resource</h4>
+                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                              isNewSelected
+                                ? 'border-green-600 bg-green-600'
+                                : 'border-gray-300 bg-white'
+                            }`}>
+                              {isNewSelected && (
+                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                          <div className={`p-3 rounded ${
+                            isNewSelected ? 'bg-green-100 border-2 border-green-500' : 'bg-green-50'
+                          }`}>
+                            <p className="font-medium text-gray-900">{duplicateResources.new[index].name}</p>
+                            <p className="text-xs text-gray-600 mt-1">URI: {duplicateResources.new[index].uri}</p>
+                            {duplicateResources.new[index].description && (
+                              <p className="text-sm text-gray-600 mt-1">{duplicateResources.new[index].description}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleApplyResourceChoices}
+                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  선택 적용
+                </button>
+                <button
+                  onClick={handleCancelDuplicateResources}
+                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Success Modal */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -1132,76 +1663,6 @@ export default function EditMCPServerPage() {
             </p>
           </div>
 
-          {isLoadingPreview && (
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
-              <div className="flex items-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                <span className="text-blue-700">{t('edit.loadingTools')}</span>
-              </div>
-            </div>
-          )}
-
-          {previewTools.length > 0 && (
-            <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-green-800">
-                  {t('edit.toolsPreview', { count: String(previewTools.length) })}
-                </h3>
-                <button
-                  type="button"
-                  onClick={handleUsePreviewTools}
-                  className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors"
-                >
-                  모두 추가
-                </button>
-              </div>
-              <div className="space-y-3">
-                {previewTools.map((tool: any, index: number) => (
-                  <div key={index} className="bg-white rounded-lg p-3 border border-green-200">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-green-900 text-sm">{tool.name}</h4>
-                        <p className="text-xs text-green-700 mt-1">{tool.description || t('edit.noDescription')}</p>
-
-                        {/* Parameters 정보 표시 */}
-                        {tool.inputSchema?.properties && (
-                          <div className="mt-2">
-                            <p className="text-xs font-medium text-gray-700 mb-1">Parameters:</p>
-                            <div className="space-y-1">
-                              {Object.entries(tool.inputSchema.properties).map(([paramName, paramInfo]: [string, any]) => (
-                                <div key={paramName} className="text-xs text-gray-600 flex items-center gap-2">
-                                  <span className="font-medium">{paramName}</span>
-                                  <span className="text-blue-600">({paramInfo.type || 'any'})</span>
-                                  {tool.inputSchema?.required?.includes(paramName) && (
-                                    <span className="text-red-600 text-xs">{t('edit.required')}</span>
-                                  )}
-                                  {paramInfo.description && (
-                                    <span className="text-gray-500">- {paramInfo.description}</span>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {formData.url && formData.protocol && !isLoadingPreview && previewTools.length === 0 && formData.protocol !== TransportType.STDIO && (
-            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-              <div className="flex items-center">
-                <div className="text-yellow-600 mr-2">⚠️</div>
-                <span className="text-yellow-700 text-sm">
-                  {t('edit.connectionError')}
-                </span>
-              </div>
-            </div>
-          )}
-
           {formData.protocol === TransportType.STDIO && (
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
               <div className="flex items-center">
@@ -1231,20 +1692,148 @@ export default function EditMCPServerPage() {
             </p>
           </div>
 
+          {/* Tabs for Tools, Prompts, Resources */}
           <div className="border-t pt-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-800">
-                {t('edit.tools', { count: String(tools.length) })}
-              </h2>
+            {/* Tab Headers */}
+            <div className="flex gap-2 mb-6 border-b border-gray-200">
               <button
                 type="button"
-                onClick={handleAddTool}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                onClick={() => setActiveTab('tools')}
+                className={`px-6 py-3 font-medium transition-colors ${
+                  activeTab === 'tools'
+                    ? 'border-b-2 border-blue-600 text-blue-600'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
               >
-                <PlusIcon className="h-4 w-4" />
-                {t('edit.addTool')}
+                Tools ({tools.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('prompts')}
+                className={`px-6 py-3 font-medium transition-colors ${
+                  activeTab === 'prompts'
+                    ? 'border-b-2 border-blue-600 text-blue-600'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                Prompts ({prompts.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('resources')}
+                className={`px-6 py-3 font-medium transition-colors ${
+                  activeTab === 'resources'
+                    ? 'border-b-2 border-blue-600 text-blue-600'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                Resources ({resources.length})
               </button>
             </div>
+
+            {/* Tools Tab Content */}
+            {activeTab === 'tools' && (
+              <div className="space-y-4">
+                {/* Search Tools Button */}
+                {formData.protocol && formData.url && (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => detectAndPreviewTools({ url: formData.url, protocol: formData.protocol })}
+                      disabled={isLoadingPreview}
+                      className="px-4 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {isLoadingPreview ? 'Searching Tools...' : 'Search Tools'}
+                    </button>
+                  </div>
+                )}
+
+                {isLoadingPreview && (
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+                    <div className="flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                      <span className="text-blue-700">Loading Tools...</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tools Preview */}
+                {previewTools.length > 0 && (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-medium text-green-800">
+                        Found {previewTools.length} Tools
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={handleUsePreviewTools}
+                        className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors"
+                      >
+                        Add All Tools
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {previewTools.map((tool: any, index: number) => (
+                        <div key={index} className="bg-white rounded-lg p-3 border border-green-200">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-medium text-green-900 text-sm">{tool.name}</h4>
+                              <p className="text-xs text-green-700 mt-1">{tool.description || 'No description'}</p>
+
+                              {/* Parameters 정보 표시 */}
+                              {tool.inputSchema?.properties && (
+                                <div className="mt-2">
+                                  <p className="text-xs font-medium text-gray-700 mb-1">Parameters:</p>
+                                  <div className="space-y-1">
+                                    {Object.entries(tool.inputSchema.properties).map(([paramName, paramInfo]: [string, any]) => (
+                                      <div key={paramName} className="text-xs text-gray-600 flex items-center gap-2">
+                                        <span className="font-medium">{paramName}</span>
+                                        <span className="text-blue-600">({paramInfo.type || 'any'})</span>
+                                        {tool.inputSchema?.required?.includes(paramName) && (
+                                          <span className="text-red-600 text-xs">Required</span>
+                                        )}
+                                        {paramInfo.description && (
+                                          <span className="text-gray-500">- {paramInfo.description}</span>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tools not found warning */}
+                {!isLoadingPreview && toolsSearchAttempted && previewTools.length === 0 && (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                    <div className="flex items-center">
+                      <div className="text-yellow-600 mr-2">⚠️</div>
+                      <span className="text-yellow-700 text-sm">
+                        Tools를 찾지 못했습니다. Server URL과 Transport Type을 확인하고 서버가 실행 중인지 확인해주세요.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Add Tool Button */}
+                <div className="flex items-center justify-between">
+                  <h3 className="text-md font-semibold text-gray-800">
+                    Added Tools ({tools.length})
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={handleAddTool}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >
+                    <PlusIcon className="h-4 w-4" />
+                    {t('edit.addTool')}
+                  </button>
+                </div>
 
             {tools.length > 0 && (
               <div className="space-y-3 mb-4">
@@ -1292,8 +1881,253 @@ export default function EditMCPServerPage() {
                 ))}
               </div>
             )}
+              </div>
+            )}
 
-            {showAddTool && (
+            {/* Prompts Tab Content */}
+            {activeTab === 'prompts' && (
+              <div className="space-y-4">
+                {/* Search Prompts Button */}
+                {formData.protocol && formData.url && (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => detectAndPreviewPrompts({ url: formData.url, protocol: formData.protocol })}
+                      disabled={isLoadingPrompts}
+                      className="px-4 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {isLoadingPrompts ? 'Searching Prompts...' : 'Search Prompts'}
+                    </button>
+                  </div>
+                )}
+
+                {/* Prompts Preview */}
+                {previewPrompts.length > 0 && (
+                  <div className="p-4 bg-purple-50 border border-purple-200 rounded-md">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-medium text-purple-800">
+                        Found {previewPrompts.length} Prompts
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={handleAddAllPrompts}
+                        className="px-3 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 transition-colors"
+                      >
+                        Add All Prompts
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {previewPrompts.map((prompt: any, index: number) => (
+                        <div key={index} className="bg-white rounded-lg p-3 border border-purple-200">
+                          <h4 className="font-medium text-purple-900 text-sm">{prompt.name}</h4>
+                          {prompt.description && (
+                            <p className="text-xs text-purple-700 mt-1">{prompt.description}</p>
+                          )}
+                          {prompt.arguments && prompt.arguments.length > 0 && (
+                            <div className="mt-2">
+                              <p className="text-xs font-medium text-gray-700 mb-1">Arguments:</p>
+                              <div className="space-y-1">
+                                {prompt.arguments.map((arg: any, argIdx: number) => (
+                                  <div key={argIdx} className="text-xs text-gray-600">
+                                    <span className="font-medium">{arg.name}</span>
+                                    {arg.required && <span className="text-red-600 ml-1">*</span>}
+                                    {arg.description && <span className="text-gray-500"> - {arg.description}</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Prompts not found warning */}
+                {!isLoadingPrompts && promptsSearchAttempted && previewPrompts.length === 0 && (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                    <div className="flex items-center">
+                      <div className="text-yellow-600 mr-2">⚠️</div>
+                      <span className="text-yellow-700 text-sm">
+                        Prompts를 찾지 못했습니다. Server URL과 Transport Type을 확인하고 서버가 실행 중인지 확인해주세요.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Add Prompt Button */}
+                <div className="flex items-center justify-between">
+                  <h3 className="text-md font-semibold text-gray-800">
+                    Added Prompts ({prompts.length})
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddPrompt(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >
+                    <PlusIcon className="h-4 w-4" />
+                    Add Prompt
+                  </button>
+                </div>
+
+                {/* Prompts List */}
+                {prompts.length > 0 && (
+                  <div className="space-y-3">
+                    {prompts.map((prompt, index: number) => (
+                      <div key={index} className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h3 className="font-medium text-gray-900">{prompt.name}</h3>
+                            <p className="text-sm text-gray-600 mt-1">{prompt.description}</p>
+                          </div>
+                          <div className="flex gap-2 ml-4">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPromptForm(prompt);
+                                setEditingPromptIndex(index);
+                                setShowAddPrompt(true);
+                              }}
+                              className="p-1 text-gray-400 hover:text-blue-600"
+                            >
+                              <PencilIcon className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPrompts(prompts.filter((_, i) => i !== index))}
+                              className="p-1 text-gray-400 hover:text-red-600"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Resources Tab Content */}
+            {activeTab === 'resources' && (
+              <div className="space-y-4">
+                {/* Search Resources Button */}
+                {formData.protocol && formData.url && (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => detectAndPreviewResources({ url: formData.url, protocol: formData.protocol })}
+                      disabled={isLoadingResources}
+                      className="px-4 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {isLoadingResources ? 'Searching Resources...' : 'Search Resources'}
+                    </button>
+                  </div>
+                )}
+
+                {/* Resources Preview */}
+                {previewResources.length > 0 && (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-medium text-green-800">
+                        Found {previewResources.length} Resources
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={handleAddAllResources}
+                        className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors"
+                      >
+                        Add All Resources
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {previewResources.map((resource: any, index: number) => (
+                        <div key={index} className="bg-white rounded-lg p-3 border border-green-200">
+                          <h4 className="font-medium text-green-900 text-sm">{resource.name}</h4>
+                          <p className="text-xs text-green-700 mt-1">URI: {resource.uri}</p>
+                          {resource.description && (
+                            <p className="text-xs text-gray-600 mt-1">{resource.description}</p>
+                          )}
+                          {resource.mimeType && (
+                            <p className="text-xs text-blue-600 mt-1">Type: {resource.mimeType}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Resources not found warning */}
+                {!isLoadingResources && resourcesSearchAttempted && previewResources.length === 0 && (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                    <div className="flex items-center">
+                      <div className="text-yellow-600 mr-2">⚠️</div>
+                      <span className="text-yellow-700 text-sm">
+                        Resources를 찾지 못했습니다. Server URL과 Transport Type을 확인하고 서버가 실행 중인지 확인해주세요.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Add Resource Button */}
+                <div className="flex items-center justify-between">
+                  <h3 className="text-md font-semibold text-gray-800">
+                    Added Resources ({resources.length})
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddResource(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >
+                    <PlusIcon className="h-4 w-4" />
+                    Add Resource
+                  </button>
+                </div>
+
+                {/* Resources List */}
+                {resources.length > 0 && (
+                  <div className="space-y-3">
+                    {resources.map((resource, index: number) => (
+                      <div key={index} className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h3 className="font-medium text-gray-900">{resource.name}</h3>
+                            <p className="text-sm text-gray-600 mt-1">URI: {resource.uri}</p>
+                            {resource.description && (
+                              <p className="text-sm text-gray-600 mt-1">{resource.description}</p>
+                            )}
+                          </div>
+                          <div className="flex gap-2 ml-4">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setResourceForm(resource);
+                                setEditingResourceIndex(index);
+                                setShowAddResource(true);
+                              }}
+                              className="p-1 text-gray-400 hover:text-blue-600"
+                            >
+                              <PencilIcon className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setResources(resources.filter((_, i) => i !== index))}
+                              className="p-1 text-gray-400 hover:text-red-600"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Tool Add/Edit Modal */}
+          {showAddTool && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                 <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                   <h3 className="text-lg font-semibold mb-4">
@@ -1471,9 +2305,176 @@ export default function EditMCPServerPage() {
                   </div>
                 </div>
               </div>
-            )}
-          </div>
-          
+          )}
+
+          {/* Prompt Add/Edit Modal */}
+          {showAddPrompt && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                <h3 className="text-lg font-semibold mb-4">
+                  {editingPromptIndex !== null ? 'Edit Prompt' : 'Add New Prompt'}
+                </h3>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Prompt Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={promptForm.name}
+                      onChange={(e) => setPromptForm(prev => ({ ...prev, name: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter prompt name"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Description
+                    </label>
+                    <textarea
+                      value={promptForm.description}
+                      onChange={(e) => setPromptForm(prev => ({ ...prev, description: e.target.value }))}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter description"
+                    />
+                  </div>
+
+                  <div className="flex gap-2 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (editingPromptIndex !== null) {
+                          const updated = [...prompts];
+                          updated[editingPromptIndex] = promptForm;
+                          setPrompts(updated);
+                        } else {
+                          setPrompts([...prompts, promptForm]);
+                        }
+                        setShowAddPrompt(false);
+                        setEditingPromptIndex(null);
+                        setPromptForm({ name: "", description: "", arguments: [] });
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                    >
+                      {editingPromptIndex !== null ? 'Update' : 'Add'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddPrompt(false);
+                        setEditingPromptIndex(null);
+                        setPromptForm({ name: "", description: "", arguments: [] });
+                      }}
+                      className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Resource Add/Edit Modal */}
+          {showAddResource && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                <h3 className="text-lg font-semibold mb-4">
+                  {editingResourceIndex !== null ? 'Edit Resource' : 'Add New Resource'}
+                </h3>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Resource URI *
+                    </label>
+                    <input
+                      type="text"
+                      value={resourceForm.uri}
+                      onChange={(e) => setResourceForm(prev => ({ ...prev, uri: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="e.g., file:///path/to/resource"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Resource Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={resourceForm.name}
+                      onChange={(e) => setResourceForm(prev => ({ ...prev, name: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter resource name"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Description
+                    </label>
+                    <textarea
+                      value={resourceForm.description}
+                      onChange={(e) => setResourceForm(prev => ({ ...prev, description: e.target.value }))}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter description"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      MIME Type
+                    </label>
+                    <input
+                      type="text"
+                      value={resourceForm.mimeType}
+                      onChange={(e) => setResourceForm(prev => ({ ...prev, mimeType: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="e.g., text/plain, application/json"
+                    />
+                  </div>
+
+                  <div className="flex gap-2 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (editingResourceIndex !== null) {
+                          const updated = [...resources];
+                          updated[editingResourceIndex] = resourceForm;
+                          setResources(updated);
+                        } else {
+                          setResources([...resources, resourceForm]);
+                        }
+                        setShowAddResource(false);
+                        setEditingResourceIndex(null);
+                        setResourceForm({ uri: "", name: "", description: "", mimeType: "" });
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                    >
+                      {editingResourceIndex !== null ? 'Update' : 'Add'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddResource(false);
+                        setEditingResourceIndex(null);
+                        setResourceForm({ uri: "", name: "", description: "", mimeType: "" });
+                      }}
+                      className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-end gap-3">
             <button
               type="button"

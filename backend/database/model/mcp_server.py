@@ -6,7 +6,7 @@ from .tag import mcp_server_tags
 
 class MCPServer(Base):
     __tablename__ = 'mcp_servers'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255), nullable=False)
     github_link = Column(String(500), nullable=False)
@@ -22,9 +22,11 @@ class MCPServer(Base):
     last_health_check = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+
     owner = relationship("User", back_populates="mcp_servers")
     tools = relationship("MCPServerTool", back_populates="mcp_server", cascade="all, delete-orphan")
+    prompts = relationship("MCPServerPrompt", back_populates="mcp_server", cascade="all, delete-orphan")
+    resources = relationship("MCPServerResource", back_populates="mcp_server", cascade="all, delete-orphan")
     tags = relationship("Tag", secondary=mcp_server_tags, backref="mcp_servers")
     favorites = relationship("UserFavorite", back_populates="mcp_server")
 
@@ -42,7 +44,7 @@ class MCPServerTool(Base):
 
 class MCPServerProperty(Base):
     __tablename__ = 'mcp_server_properties'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
@@ -50,5 +52,42 @@ class MCPServerProperty(Base):
     required = Column(Boolean, default=False)
     tool_id = Column(Integer, ForeignKey('mcp_server_tools.id'), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+
     tool = relationship("MCPServerTool", back_populates="parameters")
+
+class MCPServerPrompt(Base):
+    __tablename__ = 'mcp_server_prompts'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    mcp_server_id = Column(Integer, ForeignKey('mcp_servers.id'), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    mcp_server = relationship("MCPServer", back_populates="prompts")
+    arguments = relationship("MCPServerPromptArgument", back_populates="prompt", cascade="all, delete-orphan")
+
+class MCPServerPromptArgument(Base):
+    __tablename__ = 'mcp_server_prompt_arguments'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    required = Column(Boolean, default=False)
+    prompt_id = Column(Integer, ForeignKey('mcp_server_prompts.id'), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    prompt = relationship("MCPServerPrompt", back_populates="arguments")
+
+class MCPServerResource(Base):
+    __tablename__ = 'mcp_server_resources'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    uri = Column(String(500), nullable=False)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    mime_type = Column(String(100), nullable=True)
+    mcp_server_id = Column(Integer, ForeignKey('mcp_servers.id'), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    mcp_server = relationship("MCPServer", back_populates="resources")

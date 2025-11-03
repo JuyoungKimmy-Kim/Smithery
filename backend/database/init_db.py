@@ -22,6 +22,7 @@ def init_database():
                 username="admin",
                 email="admin@smithery.com",
                 password="admin123",
+                nickname="admin",
                 is_admin="admin"
             )
             print(f"관리자 계정이 생성되었습니다: {admin.username}")

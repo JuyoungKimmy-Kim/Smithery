@@ -22,7 +22,10 @@ from urllib.parse import urlparse
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
 from backend.database.dao.mcp_server_dao import MCPServerDAO
-from backend.database.model import MCPServer, MCPServerTool, MCPServerProperty, Tag
+from backend.database.model import (
+    MCPServer, MCPServerTool, MCPServerProperty, Tag,
+    MCPServerPrompt, MCPServerPromptArgument, MCPServerResource
+)
 from datetime import datetime
 import pytz
 
@@ -40,25 +43,35 @@ class MCPServerService:
     
     def create_mcp_server(self, mcp_server_data: Dict[str, Any], owner_id: int) -> MCPServer:
         """새 MCP 서버를 생성합니다."""
-        # 프론트엔드에서 전송한 tools 데이터가 있으면 사용
+        # 프론트엔드에서 전송한 데이터 추출
         tools_data = mcp_server_data.get('tools', [])
-        
+        prompts_data = mcp_server_data.get('prompts', [])
+        resources_data = mcp_server_data.get('resources', [])
+
         # tools 데이터가 없으면 GitHub에서 추출 시도
         if not tools_data:
             tools_data = self._extract_tools_from_github(mcp_server_data['github_link'])
-        
+
         # 태그 처리
         tags = mcp_server_data.get('tags', [])
         if isinstance(tags, str):
             tags = [tag.strip() for tag in tags.split(',') if tag.strip()]
-        
+
         # MCP 서버 생성
         mcp_server = self.mcp_server_dao.create_mcp_server(mcp_server_data, owner_id, tags)
-        
+
         # 도구 정보 추가
         if tools_data:
             self.mcp_server_dao.add_tools_to_mcp_server(mcp_server.id, tools_data)
-        
+
+        # 프롬프트 정보 추가
+        if prompts_data:
+            self._add_prompts_to_mcp_server(mcp_server.id, prompts_data)
+
+        # 리소스 정보 추가
+        if resources_data:
+            self._add_resources_to_mcp_server(mcp_server.id, resources_data)
+
         return mcp_server
     
     def _extract_tools_from_github(self, github_link: str) -> List[Dict[str, Any]]:
@@ -117,16 +130,18 @@ class MCPServerService:
             data_dict = mcp_server_data.dict()
         else:
             data_dict = mcp_server_data
-        
+
+        mcp_server = self.get_mcp_server_by_id(mcp_server_id)
+        if not mcp_server:
+            return None
+
         # tools 데이터가 있으면 업데이트
         if 'tools' in data_dict and data_dict['tools'] is not None:
             # 기존 tools 삭제
-            mcp_server = self.get_mcp_server_by_id(mcp_server_id)
-            if mcp_server:
-                for tool in mcp_server.tools:
-                    self.db.delete(tool)
-                self.db.commit()
-            
+            for tool in mcp_server.tools:
+                self.db.delete(tool)
+            self.db.commit()
+
             # 새 tools 추가
             tools_data = data_dict['tools']
             if tools_data:
@@ -138,11 +153,51 @@ class MCPServerService:
                     else:
                         tool_dict = tool
                     tools_dict.append(tool_dict)
-                
+
                 self.mcp_server_dao.add_tools_to_mcp_server(mcp_server_id, tools_dict)
-        
-        # tools 키를 제거하고 나머지 데이터로 업데이트
-        update_data = {k: v for k, v in data_dict.items() if k != 'tools'}
+
+        # prompts 데이터가 있으면 업데이트
+        if 'prompts' in data_dict and data_dict['prompts'] is not None:
+            # 기존 prompts 삭제
+            for prompt in mcp_server.prompts:
+                self.db.delete(prompt)
+            self.db.commit()
+
+            # 새 prompts 추가
+            prompts_data = data_dict['prompts']
+            if prompts_data:
+                prompts_dict = []
+                for prompt in prompts_data:
+                    if hasattr(prompt, 'dict'):
+                        prompt_dict = prompt.dict()
+                    else:
+                        prompt_dict = prompt
+                    prompts_dict.append(prompt_dict)
+
+                self._add_prompts_to_mcp_server(mcp_server_id, prompts_dict)
+
+        # resources 데이터가 있으면 업데이트
+        if 'resources' in data_dict and data_dict['resources'] is not None:
+            # 기존 resources 삭제
+            for resource in mcp_server.resources:
+                self.db.delete(resource)
+            self.db.commit()
+
+            # 새 resources 추가
+            resources_data = data_dict['resources']
+            if resources_data:
+                resources_dict = []
+                for resource in resources_data:
+                    if hasattr(resource, 'dict'):
+                        resource_dict = resource.dict()
+                    else:
+                        resource_dict = resource
+                    resources_dict.append(resource_dict)
+
+                self._add_resources_to_mcp_server(mcp_server_id, resources_dict)
+
+        # tools, prompts, resources 키를 제거하고 나머지 데이터로 업데이트
+        update_data = {k: v for k, v in data_dict.items() if k not in ['tools', 'prompts', 'resources']}
         return self.mcp_server_dao.update_mcp_server(mcp_server_id, update_data)
     
     def delete_mcp_server(self, mcp_server_id: int) -> bool:
@@ -286,3 +341,40 @@ class MCPServerService:
             "last_health_check": mcp_server.last_health_check.isoformat() if mcp_server.last_health_check else None,
             "error": error_message
         }
+
+    def _add_prompts_to_mcp_server(self, mcp_server_id: int, prompts_data: List[Dict[str, Any]]):
+        """MCP 서버에 prompts를 추가합니다."""
+        for prompt_data in prompts_data:
+            prompt = MCPServerPrompt(
+                name=prompt_data['name'],
+                description=prompt_data.get('description'),
+                mcp_server_id=mcp_server_id
+            )
+            self.db.add(prompt)
+            self.db.flush()  # ID를 가져오기 위해 flush
+
+            # arguments 추가
+            for arg_data in prompt_data.get('arguments', []):
+                argument = MCPServerPromptArgument(
+                    name=arg_data['name'],
+                    description=arg_data.get('description'),
+                    required=arg_data.get('required', False),
+                    prompt_id=prompt.id
+                )
+                self.db.add(argument)
+
+        self.db.commit()
+
+    def _add_resources_to_mcp_server(self, mcp_server_id: int, resources_data: List[Dict[str, Any]]):
+        """MCP 서버에 resources를 추가합니다."""
+        for resource_data in resources_data:
+            resource = MCPServerResource(
+                uri=resource_data['uri'],
+                name=resource_data['name'],
+                description=resource_data.get('description'),
+                mime_type=resource_data.get('mimeType') or resource_data.get('mime_type'),
+                mcp_server_id=mcp_server_id
+            )
+            self.db.add(resource)
+
+        self.db.commit()
