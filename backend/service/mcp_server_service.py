@@ -99,10 +99,29 @@ class MCPServerService:
             }
         ]
     
+    def get_mcp_servers(
+        self,
+        status: str = 'approved',
+        category: Optional[str] = None,
+        sort: str = 'favorites',
+        order: str = 'desc',
+        limit: int = 20,
+        offset: int = 0
+    ) -> List[MCPServer]:
+        """MCP 서버 목록을 조회합니다. (통합 조회 메서드)"""
+        return self.mcp_server_dao.get_mcp_servers(
+            status=status,
+            category=category,
+            sort=sort,
+            order=order,
+            limit=limit,
+            offset=offset
+        )
+
     def get_approved_mcp_servers(self, limit: int = None, offset: int = 0) -> List[MCPServer]:
-        """승인된 MCP 서버 목록을 조회합니다."""
+        """승인된 MCP 서버 목록을 조회합니다. (레거시 메서드)"""
         return self.mcp_server_dao.get_approved_mcp_servers(limit, offset)
-    
+
     def get_pending_mcp_servers(self) -> List[MCPServer]:
         """승인 대기중인 MCP 서버 목록을 조회합니다."""
         return self.mcp_server_dao.get_pending_mcp_servers()
@@ -122,6 +141,14 @@ class MCPServerService:
     def get_mcp_servers_by_category(self, category: str, status: str = 'approved') -> List[MCPServer]:
         """카테고리별 MCP 서버 목록을 조회합니다."""
         return self.mcp_server_dao.get_mcp_servers_by_category(category, status)
+
+    def get_mcp_servers_by_tags(self, tags: List[str], status: str = 'approved') -> List[MCPServer]:
+        """태그별 MCP 서버 목록을 조회합니다."""
+        return self.mcp_server_dao.search_mcp_servers_with_tags(None, tags, status)
+
+    def search_mcp_servers_with_tags(self, keyword: str, tags: List[str], status: str = 'approved') -> List[MCPServer]:
+        """키워드와 태그로 MCP 서버를 검색합니다. (AND 조건)"""
+        return self.mcp_server_dao.search_mcp_servers_with_tags(keyword, tags, status)
     
     def update_mcp_server(self, mcp_server_id: int, mcp_server_data) -> Optional[MCPServer]:
         """MCP 서버를 수정합니다."""
@@ -247,6 +274,14 @@ class MCPServerService:
     def get_mcp_server_favorites_count(self, mcp_server_id: int) -> int:
         """특정 MCP 서버의 즐겨찾기 수를 조회합니다."""
         return self.mcp_server_dao.get_mcp_server_favorites_count(mcp_server_id)
+
+    def get_top_mcp_servers(self, limit: int = 3) -> List[MCPServer]:
+        """인기 MCP 서버 Top N을 조회합니다. (즐겨찾기 수 기준)"""
+        return self.mcp_server_dao.get_top_mcp_servers(limit)
+
+    def get_latest_mcp_servers(self, limit: int = 3) -> List[MCPServer]:
+        """최신 등록된 MCP 서버 Top N을 조회합니다. (등록일 기준)"""
+        return self.mcp_server_dao.get_latest_mcp_servers(limit)
     
     def update_mcp_server_announcement(self, mcp_server_id: int, announcement: Optional[str]) -> Optional[MCPServer]:
         """MCP 서버의 공지사항을 업데이트합니다."""

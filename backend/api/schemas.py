@@ -23,7 +23,17 @@ class UserResponse(BaseModel):
     is_admin: str
     avatar_url: Optional[str] = None
     created_at: datetime
-    
+
+    class Config:
+        from_attributes = True
+
+class TopUserResponse(BaseModel):
+    id: int
+    username: str
+    nickname: str
+    avatar_url: Optional[str] = None
+    mcp_servers_count: int
+
     class Config:
         from_attributes = True
 
@@ -160,8 +170,8 @@ class TagResponse(BaseModel):
         from_attributes = True
 
 class SearchRequest(BaseModel):
-    keyword: str
-    category: Optional[str] = None
+    keyword: Optional[str] = None
+    tags: Optional[List[str]] = None
     status: str = 'approved'
 
 class SearchResponse(BaseModel):
