@@ -129,37 +129,43 @@ async def preview_mcp_resources(request: PreviewResourcesRequest):
 
 @router.get("/", response_model=List[MCPServerResponse])
 def get_mcp_servers(
-    status: str = Query("approved", description="서버 상태"),
+    status: str = Query("approved", description="서버 상태 (approved, pending)"),
     category: Optional[str] = Query(None, description="카테고리"),
+    sort: str = Query("favorites", description="정렬 기준 (favorites, created_at)"),
+    order: str = Query("desc", description="정렬 순서 (asc, desc)"),
     limit: int = Query(20, description="조회 개수"),
     offset: int = Query(0, description="오프셋"),
     db: Session = Depends(get_db)
 ):
-    """MCP 서버 목록을 조회합니다."""
+    """
+    MCP 서버 목록을 조회합니다.
+
+    - sort=favorites: 즐겨찾기 수 기준 정렬 (기본값)
+    - sort=created_at: 등록일 기준 정렬
+    - order=desc: 내림차순 (기본값)
+    - order=asc: 오름차순
+
+    Examples:
+    - GET /?sort=favorites&limit=3  # Top 3 인기 서버
+    - GET /?sort=created_at&limit=3 # Latest 3 서버
+    """
     mcp_service = MCPServerService(db)
 
-    if status == "approved":
-        mcps = mcp_service.get_approved_mcp_servers(limit, offset)
-    elif status == "pending":
-        mcps = mcp_service.get_pending_mcp_servers()
-    else:
-        mcps = mcp_service.get_approved_mcp_servers(limit, offset)
+    # sort와 order 파라미터로 통합 조회
+    mcps = mcp_service.get_mcp_servers(
+        status=status,
+        category=category,
+        sort=sort,
+        order=order,
+        limit=limit,
+        offset=offset
+    )
 
     # 각 MCP 서버에 favorites_count 추가
     for mcp in mcps:
         mcp.favorites_count = mcp_service.get_mcp_server_favorites_count(mcp.id)
-        print(f"MCP {mcp.id} ({mcp.name}): favorites_count = {mcp.favorites_count}")
 
     return mcps
-
-@router.get("/top", response_model=List[MCPServerResponse])
-def get_top_mcp_servers(
-    limit: int = Query(3, description="조회 개수", le=10),
-    db: Session = Depends(get_db)
-):
-    """인기 MCP 서버 Top N을 조회합니다. (즐겨찾기 수 기준)"""
-    mcp_service = MCPServerService(db)
-    return mcp_service.get_top_mcp_servers(limit)
 
 @router.get("/top-users", response_model=List[TopUserResponse])
 def get_top_users(
@@ -169,21 +175,6 @@ def get_top_users(
     """Top Contributors를 조회합니다. (등록한 MCP 서버 수 기준)"""
     user_service = UserService(db)
     return user_service.get_top_users(limit)
-
-@router.get("/latest", response_model=List[MCPServerResponse])
-def get_latest_mcp_servers(
-    limit: int = Query(3, description="조회 개수", le=10),
-    db: Session = Depends(get_db)
-):
-    """최신 등록된 MCP 서버 목록을 조회합니다. (등록일 기준)"""
-    mcp_service = MCPServerService(db)
-    mcps = mcp_service.get_latest_mcp_servers(limit)
-
-    # 각 MCP 서버에 favorites_count 추가
-    for mcp in mcps:
-        mcp.favorites_count = mcp_service.get_mcp_server_favorites_count(mcp.id)
-
-    return mcps
 
 @router.get("/{mcp_server_id}/favorites/count")
 def get_mcp_server_favorites_count(mcp_server_id: int, db: Session = Depends(get_db)):

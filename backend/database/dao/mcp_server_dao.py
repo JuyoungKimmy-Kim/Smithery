@@ -37,6 +37,77 @@ class MCPServerDAO:
         self.db.refresh(mcp_server)
         return mcp_server
     
+    def get_mcp_servers(
+        self,
+        status: str = 'approved',
+        category: Optional[str] = None,
+        sort: str = 'favorites',
+        order: str = 'desc',
+        limit: int = 20,
+        offset: int = 0
+    ) -> List[MCPServer]:
+        """
+        MCP 서버 목록을 조회합니다. (통합 조회 메서드)
+
+        Args:
+            status: 서버 상태 (approved, pending)
+            category: 카테고리 필터
+            sort: 정렬 기준 (favorites, created_at)
+            order: 정렬 순서 (asc, desc)
+            limit: 조회 개수
+            offset: 오프셋
+        """
+        query = self.db.query(MCPServer).options(
+            joinedload(MCPServer.owner),
+            joinedload(MCPServer.tags),
+            joinedload(MCPServer.tools)
+        )
+
+        # 상태 필터
+        query = query.filter(MCPServer.status == status)
+
+        # 카테고리 필터
+        if category:
+            query = query.filter(MCPServer.category == category)
+
+        # 정렬 처리
+        if sort == 'favorites':
+            # 즐겨찾기 수 기준 정렬
+            favorites_subquery = self.db.query(
+                UserFavorite.mcp_server_id,
+                func.count(UserFavorite.id).label('favorites_count')
+            ).group_by(UserFavorite.mcp_server_id).subquery()
+
+            query = query.outerjoin(
+                favorites_subquery, MCPServer.id == favorites_subquery.c.mcp_server_id
+            )
+
+            if order == 'desc':
+                query = query.order_by(
+                    desc(favorites_subquery.c.favorites_count),
+                    MCPServer.created_at.desc()
+                )
+            else:
+                query = query.order_by(
+                    favorites_subquery.c.favorites_count,
+                    MCPServer.created_at.asc()
+                )
+        elif sort == 'created_at':
+            # 등록일 기준 정렬
+            if order == 'desc':
+                query = query.order_by(desc(MCPServer.created_at))
+            else:
+                query = query.order_by(MCPServer.created_at)
+        else:
+            # 기본: created_at desc
+            query = query.order_by(desc(MCPServer.created_at))
+
+        # limit, offset 적용
+        if limit:
+            query = query.limit(limit).offset(offset)
+
+        return query.all()
+
     def get_mcp_server_by_id(self, mcp_server_id: int) -> Optional[MCPServer]:
         """ID로 MCP 서버를 조회합니다."""
         return self.db.query(MCPServer).filter(MCPServer.id == mcp_server_id).first()

@@ -99,10 +99,29 @@ class MCPServerService:
             }
         ]
     
+    def get_mcp_servers(
+        self,
+        status: str = 'approved',
+        category: Optional[str] = None,
+        sort: str = 'favorites',
+        order: str = 'desc',
+        limit: int = 20,
+        offset: int = 0
+    ) -> List[MCPServer]:
+        """MCP 서버 목록을 조회합니다. (통합 조회 메서드)"""
+        return self.mcp_server_dao.get_mcp_servers(
+            status=status,
+            category=category,
+            sort=sort,
+            order=order,
+            limit=limit,
+            offset=offset
+        )
+
     def get_approved_mcp_servers(self, limit: int = None, offset: int = 0) -> List[MCPServer]:
-        """승인된 MCP 서버 목록을 조회합니다."""
+        """승인된 MCP 서버 목록을 조회합니다. (레거시 메서드)"""
         return self.mcp_server_dao.get_approved_mcp_servers(limit, offset)
-    
+
     def get_pending_mcp_servers(self) -> List[MCPServer]:
         """승인 대기중인 MCP 서버 목록을 조회합니다."""
         return self.mcp_server_dao.get_pending_mcp_servers()
