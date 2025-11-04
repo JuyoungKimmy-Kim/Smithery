@@ -161,7 +161,7 @@ class TagResponse(BaseModel):
 
 class SearchRequest(BaseModel):
     keyword: str
-    category: Optional[str] = None
+    tags: Optional[List[str]] = None
     status: str = 'approved'
 
 class SearchResponse(BaseModel):

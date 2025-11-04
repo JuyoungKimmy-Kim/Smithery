@@ -181,16 +181,16 @@ def search_mcp_servers(
 ):
     """MCP 서버를 검색합니다."""
     mcp_service = MCPServerService(db)
-    
-    if search_request.category:
-        mcp_servers = mcp_service.get_mcp_servers_by_category(
-            search_request.category, search_request.status
+
+    if search_request.tags:
+        mcp_servers = mcp_service.get_mcp_servers_by_tags(
+            search_request.tags, search_request.status
         )
     else:
         mcp_servers = mcp_service.search_mcp_servers(
             search_request.keyword, search_request.status
         )
-    
+
     return SearchResponse(
         mcp_servers=mcp_servers,
         total_count=len(mcp_servers)
