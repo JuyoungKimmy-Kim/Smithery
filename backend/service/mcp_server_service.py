@@ -125,7 +125,11 @@ class MCPServerService:
 
     def get_mcp_servers_by_tags(self, tags: List[str], status: str = 'approved') -> List[MCPServer]:
         """태그별 MCP 서버 목록을 조회합니다."""
-        return self.mcp_server_dao.get_mcp_servers_by_tags(tags, status)
+        return self.mcp_server_dao.search_mcp_servers_with_tags(None, tags, status)
+
+    def search_mcp_servers_with_tags(self, keyword: str, tags: List[str], status: str = 'approved') -> List[MCPServer]:
+        """키워드와 태그로 MCP 서버를 검색합니다. (AND 조건)"""
+        return self.mcp_server_dao.search_mcp_servers_with_tags(keyword, tags, status)
     
     def update_mcp_server(self, mcp_server_id: int, mcp_server_data) -> Optional[MCPServer]:
         """MCP 서버를 수정합니다."""

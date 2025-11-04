@@ -182,14 +182,25 @@ def search_mcp_servers(
     """MCP 서버를 검색합니다."""
     mcp_service = MCPServerService(db)
 
-    if search_request.tags:
+    # keyword와 tags 모두 처리
+    if search_request.keyword and search_request.tags:
+        # 둘 다 있으면 AND 조건으로 검색
+        mcp_servers = mcp_service.search_mcp_servers_with_tags(
+            search_request.keyword, search_request.tags, search_request.status
+        )
+    elif search_request.tags:
+        # tags만 있으면 tag 검색
         mcp_servers = mcp_service.get_mcp_servers_by_tags(
             search_request.tags, search_request.status
         )
-    else:
+    elif search_request.keyword:
+        # keyword만 있으면 keyword 검색
         mcp_servers = mcp_service.search_mcp_servers(
             search_request.keyword, search_request.status
         )
+    else:
+        # 둘 다 없으면 모든 서버 반환
+        mcp_servers = mcp_service.get_approved_mcp_servers()
 
     return SearchResponse(
         mcp_servers=mcp_servers,

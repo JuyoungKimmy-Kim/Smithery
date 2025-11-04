@@ -160,7 +160,7 @@ class TagResponse(BaseModel):
         from_attributes = True
 
 class SearchRequest(BaseModel):
-    keyword: str
+    keyword: Optional[str] = None
     tags: Optional[List[str]] = None
     status: str = 'approved'
 

@@ -97,19 +97,31 @@ class MCPServerDAO:
             )
         ).order_by(MCPServer.created_at.desc()).all()
 
-    def get_mcp_servers_by_tags(self, tags: List[str], status: str = 'approved') -> List[MCPServer]:
-        """태그별 MCP 서버 목록을 조회합니다. (OR 조건: 하나라도 일치하면 반환)"""
-        return self.db.query(MCPServer).options(
+    def search_mcp_servers_with_tags(self, keyword: Optional[str], tags: List[str], status: str = 'approved') -> List[MCPServer]:
+        """키워드와 태그로 MCP 서버를 검색합니다. keyword가 None이면 tags만으로 검색"""
+        query = self.db.query(MCPServer).options(
             joinedload(MCPServer.owner),
             joinedload(MCPServer.tags)
         ).join(
             MCPServer.tags
-        ).filter(
-            and_(
-                Tag.name.in_(tags),
-                MCPServer.status == status
+        )
+
+        # 필터 조건 구성
+        conditions = [
+            Tag.name.in_(tags),
+            MCPServer.status == status
+        ]
+
+        # keyword가 있으면 추가 필터
+        if keyword:
+            conditions.append(
+                or_(
+                    MCPServer.name.ilike(f'%{keyword}%'),
+                    MCPServer.description.ilike(f'%{keyword}%')
+                )
             )
-        ).distinct().order_by(MCPServer.created_at.desc()).all()
+
+        return query.filter(and_(*conditions)).distinct().order_by(MCPServer.created_at.desc()).all()
     
     def update_mcp_server(self, mcp_server_id: int, mcp_server_data: Dict[str, Any]) -> Optional[MCPServer]:
         """MCP 서버를 수정합니다."""
