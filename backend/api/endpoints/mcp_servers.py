@@ -14,7 +14,7 @@ from backend.api.schemas import (
     SearchRequest, SearchResponse, FavoriteRequest, FavoriteResponse,
     AdminApprovalRequest, TagResponse, PreviewToolsRequest, PreviewToolsResponse,
     AnnouncementRequest, PreviewPromptsRequest, PreviewPromptsResponse,
-    PreviewResourcesRequest, PreviewResourcesResponse
+    PreviewResourcesRequest, PreviewResourcesResponse, TopUserResponse
 )
 from backend.api.auth import get_current_user, get_current_admin_user
 
@@ -137,20 +137,38 @@ def get_mcp_servers(
 ):
     """MCP 서버 목록을 조회합니다."""
     mcp_service = MCPServerService(db)
-    
+
     if status == "approved":
         mcps = mcp_service.get_approved_mcp_servers(limit, offset)
     elif status == "pending":
         mcps = mcp_service.get_pending_mcp_servers()
     else:
         mcps = mcp_service.get_approved_mcp_servers(limit, offset)
-    
+
     # 각 MCP 서버에 favorites_count 추가
     for mcp in mcps:
         mcp.favorites_count = mcp_service.get_mcp_server_favorites_count(mcp.id)
         print(f"MCP {mcp.id} ({mcp.name}): favorites_count = {mcp.favorites_count}")
-    
+
     return mcps
+
+@router.get("/top", response_model=List[MCPServerResponse])
+def get_top_mcp_servers(
+    limit: int = Query(3, description="조회 개수", le=10),
+    db: Session = Depends(get_db)
+):
+    """인기 MCP 서버 Top N을 조회합니다. (즐겨찾기 수 기준)"""
+    mcp_service = MCPServerService(db)
+    return mcp_service.get_top_mcp_servers(limit)
+
+@router.get("/top-users", response_model=List[TopUserResponse])
+def get_top_users(
+    limit: int = Query(3, description="조회 개수", le=10),
+    db: Session = Depends(get_db)
+):
+    """Top Contributors를 조회합니다. (등록한 MCP 서버 수 기준)"""
+    user_service = UserService(db)
+    return user_service.get_top_users(limit)
 
 @router.get("/{mcp_server_id}/favorites/count")
 def get_mcp_server_favorites_count(mcp_server_id: int, db: Session = Depends(get_db)):

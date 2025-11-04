@@ -99,4 +99,8 @@ class UserService:
     def is_admin(self, user_id: int) -> bool:
         """사용자가 관리자인지 확인합니다."""
         user = self.user_dao.get_user_by_id(user_id)
-        return user is not None and user.is_admin == "admin" 
+        return user is not None and user.is_admin == "admin"
+
+    def get_top_users(self, limit: int = 3) -> List[Dict[str, Any]]:
+        """Top Contributors를 조회합니다. (등록한 승인된 MCP 서버 수 기준)"""
+        return self.user_dao.get_top_users(limit) 

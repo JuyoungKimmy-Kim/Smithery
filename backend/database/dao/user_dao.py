@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
-from typing import Optional, List
+from sqlalchemy import and_, func, desc
+from typing import Optional, List, Dict, Any
 from backend.database.model import User, MCPServer, UserFavorite
 from passlib.context import CryptContext
 
@@ -105,4 +105,33 @@ class UserDAO:
         favorite = self.db.query(UserFavorite).filter(
             and_(UserFavorite.user_id == user_id, UserFavorite.mcp_server_id == mcp_server_id)
         ).first()
-        return favorite is not None 
+        return favorite is not None
+
+    def get_top_users(self, limit: int = 3) -> List[Dict[str, Any]]:
+        """Top Contributors를 조회합니다. (등록한 승인된 MCP 서버 수 기준, 내림차순)"""
+        # 서브쿼리로 각 사용자의 승인된 MCP 서버 수 계산
+        results = self.db.query(
+            User,
+            func.count(MCPServer.id).label('mcp_servers_count')
+        ).join(
+            MCPServer, User.id == MCPServer.owner_id
+        ).filter(
+            MCPServer.status == 'approved'
+        ).group_by(
+            User.id
+        ).order_by(
+            desc('mcp_servers_count')
+        ).limit(limit).all()
+
+        # Dict 형식으로 변환
+        top_users = []
+        for user, count in results:
+            top_users.append({
+                'id': user.id,
+                'username': user.username,
+                'nickname': user.nickname,
+                'avatar_url': user.avatar_url,
+                'mcp_servers_count': count
+            })
+
+        return top_users 

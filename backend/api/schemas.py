@@ -23,7 +23,17 @@ class UserResponse(BaseModel):
     is_admin: str
     avatar_url: Optional[str] = None
     created_at: datetime
-    
+
+    class Config:
+        from_attributes = True
+
+class TopUserResponse(BaseModel):
+    id: int
+    username: str
+    nickname: str
+    avatar_url: Optional[str] = None
+    mcp_servers_count: int
+
     class Config:
         from_attributes = True
 

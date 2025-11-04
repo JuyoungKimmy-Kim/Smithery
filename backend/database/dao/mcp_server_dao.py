@@ -208,8 +208,29 @@ class MCPServerDAO:
         mcp_server = self.get_mcp_server_by_id(mcp_server_id)
         if not mcp_server:
             return None
-        
+
         mcp_server.announcement = announcement
         self.db.commit()
         self.db.refresh(mcp_server)
         return mcp_server
+
+    def get_top_mcp_servers(self, limit: int = 3) -> List[MCPServer]:
+        """인기 MCP 서버 Top N을 조회합니다. (즐겨찾기 수 기준, 내림차순)"""
+        # 서브쿼리로 각 MCP 서버의 즐겨찾기 수 계산
+        favorites_subquery = self.db.query(
+            UserFavorite.mcp_server_id,
+            func.count(UserFavorite.id).label('favorites_count')
+        ).group_by(UserFavorite.mcp_server_id).subquery()
+
+        # 메인 쿼리에서 조인하고 정렬하여 Top N 반환
+        return self.db.query(MCPServer).options(
+            joinedload(MCPServer.owner),
+            joinedload(MCPServer.tags),
+            joinedload(MCPServer.tools)
+        ).join(
+            favorites_subquery, MCPServer.id == favorites_subquery.c.mcp_server_id
+        ).filter(
+            MCPServer.status == 'approved'
+        ).order_by(
+            desc(favorites_subquery.c.favorites_count)
+        ).limit(limit).all()
