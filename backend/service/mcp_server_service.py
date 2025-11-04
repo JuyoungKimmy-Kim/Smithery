@@ -259,6 +259,10 @@ class MCPServerService:
     def get_top_mcp_servers(self, limit: int = 3) -> List[MCPServer]:
         """인기 MCP 서버 Top N을 조회합니다. (즐겨찾기 수 기준)"""
         return self.mcp_server_dao.get_top_mcp_servers(limit)
+
+    def get_latest_mcp_servers(self, limit: int = 3) -> List[MCPServer]:
+        """최신 등록된 MCP 서버 Top N을 조회합니다. (등록일 기준)"""
+        return self.mcp_server_dao.get_latest_mcp_servers(limit)
     
     def update_mcp_server_announcement(self, mcp_server_id: int, announcement: Optional[str]) -> Optional[MCPServer]:
         """MCP 서버의 공지사항을 업데이트합니다."""

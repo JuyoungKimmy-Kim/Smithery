@@ -234,3 +234,15 @@ class MCPServerDAO:
         ).order_by(
             desc(favorites_subquery.c.favorites_count)
         ).limit(limit).all()
+
+    def get_latest_mcp_servers(self, limit: int = 3) -> List[MCPServer]:
+        """최신 등록된 MCP 서버 Top N을 조회합니다. (등록일 기준, 내림차순)"""
+        return self.db.query(MCPServer).options(
+            joinedload(MCPServer.owner),
+            joinedload(MCPServer.tags),
+            joinedload(MCPServer.tools)
+        ).filter(
+            MCPServer.status == 'approved'
+        ).order_by(
+            desc(MCPServer.created_at)
+        ).limit(limit).all()

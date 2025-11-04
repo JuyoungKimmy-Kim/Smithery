@@ -170,6 +170,21 @@ def get_top_users(
     user_service = UserService(db)
     return user_service.get_top_users(limit)
 
+@router.get("/latest", response_model=List[MCPServerResponse])
+def get_latest_mcp_servers(
+    limit: int = Query(3, description="조회 개수", le=10),
+    db: Session = Depends(get_db)
+):
+    """최신 등록된 MCP 서버 목록을 조회합니다. (등록일 기준)"""
+    mcp_service = MCPServerService(db)
+    mcps = mcp_service.get_latest_mcp_servers(limit)
+
+    # 각 MCP 서버에 favorites_count 추가
+    for mcp in mcps:
+        mcp.favorites_count = mcp_service.get_mcp_server_favorites_count(mcp.id)
+
+    return mcps
+
 @router.get("/{mcp_server_id}/favorites/count")
 def get_mcp_server_favorites_count(mcp_server_id: int, db: Session = Depends(get_db)):
     """특정 MCP 서버의 즐겨찾기 수를 조회합니다."""
