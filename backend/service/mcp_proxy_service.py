@@ -656,3 +656,156 @@ class MCPProxyService:
         except Exception as e:
             logger.error(f"[Streamable HTTP] Failed: {str(e)}", exc_info=True)
             return MCPProxyService._create_error_response(f"Streamable HTTP failed: {str(e)}", data_key="resources")
+
+    # ==================== TOOL CALLING METHODS ====================
+
+    @staticmethod
+    async def call_tool(url: str, protocol: str, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Call a specific tool on the MCP server
+
+        Args:
+            url: MCP 서버 URL 또는 명령어
+            protocol: 프로토콜 타입 (stdio, sse, streamable-http)
+            tool_name: Tool name to call
+            arguments: Tool arguments
+
+        Returns:
+            Dict containing tool execution result
+        """
+        logger.info(f"[MCP Proxy] Calling tool {tool_name} - URL: {url}, Protocol: {protocol}")
+
+        if not MCP_SDK_AVAILABLE:
+            logger.error("MCP SDK is not installed")
+            return {
+                "success": False,
+                "error": "MCP SDK is not installed"
+            }
+
+        try:
+            normalized_protocol = MCPProxyService._normalize_protocol(protocol)
+
+            if normalized_protocol == "stdio":
+                return await MCPProxyService._call_tool_stdio(url, tool_name, arguments)
+            elif normalized_protocol == "sse":
+                return await MCPProxyService._call_tool_sse(url, tool_name, arguments)
+            else:
+                return await MCPProxyService._call_tool_streamable_http(url, tool_name, arguments)
+
+        except Exception as e:
+            logger.error(f"[MCP Proxy] Failed to call tool: {str(e)}", exc_info=True)
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    @staticmethod
+    async def _call_tool_stdio(command: str, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """STDIO를 통해 tool 호출"""
+        logger.info(f"[STDIO] Calling tool {tool_name} with command: {command}")
+
+        try:
+            parts = command.split()
+            if not parts:
+                return {"success": False, "error": "Empty command"}
+
+            cmd = parts[0]
+            args = parts[1:] if len(parts) > 1 else []
+
+            server_params = StdioServerParameters(command=cmd, args=args, env=None)
+
+            async with stdio_client(server_params) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await asyncio.wait_for(session.initialize(), timeout=MCPProxyService.DEFAULT_TIMEOUT)
+
+                    result = await asyncio.wait_for(
+                        session.call_tool(tool_name, arguments),
+                        timeout=MCPProxyService.DEFAULT_TIMEOUT
+                    )
+
+                    logger.info(f"[STDIO] Tool {tool_name} executed successfully")
+                    return {
+                        "success": True,
+                        "result": result.content if hasattr(result, 'content') else result
+                    }
+
+        except asyncio.TimeoutError:
+            return {
+                "success": False,
+                "error": f"STDIO timeout after {MCPProxyService.DEFAULT_TIMEOUT}s"
+            }
+        except Exception as e:
+            logger.error(f"[STDIO] Failed: {str(e)}", exc_info=True)
+            return {"success": False, "error": str(e)}
+
+    @staticmethod
+    async def _call_tool_sse(url: str, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """SSE를 통해 tool 호출"""
+        logger.info(f"[SSE] Calling tool {tool_name} from: {url}")
+
+        try:
+            if not url.startswith("http://") and not url.startswith("https://"):
+                return {"success": False, "error": f"Invalid URL: {url}"}
+
+            async with sse_client(url) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await asyncio.wait_for(session.initialize(), timeout=MCPProxyService.DEFAULT_TIMEOUT)
+
+                    result = await asyncio.wait_for(
+                        session.call_tool(tool_name, arguments),
+                        timeout=MCPProxyService.DEFAULT_TIMEOUT
+                    )
+
+                    logger.info(f"[SSE] Tool {tool_name} executed successfully")
+                    return {
+                        "success": True,
+                        "result": result.content if hasattr(result, 'content') else result
+                    }
+
+        except asyncio.TimeoutError:
+            return {
+                "success": False,
+                "error": f"SSE timeout after {MCPProxyService.DEFAULT_TIMEOUT}s"
+            }
+        except Exception as e:
+            logger.error(f"[SSE] Failed: {str(e)}", exc_info=True)
+            return {"success": False, "error": str(e)}
+
+    @staticmethod
+    async def _call_tool_streamable_http(url: str, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Streamable HTTP를 통해 tool 호출"""
+        logger.info(f"[Streamable HTTP] Calling tool {tool_name} from: {url}")
+
+        try:
+            if not url.startswith("http://") and not url.startswith("https://"):
+                return {"success": False, "error": f"Invalid URL: {url}"}
+
+            if not HAS_STREAMABLE_HTTP:
+                logger.warning("[Streamable HTTP] Not available, trying SSE")
+                return await MCPProxyService._call_tool_sse(url, tool_name, arguments)
+
+            async with streamablehttp_client(url) as transport_tuple:
+                read, write, _ = transport_tuple
+
+                async with ClientSession(read, write) as session:
+                    await asyncio.wait_for(session.initialize(), timeout=MCPProxyService.DEFAULT_TIMEOUT)
+
+                    result = await asyncio.wait_for(
+                        session.call_tool(tool_name, arguments),
+                        timeout=MCPProxyService.DEFAULT_TIMEOUT
+                    )
+
+                    logger.info(f"[Streamable HTTP] Tool {tool_name} executed successfully")
+                    return {
+                        "success": True,
+                        "result": result.content if hasattr(result, 'content') else result
+                    }
+
+        except asyncio.TimeoutError:
+            return {
+                "success": False,
+                "error": f"Streamable HTTP timeout after {MCPProxyService.DEFAULT_TIMEOUT}s"
+            }
+        except Exception as e:
+            logger.error(f"[Streamable HTTP] Failed: {str(e)}", exc_info=True)
+            return {"success": False, "error": str(e)}
