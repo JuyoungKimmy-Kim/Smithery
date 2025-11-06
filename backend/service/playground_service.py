@@ -24,17 +24,26 @@ class PlaygroundService:
     # Rate limiting constants
     DAILY_QUERY_LIMIT = 10
 
-    def __init__(self, api_key: str = None, model: str = "gpt-4-turbo-preview"):
+    def __init__(self, api_key: str = None, model: str = "gpt-4-turbo-preview", base_url: str = None):
         """
         Initialize PlaygroundService
 
         Args:
             api_key: OpenAI API key (defaults to env var OPENAI_API_KEY)
             model: Model to use (defaults to gpt-4-turbo-preview)
+            base_url: API base URL (defaults to env var LLM_BASE_URL or OpenAI default)
         """
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.model = model
-        self.client = OpenAI(api_key=self.api_key) if self.api_key else None
+        self.base_url = base_url or os.getenv("LLM_BASE_URL")
+
+        if self.api_key:
+            if self.base_url:
+                self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+            else:
+                self.client = OpenAI(api_key=self.api_key)
+        else:
+            self.client = None
 
     @staticmethod
     def check_rate_limit(db: Session, user_id: int, mcp_server_id: int) -> Dict[str, Any]:
