@@ -271,37 +271,75 @@ class PlaygroundService:
                         function_args
                     )
 
-                    logger.info(f"Tool {function_name} result: {tool_result}")
+                    logger.info(f"Tool {function_name} result type: {type(tool_result)}")
+                    logger.info(f"Tool {function_name} result: {str(tool_result)[:500]}")
 
                     # Extract actual content from MCP result
                     tool_content = ""
-                    if isinstance(tool_result, dict):
-                        if tool_result.get("success"):
-                            result_data = tool_result.get("result", {})
-                            # MCP result.content is usually a list of content items
-                            if isinstance(result_data, list):
-                                # Extract text from content items
-                                text_parts = []
-                                for item in result_data:
-                                    if isinstance(item, dict):
-                                        if "text" in item:
-                                            text_parts.append(item["text"])
-                                        elif "type" in item and item["type"] == "text":
-                                            text_parts.append(item.get("text", ""))
-                                tool_content = "\n".join(text_parts) if text_parts else json.dumps(result_data)
-                            else:
-                                tool_content = json.dumps(result_data)
-                        else:
-                            tool_content = f"Error: {tool_result.get('error', 'Unknown error')}"
-                    else:
-                        tool_content = str(tool_result)
+                    try:
+                        if isinstance(tool_result, dict):
+                            if tool_result.get("success"):
+                                result_data = tool_result.get("result", {})
+                                logger.info(f"Result data type: {type(result_data)}")
 
-                    logger.info(f"Parsed tool content: {tool_content[:200]}...")
+                                # MCP result.content is usually a list of content items
+                                if isinstance(result_data, list):
+                                    # Extract text from content items
+                                    text_parts = []
+                                    for item in result_data:
+                                        if isinstance(item, dict):
+                                            if "text" in item:
+                                                text_parts.append(str(item["text"]))
+                                            elif "type" in item and item["type"] == "text":
+                                                text_parts.append(str(item.get("text", "")))
+
+                                    if text_parts:
+                                        tool_content = "\n".join(text_parts)
+                                    else:
+                                        # Fallback: convert to string representation
+                                        try:
+                                            tool_content = json.dumps(result_data, ensure_ascii=False, default=str)
+                                        except (TypeError, ValueError) as e:
+                                            logger.error(f"JSON serialization failed: {e}")
+                                            tool_content = str(result_data)
+                                elif isinstance(result_data, dict):
+                                    # Try to serialize dict
+                                    try:
+                                        tool_content = json.dumps(result_data, ensure_ascii=False, default=str)
+                                    except (TypeError, ValueError) as e:
+                                        logger.error(f"JSON serialization failed: {e}")
+                                        tool_content = str(result_data)
+                                else:
+                                    # Other types: convert to string
+                                    tool_content = str(result_data)
+                            else:
+                                tool_content = f"Error: {tool_result.get('error', 'Unknown error')}"
+                        else:
+                            tool_content = str(tool_result)
+                    except Exception as e:
+                        logger.error(f"Error parsing tool result: {e}", exc_info=True)
+                        tool_content = f"Error parsing result: {str(e)}"
+
+                    logger.info(f"Parsed tool content length: {len(tool_content)}")
+                    logger.info(f"Parsed tool content preview: {tool_content[:500]}...")
+
+                    # Safely serialize tool_result for response
+                    safe_tool_result = tool_result
+                    try:
+                        # Test if tool_result is JSON serializable
+                        json.dumps(tool_result)
+                    except (TypeError, ValueError):
+                        # If not, convert to safe format
+                        logger.warning(f"Tool result not JSON serializable, converting to string")
+                        safe_tool_result = {
+                            "success": tool_result.get("success", False) if isinstance(tool_result, dict) else False,
+                            "result": str(tool_result)
+                        }
 
                     response_data["tool_calls"].append({
                         "name": function_name,
                         "arguments": function_args,
-                        "result": tool_result
+                        "result": safe_tool_result
                     })
 
                     # Add tool response to messages (send as string for OpenAI)
