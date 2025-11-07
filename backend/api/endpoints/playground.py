@@ -57,7 +57,8 @@ async def playground_chat(
         )
 
     # Get MCP server
-    mcp_server = MCPServerDAO.get_mcp_server(db, server_id)
+    mcp_server_dao = MCPServerDAO(db)
+    mcp_server = mcp_server_dao.get_mcp_server_by_id(server_id)
     if not mcp_server:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
