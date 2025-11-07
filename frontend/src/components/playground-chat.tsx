@@ -181,7 +181,7 @@ export default function PlaygroundChat({ mcpServerId }: PlaygroundChatProps) {
                   rateLimit.remaining <= 2 ? "text-red-600" : "text-gray-900"
                 }`}
               >
-                {rateLimit.used}/10
+                {rateLimit.used}/{rateLimit.used + rateLimit.remaining}
               </span>
               <span className="text-gray-500 ml-1">queries today</span>
             </div>
