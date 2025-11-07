@@ -26,7 +26,7 @@ class PlaygroundService:
     """
 
     # Rate limiting constants
-    DAILY_QUERY_LIMIT = 10
+    DAILY_QUERY_LIMIT = 5
 
     def __init__(self, api_key: str = None, model: str = "gpt-4-turbo-preview", base_url: str = None):
         """
@@ -223,6 +223,21 @@ class PlaygroundService:
 
             # Build messages
             messages = conversation_history or []
+
+            # Add system prompt to encourage tool usage when tools are available
+            if tools and (not messages or messages[0].get("role") != "system"):
+                system_message = {
+                    "role": "system",
+                    "content": (
+                        "You are a helpful assistant with access to tools. "
+                        "When answering questions, ALWAYS check if there are relevant tools available that could provide accurate information. "
+                        "If a tool can help answer the user's question, you MUST use it instead of relying on general knowledge. "
+                        "For example, if the user asks about documentation, usage, or specific information that a tool like 'search_doc' can provide, "
+                        "you should call that tool first and base your answer on the tool's results."
+                    )
+                }
+                messages.insert(0, system_message)
+
             messages.append({
                 "role": "user",
                 "content": message
