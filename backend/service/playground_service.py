@@ -265,17 +265,44 @@ class PlaygroundService:
                         function_args
                     )
 
+                    logger.info(f"Tool {function_name} result: {tool_result}")
+
+                    # Extract actual content from MCP result
+                    tool_content = ""
+                    if isinstance(tool_result, dict):
+                        if tool_result.get("success"):
+                            result_data = tool_result.get("result", {})
+                            # MCP result.content is usually a list of content items
+                            if isinstance(result_data, list):
+                                # Extract text from content items
+                                text_parts = []
+                                for item in result_data:
+                                    if isinstance(item, dict):
+                                        if "text" in item:
+                                            text_parts.append(item["text"])
+                                        elif "type" in item and item["type"] == "text":
+                                            text_parts.append(item.get("text", ""))
+                                tool_content = "\n".join(text_parts) if text_parts else json.dumps(result_data)
+                            else:
+                                tool_content = json.dumps(result_data)
+                        else:
+                            tool_content = f"Error: {tool_result.get('error', 'Unknown error')}"
+                    else:
+                        tool_content = str(tool_result)
+
+                    logger.info(f"Parsed tool content: {tool_content[:200]}...")
+
                     response_data["tool_calls"].append({
                         "name": function_name,
                         "arguments": function_args,
                         "result": tool_result
                     })
 
-                    # Add tool response to messages
+                    # Add tool response to messages (send as string for OpenAI)
                     messages.append({
                         "role": "tool",
                         "tool_call_id": tool_call.id,
-                        "content": json.dumps(tool_result)
+                        "content": tool_content
                     })
 
                 # Get final response after tool execution
