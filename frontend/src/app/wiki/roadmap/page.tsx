@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ChevronDownIcon, ChevronUpIcon, CheckCircleIcon, ClockIcon, SparklesIcon, PauseIcon, LanguageIcon } from '@heroicons/react/24/solid';
-import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Feature {
   title: string;
@@ -519,8 +518,16 @@ function FeatureStatusIcon({ status }: { status?: 'completed' | 'in-progress' | 
 
 export default function RoadmapPage() {
   const [expandedVersion, setExpandedVersion] = useState<string | null>('v1.8');
-  const { language, setLanguage } = useLanguage();
-  
+  const [language, setLanguage] = useState<'en' | 'ko'>('en');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedLanguage = localStorage.getItem('wiki-language');
+    if (storedLanguage === 'ko' || storedLanguage === 'en') {
+      setLanguage(storedLanguage);
+    }
+  }, []);
+
   const roadmapData = language === 'en' ? roadmapDataEn : roadmapDataKo;
 
   const toggleVersion = (version: string) => {
@@ -528,7 +535,11 @@ export default function RoadmapPage() {
   };
 
   const handleLanguageToggle = () => {
-    setLanguage(language === 'ko' ? 'en' : 'ko');
+    const nextLanguage = language === 'ko' ? 'en' : 'ko';
+    setLanguage(nextLanguage);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('wiki-language', nextLanguage);
+    }
   };
 
   return (

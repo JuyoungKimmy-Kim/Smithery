@@ -4,14 +4,25 @@ import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { LanguageIcon } from '@heroicons/react/24/solid';
-import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function HowToUsePage() {
   const [markdown, setMarkdown] = useState('');
-  const { language, setLanguage } = useLanguage();
+  const [language, setLanguage] = useState<'en' | 'ko'>('en');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedLanguage = localStorage.getItem('wiki-language');
+    if (storedLanguage === 'ko' || storedLanguage === 'en') {
+      setLanguage(storedLanguage);
+    }
+  }, []);
 
   const handleLanguageToggle = () => {
-    setLanguage(language === 'ko' ? 'en' : 'ko');
+    const nextLanguage = language === 'ko' ? 'en' : 'ko';
+    setLanguage(nextLanguage);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('wiki-language', nextLanguage);
+    }
   };
 
   useEffect(() => {
