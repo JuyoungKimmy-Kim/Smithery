@@ -6,7 +6,8 @@ import logging
 import json
 import os
 from typing import Dict, Any, List, Optional
-from datetime import date
+from datetime import datetime
+import pytz
 from sqlalchemy.orm import Session
 from openai import OpenAI
 
@@ -14,6 +15,9 @@ from backend.database.model.playground_usage import PlaygroundUsage
 from backend.service.mcp_proxy_service import MCPProxyService
 
 logger = logging.getLogger(__name__)
+
+# KST timezone
+KST = pytz.timezone('Asia/Seoul')
 
 
 class PlaygroundService:
@@ -48,17 +52,18 @@ class PlaygroundService:
     @staticmethod
     def check_rate_limit(db: Session, user_id: int, mcp_server_id: int) -> Dict[str, Any]:
         """
-        Check if user has exceeded rate limit for today
+        Check if user has exceeded rate limit for today (KST timezone)
 
         Returns:
             Dict with 'allowed' bool and 'remaining' int
         """
-        today = date.today()
+        # Get current date in KST
+        today_kst = datetime.now(KST).date()
 
         usage = db.query(PlaygroundUsage).filter(
             PlaygroundUsage.user_id == user_id,
             PlaygroundUsage.mcp_server_id == mcp_server_id,
-            PlaygroundUsage.date == today
+            PlaygroundUsage.date == today_kst
         ).first()
 
         if not usage:
@@ -76,14 +81,15 @@ class PlaygroundService:
     @staticmethod
     def increment_usage(db: Session, user_id: int, mcp_server_id: int):
         """
-        Increment usage count for user and MCP server for today
+        Increment usage count for user and MCP server for today (KST timezone)
         """
-        today = date.today()
+        # Get current date in KST
+        today_kst = datetime.now(KST).date()
 
         usage = db.query(PlaygroundUsage).filter(
             PlaygroundUsage.user_id == user_id,
             PlaygroundUsage.mcp_server_id == mcp_server_id,
-            PlaygroundUsage.date == today
+            PlaygroundUsage.date == today_kst
         ).first()
 
         if usage:
@@ -93,7 +99,7 @@ class PlaygroundService:
                 user_id=user_id,
                 mcp_server_id=mcp_server_id,
                 query_count=1,
-                date=today
+                date=today_kst
             )
             db.add(usage)
 

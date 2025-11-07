@@ -18,3 +18,4 @@ mcp[cli]
 openai
 python-dateutil
 python-dotenv
+pytz
