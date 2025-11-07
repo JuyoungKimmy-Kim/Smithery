@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 import os
+import logging
 
 from backend.api.schemas import (
     PlaygroundChatRequest,
@@ -13,6 +14,7 @@ from backend.database.dao.mcp_server_dao import MCPServerDAO
 from backend.service.playground_service import PlaygroundService
 from backend.database.model.user import User
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -65,17 +67,14 @@ async def playground_chat(
             detail="MCP server not found"
         )
 
-    # Check if server has config
-    if not mcp_server.config:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="MCP server does not have a valid configuration"
-        )
-
-    # Get server URL from config
+    # Get server URL from server_url field or config
     server_url = mcp_server.server_url
-    if not server_url:
-        # Try to get from config
+    logger.info(f"[Playground] MCP Server ID: {server_id}, Name: {mcp_server.name}")
+    logger.info(f"[Playground] server_url: {server_url}, protocol: {mcp_server.protocol}")
+    logger.info(f"[Playground] config: {mcp_server.config}")
+
+    if not server_url and mcp_server.config:
+        # Try to get from config if server_url is empty
         config = mcp_server.config
         if isinstance(config, dict):
             # Check various possible config structures
@@ -87,9 +86,10 @@ async def playground_chat(
                 server_url = config["url"]
 
     if not server_url:
+        logger.error(f"[Playground] No server_url found for MCP server {server_id}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="MCP server URL not found in configuration"
+            detail="MCP server URL not found in server_url or config"
         )
 
     # Get API key from environment
