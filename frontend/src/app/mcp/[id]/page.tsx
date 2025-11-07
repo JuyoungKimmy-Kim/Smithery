@@ -21,6 +21,7 @@ import { MCPServer } from "@/types/mcp";
 import { useAuth } from "@/contexts/AuthContext";
 import Comments from "@/components/comments";
 import MCPCapabilitiesTabs from "@/components/mcp-capabilities-tabs";
+import PlaygroundChat from "@/components/playground-chat";
 import { apiFetch } from "@/lib/api-client";
 
 export default function MCPServerDetail() {
@@ -634,6 +635,19 @@ export default function MCPServerDetail() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Playground Section */}
+        <div className="mt-8 bg-white rounded-lg shadow-sm p-8">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              🎮 Try it out!
+            </h2>
+            <p className="text-gray-600">
+              Test this MCP server directly in your browser. Ask questions and see the tools in action.
+            </p>
+          </div>
+          <PlaygroundChat mcpServerId={parseInt(mcp.id)} />
         </div>
 
         {/* 댓글 섹션 */}

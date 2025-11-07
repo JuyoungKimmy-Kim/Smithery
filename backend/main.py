@@ -5,12 +5,16 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import os
 import sys
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # 프로젝트 루트를 Python 경로에 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.database import init_database
-from backend.api import auth_router, mcp_servers_router, comments_router
+from backend.api import auth_router, mcp_servers_router, comments_router, playground_router
 
 # Rate limiter 설정
 limiter = Limiter(key_func=get_remote_address)
@@ -39,6 +43,7 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(mcp_servers_router, prefix="/api/v1")
 app.include_router(comments_router, prefix="/api/v1")
+app.include_router(playground_router, prefix="/api/v1")
 
 @app.on_event("startup")
 async def startup_event():

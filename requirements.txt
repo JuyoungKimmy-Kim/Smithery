@@ -15,3 +15,7 @@ alembic
 passlib[bcrypt]
 PyJWT
 mcp[cli]
+openai
+python-dateutil
+python-dotenv
+pytz

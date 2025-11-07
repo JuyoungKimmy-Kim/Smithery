@@ -242,3 +242,30 @@ class PreviewResourcesResponse(BaseModel):
     resources: List[PreviewResourceResponse]
     success: bool
     message: Optional[str] = None
+
+# ==================== PLAYGROUND SCHEMAS ====================
+
+class PlaygroundChatMessage(BaseModel):
+    role: str
+    content: str
+
+class PlaygroundChatRequest(BaseModel):
+    message: str
+    conversation_history: Optional[List[PlaygroundChatMessage]] = []
+
+class PlaygroundToolCall(BaseModel):
+    name: str
+    arguments: Dict[str, Any]
+    result: Dict[str, Any]
+
+class PlaygroundChatResponse(BaseModel):
+    success: bool
+    response: Optional[str] = None
+    tool_calls: Optional[List[PlaygroundToolCall]] = []
+    tokens_used: Optional[int] = None
+    error: Optional[str] = None
+
+class PlaygroundRateLimitResponse(BaseModel):
+    allowed: bool
+    remaining: int
+    used: int

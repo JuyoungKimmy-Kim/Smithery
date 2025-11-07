@@ -6,6 +6,7 @@ from .mcp_server import (
 )
 from .tag import Tag, mcp_server_tags
 from .comment import Comment
+from .playground_usage import PlaygroundUsage
 
 __all__ = [
     'Base',
@@ -19,5 +20,6 @@ __all__ = [
     'MCPServerResource',
     'Tag',
     'mcp_server_tags',
-    'Comment'
+    'Comment',
+    'PlaygroundUsage'
 ]
