@@ -19,3 +19,4 @@ openai
 python-dateutil
 python-dotenv
 pytz
+cryptography

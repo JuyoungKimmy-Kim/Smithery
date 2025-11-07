@@ -159,7 +159,8 @@ class PlaygroundService:
         mcp_server_url: str,
         protocol: str,
         tool_name: str,
-        arguments: Dict[str, Any]
+        arguments: Dict[str, Any],
+        user_token: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Call a specific tool on the MCP server
@@ -324,16 +325,31 @@ class PlaygroundService:
                     logger.info(f"Parsed tool content preview: {tool_content[:500]}...")
 
                     # Safely serialize tool_result for response
-                    safe_tool_result = tool_result
+                    # Convert to fully JSON-serializable format
+                    def make_serializable(obj):
+                        """Recursively convert object to JSON-serializable format"""
+                        if obj is None or isinstance(obj, (str, int, float, bool)):
+                            return obj
+                        elif isinstance(obj, dict):
+                            return {str(k): make_serializable(v) for k, v in obj.items()}
+                        elif isinstance(obj, (list, tuple)):
+                            return [make_serializable(item) for item in obj]
+                        else:
+                            # For any other type, convert to string
+                            return str(obj)
+
+                    safe_tool_result = make_serializable(tool_result)
+
+                    # Verify it's actually serializable
                     try:
-                        # Test if tool_result is JSON serializable
-                        json.dumps(tool_result)
-                    except (TypeError, ValueError):
-                        # If not, convert to safe format
-                        logger.warning(f"Tool result not JSON serializable, converting to string")
+                        json.dumps(safe_tool_result)
+                        logger.info(f"Tool result successfully serialized")
+                    except (TypeError, ValueError) as e:
+                        logger.error(f"Tool result STILL not serializable: {e}, using fallback")
                         safe_tool_result = {
-                            "success": tool_result.get("success", False) if isinstance(tool_result, dict) else False,
-                            "result": str(tool_result)
+                            "success": False,
+                            "error": "Result serialization failed",
+                            "raw": str(tool_result)
                         }
 
                     response_data["tool_calls"].append({
