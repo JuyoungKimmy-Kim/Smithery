@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import Dict, Any
 import os
 
 from backend.api.schemas import (
@@ -12,6 +11,7 @@ from backend.api.auth import get_current_user
 from backend.database.database import get_db
 from backend.database.dao.mcp_server_dao import MCPServerDAO
 from backend.service.playground_service import PlaygroundService
+from backend.database.model.user import User
 
 router = APIRouter()
 
@@ -19,13 +19,13 @@ router = APIRouter()
 @router.get("/mcp-servers/{server_id}/playground/rate-limit")
 async def get_rate_limit(
     server_id: int,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ) -> PlaygroundRateLimitResponse:
     """
     Get rate limit status for current user and MCP server
     """
-    user_id = current_user["id"]
+    user_id = current_user.id
 
     rate_limit = PlaygroundService.check_rate_limit(db, user_id, server_id)
 
@@ -40,13 +40,13 @@ async def get_rate_limit(
 async def playground_chat(
     server_id: int,
     request: PlaygroundChatRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ) -> PlaygroundChatResponse:
     """
     Send a chat message to the playground with MCP integration
     """
-    user_id = current_user["id"]
+    user_id = current_user.id
 
     # Check rate limit
     rate_limit = PlaygroundService.check_rate_limit(db, user_id, server_id)
