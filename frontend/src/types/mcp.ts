@@ -62,6 +62,7 @@ export interface MCPServer {
   category?: string;
   tags?: string[];
   status?: string;
+  requires_auth?: boolean;
   announcement?: string;
   health_status?: string;
   last_health_check?: string;

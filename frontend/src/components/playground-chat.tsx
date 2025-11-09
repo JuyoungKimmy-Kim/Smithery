@@ -24,12 +24,15 @@ interface Message {
 
 interface PlaygroundChatProps {
   mcpServerId: number;
+  requiresAuth?: boolean;
 }
 
-export default function PlaygroundChat({ mcpServerId }: PlaygroundChatProps) {
+export default function PlaygroundChat({ mcpServerId, requiresAuth = false }: PlaygroundChatProps) {
   const { isAuthenticated } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
+  const [authToken, setAuthToken] = useState("");
+  const [showAuthInput, setShowAuthInput] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [rateLimit, setRateLimit] = useState<{
     allowed: boolean;
@@ -77,6 +80,13 @@ export default function PlaygroundChat({ mcpServerId }: PlaygroundChatProps) {
       return;
     }
 
+    // Check if auth token is required but not provided
+    if (requiresAuth && !authToken.trim()) {
+      setError("This MCP server requires authentication. Please enter your API key/token.");
+      setShowAuthInput(true);
+      return;
+    }
+
     const userMessage: Message = {
       role: "user",
       content: inputMessage,
@@ -88,6 +98,19 @@ export default function PlaygroundChat({ mcpServerId }: PlaygroundChatProps) {
     setError(null);
 
     try {
+      const requestBody: any = {
+        message: inputMessage,
+        conversation_history: messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
+      };
+
+      // Add auth token if provided
+      if (authToken.trim()) {
+        requestBody.auth_token = authToken;
+      }
+
       const response = await apiFetch(
         `/api/mcps/${mcpServerId}/playground/chat`,
         {
@@ -95,13 +118,7 @@ export default function PlaygroundChat({ mcpServerId }: PlaygroundChatProps) {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            message: inputMessage,
-            conversation_history: messages.map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
-          }),
+          body: JSON.stringify(requestBody),
           requiresAuth: true,
         }
       );
@@ -281,6 +298,34 @@ export default function PlaygroundChat({ mcpServerId }: PlaygroundChatProps) {
 
       {/* Input Area */}
       <div className="border-t border-gray-200 p-4">
+        {/* Auth Token Input (collapsible) */}
+        {requiresAuth && (
+          <div className="mb-3">
+            <button
+              onClick={() => setShowAuthInput(!showAuthInput)}
+              className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1 mb-2"
+            >
+              <span>{showAuthInput ? "▼" : "▶"}</span>
+              <span>Authentication Required</span>
+              {authToken && <CheckCircleIcon className="h-4 w-4 text-green-600" />}
+            </button>
+            {showAuthInput && (
+              <div className="mb-2">
+                <input
+                  type="password"
+                  value={authToken}
+                  onChange={(e) => setAuthToken(e.target.value)}
+                  placeholder="Enter your API key/token..."
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Your token is only used for this session and not stored.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="flex gap-2">
           <input
             type="text"

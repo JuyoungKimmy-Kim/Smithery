@@ -125,19 +125,26 @@ class PlaygroundService:
 
         db.commit()
 
-    async def get_mcp_tools(self, mcp_server_url: str, protocol: str) -> List[Dict[str, Any]]:
+    async def get_mcp_tools(self, mcp_server_url: str, protocol: str, user_token: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Fetch tools from MCP server
 
         Args:
             mcp_server_url: MCP server URL or command
             protocol: Protocol type (stdio, sse, http, etc.)
+            user_token: Optional user authentication token
 
         Returns:
             List of tools in OpenAI function format
         """
         try:
-            result = await MCPProxyService.fetch_tools(mcp_server_url, protocol)
+            # Convert user token to headers
+            headers = None
+            if user_token:
+                headers = {"Authorization": f"Bearer {user_token}"}
+                logger.info(f"Using authentication token for MCP tools fetch")
+
+            result = await MCPProxyService.fetch_tools(mcp_server_url, protocol, headers)
 
             if not result.get("success"):
                 logger.error(f"Failed to fetch MCP tools: {result.get('message')}")
@@ -195,13 +202,20 @@ class PlaygroundService:
             Tool execution result
         """
         try:
+            # Convert user token to headers
+            headers = None
+            if user_token:
+                headers = {"Authorization": f"Bearer {user_token}"}
+                logger.info(f"Using authentication token for MCP tool call: {tool_name}")
+
             # Use MCPProxyService to call the tool with timeout
             result = await asyncio.wait_for(
                 MCPProxyService.call_tool(
                     mcp_server_url,
                     protocol,
                     tool_name,
-                    arguments
+                    arguments,
+                    headers
                 ),
                 timeout=self.MCP_TOOL_TIMEOUT
             )
@@ -234,7 +248,8 @@ class PlaygroundService:
         message: str,
         mcp_server_url: str,
         protocol: str,
-        conversation_history: Optional[List[Dict[str, str]]] = None
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+        user_token: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Send a chat message and get response with MCP tool integration
@@ -245,6 +260,7 @@ class PlaygroundService:
             mcp_server_url: MCP server URL or command
             protocol: Protocol type
             conversation_history: Previous conversation messages
+            user_token: Optional user authentication token for MCP server
 
         Returns:
             Dict with response, tool_calls, and metadata
@@ -261,7 +277,7 @@ class PlaygroundService:
 
             try:
                 # Get MCP tools
-                tools = await self.get_mcp_tools(mcp_server_url, protocol)
+                tools = await self.get_mcp_tools(mcp_server_url, protocol, user_token)
 
                 # Build messages
                 messages = conversation_history or []
@@ -326,7 +342,8 @@ class PlaygroundService:
                             mcp_server_url,
                             protocol,
                             function_name,
-                            function_args
+                            function_args,
+                            user_token
                         )
 
                         logger.info(f"Tool {function_name} result type: {type(tool_result)}")

@@ -16,6 +16,7 @@ class MCPServer(Base):
     protocol = Column(String(20), nullable=False)
     server_url = Column(String(500), nullable=True)
     config = Column(JSON, nullable=True)
+    requires_auth = Column(Boolean, default=False, nullable=False)
     announcement = Column(Text, nullable=True)
     owner_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     health_status = Column(String(20), default='unknown')

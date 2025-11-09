@@ -116,7 +116,8 @@ async def playground_chat(
         message=request.message,
         mcp_server_url=server_url,
         protocol=mcp_server.protocol,
-        conversation_history=conversation_history
+        conversation_history=conversation_history,
+        user_token=request.auth_token
     )
 
     # Increment usage if successful

@@ -73,6 +73,7 @@ class MCPServerCreate(BaseModel):
     server_url: Optional[str] = None
     tags: Optional[str] = None
     config: Optional[Dict[str, Any]] = None
+    requires_auth: bool = False
     tools: Optional[List[MCPServerToolCreate]] = []
     prompts: Optional[List[MCPServerPromptCreate]] = []
     resources: Optional[List[MCPServerResourceCreate]] = []
@@ -85,6 +86,7 @@ class MCPServerUpdate(BaseModel):
     server_url: Optional[str] = None
     tags: Optional[str] = None
     config: Optional[Dict[str, Any]] = None
+    requires_auth: Optional[bool] = None
     tools: Optional[List[MCPServerToolCreate]] = []
     prompts: Optional[List[MCPServerPromptCreate]] = []
     resources: Optional[List[MCPServerResourceCreate]] = []
@@ -146,6 +148,7 @@ class MCPServerResponse(BaseModel):
     protocol: str
     server_url: Optional[str] = None
     config: Optional[Dict[str, Any]] = None
+    requires_auth: bool = False
     owner_id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
@@ -252,6 +255,7 @@ class PlaygroundChatMessage(BaseModel):
 class PlaygroundChatRequest(BaseModel):
     message: str
     conversation_history: Optional[List[PlaygroundChatMessage]] = []
+    auth_token: Optional[str] = None
 
 class PlaygroundToolCall(BaseModel):
     name: str

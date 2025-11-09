@@ -57,7 +57,7 @@ class MCPProxyService:
         }
 
     @staticmethod
-    async def fetch_tools(url: str, protocol: str) -> Dict[str, Any]:
+    async def fetch_tools(url: str, protocol: str, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """
         MCP 서버에서 tools 목록을 가져옵니다
         Inspector의 createTransport와 동일한 패턴
@@ -65,11 +65,12 @@ class MCPProxyService:
         Args:
             url: MCP 서버 URL 또는 명령어
             protocol: 프로토콜 타입 (stdio, sse, streamable-http)
+            headers: Optional HTTP headers for authentication
 
         Returns:
             Dict containing tools list and status
         """
-        logger.info(f"[MCP Proxy] Fetching tools - URL: {url}, Protocol: {protocol}")
+        logger.info(f"[MCP Proxy] Fetching tools - URL: {url}, Protocol: {protocol}, Headers: {bool(headers)}")
 
         if not MCP_SDK_AVAILABLE:
             logger.error("MCP SDK is not installed")
@@ -85,10 +86,10 @@ class MCPProxyService:
             if normalized_protocol == "stdio":
                 return await MCPProxyService._fetch_stdio(url)
             elif normalized_protocol == "sse":
-                return await MCPProxyService._fetch_sse(url)
+                return await MCPProxyService._fetch_sse(url, headers)
             else:
                 # streamable-http (기본값)
-                return await MCPProxyService._fetch_streamable_http(url)
+                return await MCPProxyService._fetch_streamable_http(url, headers)
 
         except Exception as e:
             logger.error(f"[MCP Proxy] Failed to fetch tools: {str(e)}", exc_info=True)
@@ -169,11 +170,11 @@ class MCPProxyService:
             return MCPProxyService._create_error_response(f"STDIO failed: {str(e)}")
 
     @staticmethod
-    async def _fetch_sse(url: str) -> Dict[str, Any]:
+    async def _fetch_sse(url: str, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """
         SSE transport - Inspector의 SSEClientTransport와 동일
         """
-        logger.info(f"[SSE] Connecting to: {url}")
+        logger.info(f"[SSE] Connecting to: {url}, Headers: {bool(headers)}")
 
         try:
             if not url.startswith("http://") and not url.startswith("https://"):
@@ -182,8 +183,8 @@ class MCPProxyService:
             logger.info(f"[SSE] Creating SSE client for {url}")
 
             # Inspector: new SSEClientTransport(new URL(url), {headers...})
-            # Python: sse_client(url)
-            async with sse_client(url) as (read, write):
+            # Python: sse_client(url, headers=headers)
+            async with sse_client(url, headers=headers or {}) as (read, write):
                 async with ClientSession(read, write) as session:
                     logger.info("[SSE] Session created, initializing...")
 
@@ -218,11 +219,11 @@ class MCPProxyService:
             return MCPProxyService._create_error_response(error_msg)
 
     @staticmethod
-    async def _fetch_streamable_http(url: str) -> Dict[str, Any]:
+    async def _fetch_streamable_http(url: str, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """
         Streamable HTTP transport - Inspector의 StreamableHTTPClientTransport와 동일
         """
-        logger.info(f"[Streamable HTTP] Connecting to: {url}")
+        logger.info(f"[Streamable HTTP] Connecting to: {url}, Headers: {bool(headers)}")
         logger.info(f"[Streamable HTTP] HAS_STREAMABLE_HTTP = {HAS_STREAMABLE_HTTP}")
 
         try:
@@ -232,15 +233,15 @@ class MCPProxyService:
             if not HAS_STREAMABLE_HTTP:
                 # Streamable HTTP가 없으면 SSE로 시도
                 logger.warning("[Streamable HTTP] Not available, trying SSE")
-                return await MCPProxyService._fetch_sse(url)
+                return await MCPProxyService._fetch_sse(url, headers)
 
             logger.info(f"[Streamable HTTP] Creating client for {url}")
             logger.info(f"[Streamable HTTP] streamablehttp_client function: {streamablehttp_client}")
 
             # Inspector: new StreamableHTTPClientTransport(new URL(url), {fetch...})
-            # Python: streamablehttp_client(url)
+            # Python: streamablehttp_client(url, headers=headers)
             logger.info(f"[Streamable HTTP] About to call streamablehttp_client({url})")
-            async with streamablehttp_client(url) as transport_tuple:
+            async with streamablehttp_client(url, headers=headers or {}) as transport_tuple:
                 logger.info(f"[Streamable HTTP] streamablehttp_client returned, unpacking...")
                 logger.info(f"[Streamable HTTP] transport_tuple type: {type(transport_tuple)}")
                 read, write, _ = transport_tuple
@@ -660,7 +661,7 @@ class MCPProxyService:
     # ==================== TOOL CALLING METHODS ====================
 
     @staticmethod
-    async def call_tool(url: str, protocol: str, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    async def call_tool(url: str, protocol: str, tool_name: str, arguments: Dict[str, Any], headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """
         Call a specific tool on the MCP server
 
@@ -669,11 +670,12 @@ class MCPProxyService:
             protocol: 프로토콜 타입 (stdio, sse, streamable-http)
             tool_name: Tool name to call
             arguments: Tool arguments
+            headers: Optional HTTP headers for authentication
 
         Returns:
             Dict containing tool execution result
         """
-        logger.info(f"[MCP Proxy] Calling tool {tool_name} - URL: {url}, Protocol: {protocol}")
+        logger.info(f"[MCP Proxy] Calling tool {tool_name} - URL: {url}, Protocol: {protocol}, Headers: {bool(headers)}")
 
         if not MCP_SDK_AVAILABLE:
             logger.error("MCP SDK is not installed")
@@ -688,9 +690,9 @@ class MCPProxyService:
             if normalized_protocol == "stdio":
                 return await MCPProxyService._call_tool_stdio(url, tool_name, arguments)
             elif normalized_protocol == "sse":
-                return await MCPProxyService._call_tool_sse(url, tool_name, arguments)
+                return await MCPProxyService._call_tool_sse(url, tool_name, arguments, headers)
             else:
-                return await MCPProxyService._call_tool_streamable_http(url, tool_name, arguments)
+                return await MCPProxyService._call_tool_streamable_http(url, tool_name, arguments, headers)
 
         except Exception as e:
             logger.error(f"[MCP Proxy] Failed to call tool: {str(e)}", exc_info=True)
@@ -739,15 +741,15 @@ class MCPProxyService:
             return {"success": False, "error": str(e)}
 
     @staticmethod
-    async def _call_tool_sse(url: str, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    async def _call_tool_sse(url: str, tool_name: str, arguments: Dict[str, Any], headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """SSE를 통해 tool 호출"""
-        logger.info(f"[SSE] Calling tool {tool_name} from: {url}")
+        logger.info(f"[SSE] Calling tool {tool_name} from: {url}, Headers: {bool(headers)}")
 
         try:
             if not url.startswith("http://") and not url.startswith("https://"):
                 return {"success": False, "error": f"Invalid URL: {url}"}
 
-            async with sse_client(url) as (read, write):
+            async with sse_client(url, headers=headers or {}) as (read, write):
                 async with ClientSession(read, write) as session:
                     await asyncio.wait_for(session.initialize(), timeout=MCPProxyService.DEFAULT_TIMEOUT)
 
@@ -772,9 +774,9 @@ class MCPProxyService:
             return {"success": False, "error": str(e)}
 
     @staticmethod
-    async def _call_tool_streamable_http(url: str, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    async def _call_tool_streamable_http(url: str, tool_name: str, arguments: Dict[str, Any], headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """Streamable HTTP를 통해 tool 호출"""
-        logger.info(f"[Streamable HTTP] Calling tool {tool_name} from: {url}")
+        logger.info(f"[Streamable HTTP] Calling tool {tool_name} from: {url}, Headers: {bool(headers)}")
 
         try:
             if not url.startswith("http://") and not url.startswith("https://"):
@@ -782,9 +784,9 @@ class MCPProxyService:
 
             if not HAS_STREAMABLE_HTTP:
                 logger.warning("[Streamable HTTP] Not available, trying SSE")
-                return await MCPProxyService._call_tool_sse(url, tool_name, arguments)
+                return await MCPProxyService._call_tool_sse(url, tool_name, arguments, headers)
 
-            async with streamablehttp_client(url) as transport_tuple:
+            async with streamablehttp_client(url, headers=headers or {}) as transport_tuple:
                 read, write, _ = transport_tuple
 
                 async with ClientSession(read, write) as session:
