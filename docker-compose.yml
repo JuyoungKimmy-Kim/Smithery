@@ -31,6 +31,24 @@ services:
       - 10001:10001
     depends_on:
       - db
+    # Resource limits to prevent OOM crashes
+    deploy:
+      resources:
+        limits:
+          memory: 2G  # Adjust based on your server capacity
+          cpus: '2.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    # Restart policy for resilience
+    restart: unless-stopped
+    # Health check to detect and recover from failures
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   frontend:
     container_name: mcp-hub-frontend

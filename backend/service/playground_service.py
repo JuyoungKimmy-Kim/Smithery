@@ -5,6 +5,7 @@ Playground Service for integrating MCP servers with LLM
 import logging
 import json
 import os
+import asyncio
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import pytz
@@ -19,6 +20,11 @@ logger = logging.getLogger(__name__)
 # KST timezone
 KST = pytz.timezone('Asia/Seoul')
 
+# Global semaphore to limit concurrent playground operations
+# This prevents resource exhaustion from too many simultaneous long-running tasks
+MAX_CONCURRENT_PLAYGROUND_OPERATIONS = 10
+playground_semaphore = asyncio.Semaphore(MAX_CONCURRENT_PLAYGROUND_OPERATIONS)
+
 
 class PlaygroundService:
     """
@@ -27,6 +33,11 @@ class PlaygroundService:
 
     # Rate limiting constants
     DAILY_QUERY_LIMIT = 5
+
+    # OpenAI API timeout (seconds) - prevent hanging on long requests
+    OPENAI_TIMEOUT = 180  # 3 minutes
+    # MCP tool call timeout (seconds) - should be less than OPENAI_TIMEOUT
+    MCP_TOOL_TIMEOUT = 150  # 2.5 minutes
 
     def __init__(self, api_key: str = None, model: str = "gpt-4-turbo-preview", base_url: str = None):
         """
@@ -43,9 +54,18 @@ class PlaygroundService:
 
         if self.api_key:
             if self.base_url:
-                self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+                self.client = OpenAI(
+                    api_key=self.api_key,
+                    base_url=self.base_url,
+                    timeout=self.OPENAI_TIMEOUT,
+                    max_retries=2  # Retry on network errors
+                )
             else:
-                self.client = OpenAI(api_key=self.api_key)
+                self.client = OpenAI(
+                    api_key=self.api_key,
+                    timeout=self.OPENAI_TIMEOUT,
+                    max_retries=2
+                )
         else:
             self.client = None
 
@@ -163,7 +183,7 @@ class PlaygroundService:
         user_token: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Call a specific tool on the MCP server
+        Call a specific tool on the MCP server with timeout protection
 
         Args:
             mcp_server_url: MCP server URL or command
@@ -175,16 +195,33 @@ class PlaygroundService:
             Tool execution result
         """
         try:
-            # Use MCPProxyService to call the tool
-            result = await MCPProxyService.call_tool(
-                mcp_server_url,
-                protocol,
-                tool_name,
-                arguments
+            # Use MCPProxyService to call the tool with timeout
+            result = await asyncio.wait_for(
+                MCPProxyService.call_tool(
+                    mcp_server_url,
+                    protocol,
+                    tool_name,
+                    arguments
+                ),
+                timeout=self.MCP_TOOL_TIMEOUT
             )
 
             return result
 
+        except asyncio.TimeoutError:
+            error_msg = f"Tool {tool_name} timed out after {self.MCP_TOOL_TIMEOUT}s"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "error": error_msg
+            }
+        except MemoryError:
+            error_msg = f"Out of memory while calling tool {tool_name}"
+            logger.error(error_msg, exc_info=True)
+            return {
+                "success": False,
+                "error": error_msg
+            }
         except Exception as e:
             logger.error(f"Error calling MCP tool {tool_name}: {str(e)}", exc_info=True)
             return {
@@ -201,6 +238,7 @@ class PlaygroundService:
     ) -> Dict[str, Any]:
         """
         Send a chat message and get response with MCP tool integration
+        Uses semaphore to limit concurrent operations and prevent resource exhaustion
 
         Args:
             message: User message
@@ -217,186 +255,204 @@ class PlaygroundService:
                 "error": "OpenAI API key not configured"
             }
 
-        try:
-            # Get MCP tools
-            tools = await self.get_mcp_tools(mcp_server_url, protocol)
+        # Use semaphore to limit concurrent playground operations
+        async with playground_semaphore:
+            logger.info(f"[Playground] Semaphore acquired. Active operations: {MAX_CONCURRENT_PLAYGROUND_OPERATIONS - playground_semaphore._value}")
 
-            # Build messages
-            messages = conversation_history or []
+            try:
+                # Get MCP tools
+                tools = await self.get_mcp_tools(mcp_server_url, protocol)
 
-            # Add system prompt to encourage tool usage when tools are available
-            if tools and (not messages or messages[0].get("role") != "system"):
-                system_message = {
-                    "role": "system",
-                    "content": (
-                        "You are a helpful assistant with access to tools. "
-                        "When answering questions, ALWAYS check if there are relevant tools available that could provide accurate information. "
-                        "If a tool can help answer the user's question, you MUST use it instead of relying on general knowledge. "
-                        "For example, if the user asks about documentation, usage, or specific information that a tool like 'search_doc' can provide, "
-                        "you should call that tool first and base your answer on the tool's results."
-                    )
+                # Build messages
+                messages = conversation_history or []
+
+                # Add system prompt to encourage tool usage when tools are available
+                if tools and (not messages or messages[0].get("role") != "system"):
+                    system_message = {
+                        "role": "system",
+                        "content": (
+                            "You are a helpful assistant with access to tools. "
+                            "When answering questions, ALWAYS check if there are relevant tools available that could provide accurate information. "
+                            "If a tool can help answer the user's question, you MUST use it instead of relying on general knowledge. "
+                            "For example, if the user asks about documentation, usage, or specific information that a tool like 'search_doc' can provide, "
+                            "you should call that tool first and base your answer on the tool's results."
+                        )
+                    }
+                    messages.insert(0, system_message)
+
+                messages.append({
+                    "role": "user",
+                    "content": message
+                })
+
+                # Call OpenAI with tools
+                response_data = {
+                    "success": True,
+                    "response": "",
+                    "tool_calls": [],
+                    "tokens_used": 0
                 }
-                messages.insert(0, system_message)
 
-            messages.append({
-                "role": "user",
-                "content": message
-            })
-
-            # Call OpenAI with tools
-            response_data = {
-                "success": True,
-                "response": "",
-                "tool_calls": [],
-                "tokens_used": 0
-            }
-
-            # First API call
-            if tools:
-                completion = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    tools=tools,
-                    tool_choice="auto"
-                )
-            else:
-                completion = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages
-                )
-
-            response_message = completion.choices[0].message
-            response_data["tokens_used"] = completion.usage.total_tokens
-
-            # Check if tool calls were made
-            if response_message.tool_calls:
-                # Execute tool calls
-                messages.append(response_message)
-
-                for tool_call in response_message.tool_calls:
-                    function_name = tool_call.function.name
-                    function_args = json.loads(tool_call.function.arguments)
-
-                    logger.info(f"Calling tool: {function_name} with args: {function_args}")
-
-                    # Call MCP tool
-                    tool_result = await self.call_mcp_tool(
-                        mcp_server_url,
-                        protocol,
-                        function_name,
-                        function_args
+                # First API call
+                if tools:
+                    completion = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=messages,
+                        tools=tools,
+                        tool_choice="auto"
+                    )
+                else:
+                    completion = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=messages
                     )
 
-                    logger.info(f"Tool {function_name} result type: {type(tool_result)}")
-                    logger.info(f"Tool {function_name} result: {str(tool_result)[:500]}")
+                response_message = completion.choices[0].message
+                response_data["tokens_used"] = completion.usage.total_tokens
 
-                    # Extract actual content from MCP result
-                    tool_content = ""
-                    try:
-                        if isinstance(tool_result, dict):
-                            if tool_result.get("success"):
-                                result_data = tool_result.get("result", {})
-                                logger.info(f"Result data type: {type(result_data)}")
+                # Check if tool calls were made
+                if response_message.tool_calls:
+                    # Execute tool calls
+                    messages.append(response_message)
 
-                                # MCP result.content is usually a list of content items
-                                if isinstance(result_data, list):
-                                    # Extract text from content items
-                                    text_parts = []
-                                    for item in result_data:
-                                        if isinstance(item, dict):
-                                            if "text" in item:
-                                                text_parts.append(str(item["text"]))
-                                            elif "type" in item and item["type"] == "text":
-                                                text_parts.append(str(item.get("text", "")))
+                    for tool_call in response_message.tool_calls:
+                        function_name = tool_call.function.name
+                        function_args = json.loads(tool_call.function.arguments)
 
-                                    if text_parts:
-                                        tool_content = "\n".join(text_parts)
-                                    else:
-                                        # Fallback: convert to string representation
+                        logger.info(f"Calling tool: {function_name} with args: {function_args}")
+
+                        # Call MCP tool
+                        tool_result = await self.call_mcp_tool(
+                            mcp_server_url,
+                            protocol,
+                            function_name,
+                            function_args
+                        )
+
+                        logger.info(f"Tool {function_name} result type: {type(tool_result)}")
+                        logger.info(f"Tool {function_name} result: {str(tool_result)[:500]}")
+
+                        # Extract actual content from MCP result
+                        tool_content = ""
+                        try:
+                            if isinstance(tool_result, dict):
+                                if tool_result.get("success"):
+                                    result_data = tool_result.get("result", {})
+                                    logger.info(f"Result data type: {type(result_data)}")
+
+                                    # MCP result.content is usually a list of content items
+                                    if isinstance(result_data, list):
+                                        # Extract text from content items
+                                        text_parts = []
+                                        for item in result_data:
+                                            if isinstance(item, dict):
+                                                if "text" in item:
+                                                    text_parts.append(str(item["text"]))
+                                                elif "type" in item and item["type"] == "text":
+                                                    text_parts.append(str(item.get("text", "")))
+
+                                        if text_parts:
+                                            tool_content = "\n".join(text_parts)
+                                        else:
+                                            # Fallback: convert to string representation
+                                            try:
+                                                tool_content = json.dumps(result_data, ensure_ascii=False, default=str)
+                                            except (TypeError, ValueError) as e:
+                                                logger.error(f"JSON serialization failed: {e}")
+                                                tool_content = str(result_data)
+                                    elif isinstance(result_data, dict):
+                                        # Try to serialize dict
                                         try:
                                             tool_content = json.dumps(result_data, ensure_ascii=False, default=str)
                                         except (TypeError, ValueError) as e:
                                             logger.error(f"JSON serialization failed: {e}")
                                             tool_content = str(result_data)
-                                elif isinstance(result_data, dict):
-                                    # Try to serialize dict
-                                    try:
-                                        tool_content = json.dumps(result_data, ensure_ascii=False, default=str)
-                                    except (TypeError, ValueError) as e:
-                                        logger.error(f"JSON serialization failed: {e}")
+                                    else:
+                                        # Other types: convert to string
                                         tool_content = str(result_data)
                                 else:
-                                    # Other types: convert to string
-                                    tool_content = str(result_data)
+                                    tool_content = f"Error: {tool_result.get('error', 'Unknown error')}"
                             else:
-                                tool_content = f"Error: {tool_result.get('error', 'Unknown error')}"
-                        else:
-                            tool_content = str(tool_result)
-                    except Exception as e:
-                        logger.error(f"Error parsing tool result: {e}", exc_info=True)
-                        tool_content = f"Error parsing result: {str(e)}"
+                                tool_content = str(tool_result)
+                        except Exception as e:
+                            logger.error(f"Error parsing tool result: {e}", exc_info=True)
+                            tool_content = f"Error parsing result: {str(e)}"
 
-                    logger.info(f"Parsed tool content length: {len(tool_content)}")
-                    logger.info(f"Parsed tool content preview: {tool_content[:500]}...")
+                        logger.info(f"Parsed tool content length: {len(tool_content)}")
+                        logger.info(f"Parsed tool content preview: {tool_content[:500]}...")
 
-                    # Safely serialize tool_result for response
-                    # Convert to fully JSON-serializable format
-                    def make_serializable(obj):
-                        """Recursively convert object to JSON-serializable format"""
-                        if obj is None or isinstance(obj, (str, int, float, bool)):
-                            return obj
-                        elif isinstance(obj, dict):
-                            return {str(k): make_serializable(v) for k, v in obj.items()}
-                        elif isinstance(obj, (list, tuple)):
-                            return [make_serializable(item) for item in obj]
-                        else:
-                            # For any other type, convert to string
-                            return str(obj)
+                        # Safely serialize tool_result for response
+                        # Convert to fully JSON-serializable format
+                        def make_serializable(obj):
+                            """Recursively convert object to JSON-serializable format"""
+                            if obj is None or isinstance(obj, (str, int, float, bool)):
+                                return obj
+                            elif isinstance(obj, dict):
+                                return {str(k): make_serializable(v) for k, v in obj.items()}
+                            elif isinstance(obj, (list, tuple)):
+                                return [make_serializable(item) for item in obj]
+                            else:
+                                # For any other type, convert to string
+                                return str(obj)
 
-                    safe_tool_result = make_serializable(tool_result)
+                        safe_tool_result = make_serializable(tool_result)
 
-                    # Verify it's actually serializable
-                    try:
-                        json.dumps(safe_tool_result)
-                        logger.info(f"Tool result successfully serialized")
-                    except (TypeError, ValueError) as e:
-                        logger.error(f"Tool result STILL not serializable: {e}, using fallback")
-                        safe_tool_result = {
-                            "success": False,
-                            "error": "Result serialization failed",
-                            "raw": str(tool_result)
-                        }
+                        # Verify it's actually serializable
+                        try:
+                            json.dumps(safe_tool_result)
+                            logger.info(f"Tool result successfully serialized")
+                        except (TypeError, ValueError) as e:
+                            logger.error(f"Tool result STILL not serializable: {e}, using fallback")
+                            safe_tool_result = {
+                                "success": False,
+                                "error": "Result serialization failed",
+                                "raw": str(tool_result)
+                            }
 
-                    response_data["tool_calls"].append({
-                        "name": function_name,
-                        "arguments": function_args,
-                        "result": safe_tool_result
-                    })
+                        response_data["tool_calls"].append({
+                            "name": function_name,
+                            "arguments": function_args,
+                            "result": safe_tool_result
+                        })
 
-                    # Add tool response to messages (send as string for OpenAI)
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": tool_content
-                    })
+                        # Add tool response to messages (send as string for OpenAI)
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": tool_content
+                        })
 
-                # Get final response after tool execution
-                second_completion = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages
-                )
+                    # Get final response after tool execution
+                    second_completion = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=messages
+                    )
 
-                response_data["response"] = second_completion.choices[0].message.content
-                response_data["tokens_used"] += second_completion.usage.total_tokens
-            else:
-                # No tool calls, just return the response
-                response_data["response"] = response_message.content
+                    response_data["response"] = second_completion.choices[0].message.content
+                    response_data["tokens_used"] += second_completion.usage.total_tokens
+                else:
+                    # No tool calls, just return the response
+                    response_data["response"] = response_message.content
 
-            return response_data
+                return response_data
 
-        except Exception as e:
-            logger.error(f"Error in playground chat: {str(e)}", exc_info=True)
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            except asyncio.TimeoutError:
+                error_msg = f"Chat operation timed out after {self.OPENAI_TIMEOUT}s"
+                logger.error(error_msg)
+                return {
+                    "success": False,
+                    "error": error_msg
+                }
+            except MemoryError:
+                error_msg = "Server ran out of memory processing this request"
+                logger.error(error_msg, exc_info=True)
+                return {
+                    "success": False,
+                    "error": error_msg
+                }
+            except Exception as e:
+                logger.error(f"Error in playground chat: {str(e)}", exc_info=True)
+                return {
+                    "success": False,
+                    "error": str(e)
+                }

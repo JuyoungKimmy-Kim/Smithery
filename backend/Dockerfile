@@ -9,7 +9,7 @@ ENV NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/ca.crt
 RUN update-ca-certificates
 
 WORKDIR /app
-COPY backend/requirements.txt .
+COPY requirements.txt .
 COPY apt.conf /etc/apt/apt.conf
 
 #Configure pip proxy with fallback to official PyPI
@@ -51,5 +51,23 @@ COPY backend/ ./backend/
 ENV PATH=/usr/local/bin:$PATH
 RUN echo "Asia/Seoul" > /etc/timezone
 
+# Install curl for healthchecks
+RUN apt-get update -y && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
 EXPOSE 10001
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "10001"]
+
+# Use Gunicorn with multiple workers for better resilience
+# - Workers can handle requests in parallel
+# - If one worker crashes, others continue serving requests
+# - Graceful timeouts prevent hung workers from blocking the server
+CMD ["gunicorn", "backend.main:app", \
+     "--workers", "4", \
+     "--worker-class", "uvicorn.workers.UvicornWorker", \
+     "--bind", "0.0.0.0:10001", \
+     "--timeout", "300", \
+     "--graceful-timeout", "120", \
+     "--max-requests", "1000", \
+     "--max-requests-jitter", "100", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-", \
+     "--log-level", "info"]
