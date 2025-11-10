@@ -63,8 +63,38 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """헬스 체크 엔드포인트"""
-    return {"status": "healthy"}
+    """
+    Enhanced health check endpoint with resource monitoring
+    Useful for monitoring backend stability and resource usage
+    """
+    try:
+        import psutil
+        process = psutil.Process()
+        memory_info = process.memory_info()
+
+        return {
+            "status": "healthy",
+            "memory": {
+                "rss_mb": round(memory_info.rss / 1024 / 1024, 2),  # Resident Set Size
+                "vms_mb": round(memory_info.vms / 1024 / 1024, 2),  # Virtual Memory Size
+                "percent": round(process.memory_percent(), 2)
+            },
+            "cpu_percent": round(process.cpu_percent(interval=0.1), 2),
+            "num_threads": process.num_threads(),
+            "connections": len(process.connections())
+        }
+    except ImportError:
+        # Fallback if psutil is not installed
+        return {
+            "status": "healthy",
+            "note": "Install psutil for detailed metrics: pip install psutil"
+        }
+    except Exception as e:
+        # If health check itself fails, still return something
+        return {
+            "status": "healthy",
+            "error": str(e)
+        }
 
 if __name__ == "__main__":
     import uvicorn
