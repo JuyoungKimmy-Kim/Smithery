@@ -5,10 +5,62 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import os
 import sys
+import logging
+from logging.handlers import RotatingFileHandler
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
+
+# Configure logging with rotation before anything else
+def setup_logging():
+    """
+    Setup logging with rotating file handler
+
+    - Rotates at 10MB
+    - Keeps 5 backup files
+    - Logs to both file and console
+    """
+    # Create logs directory if it doesn't exist
+    log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
+    os.makedirs(log_dir, exist_ok=True)
+
+    log_file = os.path.join(log_dir, "backend.log")
+
+    # Create rotating file handler
+    file_handler = RotatingFileHandler(
+        log_file,
+        maxBytes=10 * 1024 * 1024,  # 10MB
+        backupCount=5
+    )
+    file_handler.setLevel(logging.INFO)
+
+    # Create console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+
+    # Create formatter
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    file_handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+
+    # Configure root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(console_handler)
+
+    # Reduce noise from some libraries
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+    return log_file
+
+log_file_path = setup_logging()
+logger = logging.getLogger(__name__)
 
 # 프로젝트 루트를 Python 경로에 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -48,9 +100,16 @@ app.include_router(playground_router, prefix="/api/v1")
 @app.on_event("startup")
 async def startup_event():
     """애플리케이션 시작 시 데이터베이스 초기화"""
-    print("데이터베이스를 초기화합니다...")
+    logger.info("=" * 80)
+    logger.info("MCP Server Marketplace Backend Starting...")
+    logger.info(f"Log file: {log_file_path}")
+    logger.info("=" * 80)
+
+    logger.info("데이터베이스를 초기화합니다...")
     init_database()
-    print("애플리케이션이 시작되었습니다.")
+    logger.info("데이터베이스 초기화 완료")
+
+    logger.info("애플리케이션이 성공적으로 시작되었습니다.")
 
 @app.get("/")
 async def root():
