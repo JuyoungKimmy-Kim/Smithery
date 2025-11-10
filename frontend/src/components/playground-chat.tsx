@@ -10,6 +10,8 @@ import {
 } from "@heroicons/react/24/outline";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api-client";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface Message {
   role: "user" | "assistant" | "system";
@@ -222,8 +224,77 @@ export default function PlaygroundChat({ mcpServerId }: PlaygroundChatProps) {
                   : "bg-gray-100 text-gray-900"
               }`}
             >
-              <div className="whitespace-pre-wrap break-words">
-                {message.content}
+              <div className="prose prose-sm max-w-none break-words">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    // Custom styling for markdown elements
+                    p: ({ node, ...props }) => (
+                      <p className="mb-2 last:mb-0" {...props} />
+                    ),
+                    code: ({ node, inline, ...props }: any) =>
+                      inline ? (
+                        <code
+                          className={`${
+                            message.role === "user"
+                              ? "bg-blue-700 text-white"
+                              : "bg-gray-200 text-gray-900"
+                          } px-1 py-0.5 rounded text-sm`}
+                          {...props}
+                        />
+                      ) : (
+                        <code
+                          className="block bg-gray-800 text-gray-100 p-2 rounded text-sm overflow-x-auto"
+                          {...props}
+                        />
+                      ),
+                    pre: ({ node, ...props }) => (
+                      <pre className="my-2 overflow-x-auto" {...props} />
+                    ),
+                    ul: ({ node, ...props }) => (
+                      <ul className="list-disc list-inside mb-2" {...props} />
+                    ),
+                    ol: ({ node, ...props }) => (
+                      <ol className="list-decimal list-inside mb-2" {...props} />
+                    ),
+                    li: ({ node, ...props }) => (
+                      <li className="mb-1" {...props} />
+                    ),
+                    a: ({ node, ...props }) => (
+                      <a
+                        className={`underline ${
+                          message.role === "user"
+                            ? "text-blue-200 hover:text-blue-100"
+                            : "text-blue-600 hover:text-blue-800"
+                        }`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        {...props}
+                      />
+                    ),
+                    blockquote: ({ node, ...props }) => (
+                      <blockquote
+                        className={`border-l-4 pl-3 my-2 italic ${
+                          message.role === "user"
+                            ? "border-blue-400"
+                            : "border-gray-400"
+                        }`}
+                        {...props}
+                      />
+                    ),
+                    h1: ({ node, ...props }) => (
+                      <h1 className="text-xl font-bold mb-2 mt-2" {...props} />
+                    ),
+                    h2: ({ node, ...props }) => (
+                      <h2 className="text-lg font-bold mb-2 mt-2" {...props} />
+                    ),
+                    h3: ({ node, ...props }) => (
+                      <h3 className="text-md font-bold mb-1 mt-1" {...props} />
+                    ),
+                  }}
+                >
+                  {message.content}
+                </ReactMarkdown>
               </div>
 
               {/* Tool Calls */}
