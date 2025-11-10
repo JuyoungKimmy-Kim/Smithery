@@ -252,6 +252,7 @@ class PlaygroundChatMessage(BaseModel):
 class PlaygroundChatRequest(BaseModel):
     message: str
     conversation_history: Optional[List[PlaygroundChatMessage]] = []
+    mcp_auth_token: Optional[str] = None
 
 class PlaygroundToolCall(BaseModel):
     name: str
