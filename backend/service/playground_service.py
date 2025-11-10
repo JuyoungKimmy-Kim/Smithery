@@ -44,13 +44,13 @@ class PlaygroundService:
         self.base_url = base_url or os.getenv("LLM_BASE_URL")
 
         if self.api_key:
-            # Configure HTTP client with aggressive timeouts and retry limits
+            # Configure HTTP client with reasonable timeouts and retry limits
             http_client = httpx.Client(
                 timeout=httpx.Timeout(
-                    connect=10.0,    # Connection timeout
-                    read=60.0,       # Read timeout (LLM responses can be slow)
-                    write=10.0,      # Write timeout
-                    pool=10.0        # Pool timeout
+                    connect=30.0,    # Connection timeout
+                    read=180.0,      # Read timeout (LLM responses can be slow)
+                    write=30.0,      # Write timeout
+                    pool=30.0        # Pool timeout
                 ),
                 limits=httpx.Limits(
                     max_connections=10,
@@ -63,15 +63,15 @@ class PlaygroundService:
                     api_key=self.api_key,
                     base_url=self.base_url,
                     http_client=http_client,
-                    max_retries=2,  # Limit retries to prevent hanging
-                    timeout=60.0    # Overall timeout
+                    max_retries=3,  # Allow reasonable retries
+                    timeout=180.0   # Overall timeout (3 minutes)
                 )
             else:
                 self.client = OpenAI(
                     api_key=self.api_key,
                     http_client=http_client,
-                    max_retries=2,
-                    timeout=60.0
+                    max_retries=3,
+                    timeout=180.0
                 )
         else:
             self.client = None
@@ -248,10 +248,10 @@ class PlaygroundService:
             # Wrap entire chat logic in a timeout to prevent hanging
             return await asyncio.wait_for(
                 self._chat_internal(message, mcp_server_url, protocol, conversation_history),
-                timeout=120.0  # Maximum 2 minutes for entire operation
+                timeout=240.0  # Maximum 4 minutes for entire operation
             )
         except asyncio.TimeoutError:
-            logger.error("Chat operation timed out after 120 seconds")
+            logger.error("Chat operation timed out after 240 seconds")
             return {
                 "success": False,
                 "error": "Request timed out. The operation took too long to complete."
@@ -357,13 +357,13 @@ class PlaygroundService:
                                 function_name,
                                 function_args
                             ),
-                            timeout=30.0  # 30 second timeout per tool call
+                            timeout=60.0  # 60 second timeout per tool call
                         )
                     except asyncio.TimeoutError:
-                        logger.error(f"Tool {function_name} timed out after 30 seconds")
+                        logger.error(f"Tool {function_name} timed out after 60 seconds")
                         tool_result = {
                             "success": False,
-                            "error": f"Tool execution timed out after 30 seconds"
+                            "error": f"Tool execution timed out after 60 seconds"
                         }
                     except Exception as e:
                         logger.error(f"Tool {function_name} failed: {str(e)}", exc_info=True)
