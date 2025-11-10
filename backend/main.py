@@ -68,4 +68,29 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    import signal
+    import sys
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    def handle_shutdown(sig, frame):
+        """Graceful shutdown handler for SIGTERM and SIGINT"""
+        logger.info(f"Received shutdown signal ({sig}), cleaning up...")
+        sys.exit(0)
+
+    # Register signal handlers for graceful shutdown
+    signal.signal(signal.SIGTERM, handle_shutdown)
+    signal.signal(signal.SIGINT, handle_shutdown)
+
+    logger.info("Starting FastAPI application with Uvicorn...")
+
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8000,
+        timeout_keep_alive=180,   # Keep-alive timeout for long-running requests
+        limit_concurrency=50,      # Max concurrent connections to prevent resource exhaustion
+        limit_max_requests=1000,   # Restart worker after N requests to prevent memory leaks
+        log_level="info"
+    ) 
