@@ -114,6 +114,7 @@ class MCPProxyService:
     async def _fetch_stdio(command: str) -> Dict[str, Any]:
         """
         STDIO transport - Inspector의 StdioClientTransport와 동일
+        Improved error handling and resource cleanup
         """
         logger.info(f"[STDIO] Starting with command: {command}")
 
@@ -164,14 +165,20 @@ class MCPProxyService:
             return MCPProxyService._create_error_response(
                 f"STDIO timeout after {MCPProxyService.DEFAULT_TIMEOUT}s"
             )
+        except asyncio.CancelledError:
+            logger.warning("[STDIO] Request was cancelled by client")
+            raise  # Re-raise to propagate cancellation properly
         except Exception as e:
             logger.error(f"[STDIO] Failed: {type(e).__name__}: {str(e)}", exc_info=True)
             return MCPProxyService._create_error_response(f"STDIO failed: {str(e)}")
+        finally:
+            logger.debug("[STDIO] Resource cleanup completed")
 
     @staticmethod
     async def _fetch_sse(url: str) -> Dict[str, Any]:
         """
         SSE transport - Inspector의 SSEClientTransport와 동일
+        Improved error handling and resource cleanup
         """
         logger.info(f"[SSE] Connecting to: {url}")
 
@@ -212,15 +219,21 @@ class MCPProxyService:
             error_msg = f"SSE timeout after {MCPProxyService.DEFAULT_TIMEOUT}s"
             logger.error(f"[SSE] {error_msg}")
             return MCPProxyService._create_error_response(error_msg)
+        except asyncio.CancelledError:
+            logger.warning("[SSE] Request was cancelled by client")
+            raise  # Re-raise to propagate cancellation properly
         except Exception as e:
             error_msg = f"SSE failed: {type(e).__name__}: {str(e)}"
             logger.error(f"[SSE] {error_msg}", exc_info=True)
             return MCPProxyService._create_error_response(error_msg)
+        finally:
+            logger.debug("[SSE] Resource cleanup completed")
 
     @staticmethod
     async def _fetch_streamable_http(url: str) -> Dict[str, Any]:
         """
         Streamable HTTP transport - Inspector의 StreamableHTTPClientTransport와 동일
+        Improved error handling and resource cleanup
         """
         logger.info(f"[Streamable HTTP] Connecting to: {url}")
         logger.info(f"[Streamable HTTP] HAS_STREAMABLE_HTTP = {HAS_STREAMABLE_HTTP}")
@@ -277,11 +290,15 @@ class MCPProxyService:
             error_msg = f"Streamable HTTP timeout after {MCPProxyService.DEFAULT_TIMEOUT}s"
             logger.error(f"[Streamable HTTP] {error_msg}")
             return MCPProxyService._create_error_response(error_msg)
-
+        except asyncio.CancelledError:
+            logger.warning("[Streamable HTTP] Request was cancelled by client")
+            raise  # Re-raise to propagate cancellation properly
         except Exception as e:
             error_msg = f"Streamable HTTP failed: {type(e).__name__}: {str(e)}"
             logger.error(f"[Streamable HTTP] {error_msg}", exc_info=True)
             return MCPProxyService._create_error_response(error_msg)
+        finally:
+            logger.debug("[Streamable HTTP] Resource cleanup completed")
 
     @staticmethod
     def _convert_tools(tools_list) -> List[Dict[str, Any]]:
@@ -701,7 +718,7 @@ class MCPProxyService:
 
     @staticmethod
     async def _call_tool_stdio(command: str, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """STDIO를 통해 tool 호출"""
+        """STDIO를 통해 tool 호출 - Improved error handling"""
         logger.info(f"[STDIO] Calling tool {tool_name} with command: {command}")
 
         try:
@@ -734,13 +751,18 @@ class MCPProxyService:
                 "success": False,
                 "error": f"STDIO timeout after {MCPProxyService.DEFAULT_TIMEOUT}s"
             }
+        except asyncio.CancelledError:
+            logger.warning(f"[STDIO] Tool call {tool_name} was cancelled by client")
+            raise
         except Exception as e:
             logger.error(f"[STDIO] Failed: {str(e)}", exc_info=True)
             return {"success": False, "error": str(e)}
+        finally:
+            logger.debug(f"[STDIO] Tool {tool_name} cleanup completed")
 
     @staticmethod
     async def _call_tool_sse(url: str, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """SSE를 통해 tool 호출"""
+        """SSE를 통해 tool 호출 - Improved error handling"""
         logger.info(f"[SSE] Calling tool {tool_name} from: {url}")
 
         try:
@@ -767,13 +789,18 @@ class MCPProxyService:
                 "success": False,
                 "error": f"SSE timeout after {MCPProxyService.DEFAULT_TIMEOUT}s"
             }
+        except asyncio.CancelledError:
+            logger.warning(f"[SSE] Tool call {tool_name} was cancelled by client")
+            raise
         except Exception as e:
             logger.error(f"[SSE] Failed: {str(e)}", exc_info=True)
             return {"success": False, "error": str(e)}
+        finally:
+            logger.debug(f"[SSE] Tool {tool_name} cleanup completed")
 
     @staticmethod
     async def _call_tool_streamable_http(url: str, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """Streamable HTTP를 통해 tool 호출"""
+        """Streamable HTTP를 통해 tool 호출 - Improved error handling"""
         logger.info(f"[Streamable HTTP] Calling tool {tool_name} from: {url}")
 
         try:
@@ -806,6 +833,11 @@ class MCPProxyService:
                 "success": False,
                 "error": f"Streamable HTTP timeout after {MCPProxyService.DEFAULT_TIMEOUT}s"
             }
+        except asyncio.CancelledError:
+            logger.warning(f"[Streamable HTTP] Tool call {tool_name} was cancelled by client")
+            raise
         except Exception as e:
             logger.error(f"[Streamable HTTP] Failed: {str(e)}", exc_info=True)
             return {"success": False, "error": str(e)}
+        finally:
+            logger.debug(f"[Streamable HTTP] Tool {tool_name} cleanup completed")

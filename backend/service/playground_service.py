@@ -5,6 +5,7 @@ Playground Service for integrating MCP servers with LLM
 import logging
 import json
 import os
+import asyncio
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import pytz
@@ -28,6 +29,10 @@ class PlaygroundService:
     # Rate limiting constants
     DAILY_QUERY_LIMIT = 5
 
+    # Shared OpenAI client (singleton pattern to reuse connections)
+    _shared_client = None
+    _client_config = None
+
     def __init__(self, api_key: str = None, model: str = "gpt-4-turbo-preview", base_url: str = None):
         """
         Initialize PlaygroundService
@@ -42,10 +47,29 @@ class PlaygroundService:
         self.base_url = base_url or os.getenv("LLM_BASE_URL")
 
         if self.api_key:
-            if self.base_url:
-                self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
-            else:
-                self.client = OpenAI(api_key=self.api_key)
+            # Reuse shared client if config matches to avoid creating multiple connection pools
+            current_config = (self.api_key, self.base_url)
+
+            if PlaygroundService._shared_client is None or PlaygroundService._client_config != current_config:
+                logger.info("Creating new shared OpenAI client")
+                # Use default OpenAI client without custom http_client to avoid connection leaks
+                # OpenAI SDK handles connection pooling internally
+                if self.base_url:
+                    PlaygroundService._shared_client = OpenAI(
+                        api_key=self.api_key,
+                        base_url=self.base_url,
+                        max_retries=2,  # Limit retries to prevent excessive server load
+                        timeout=180.0   # Overall timeout (3 minutes)
+                    )
+                else:
+                    PlaygroundService._shared_client = OpenAI(
+                        api_key=self.api_key,
+                        max_retries=2,
+                        timeout=180.0
+                    )
+                PlaygroundService._client_config = current_config
+
+            self.client = PlaygroundService._shared_client
         else:
             self.client = None
 
@@ -218,6 +242,36 @@ class PlaygroundService:
             }
 
         try:
+            # Wrap entire chat logic in a timeout to prevent hanging
+            # Must be less than endpoint timeout (180s) to allow proper cleanup
+            return await asyncio.wait_for(
+                self._chat_internal(message, mcp_server_url, protocol, conversation_history),
+                timeout=170.0  # Maximum 170s (less than endpoint's 180s)
+            )
+        except asyncio.TimeoutError:
+            logger.error("Chat operation timed out after 170 seconds")
+            return {
+                "success": False,
+                "error": "Request timed out. The operation took too long to complete."
+            }
+        except Exception as e:
+            logger.error(f"Unexpected error in chat: {str(e)}", exc_info=True)
+            return {
+                "success": False,
+                "error": f"An unexpected error occurred: {str(e)}"
+            }
+
+    async def _chat_internal(
+        self,
+        message: str,
+        mcp_server_url: str,
+        protocol: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
+        """
+        Internal chat implementation with error handling
+        """
+        try:
             # Get MCP tools
             tools = await self.get_mcp_tools(mcp_server_url, protocol)
 
@@ -251,41 +305,88 @@ class PlaygroundService:
                 "tokens_used": 0
             }
 
-            # First API call
-            if tools:
-                completion = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    tools=tools,
-                    tool_choice="auto"
-                )
-            else:
-                completion = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages
-                )
+            # First API call - run in executor to make it truly async
+            try:
+                if tools:
+                    completion = await asyncio.to_thread(
+                        self.client.chat.completions.create,
+                        model=self.model,
+                        messages=messages,
+                        tools=tools,
+                        tool_choice="auto"
+                    )
+                else:
+                    completion = await asyncio.to_thread(
+                        self.client.chat.completions.create,
+                        model=self.model,
+                        messages=messages
+                    )
+            except Exception as e:
+                error_type = type(e).__name__
+                error_msg = str(e)
+                logger.error(f"OpenAI API call failed - Type: {error_type}, Message: {error_msg}", exc_info=True)
+                logger.error(f"Model: {self.model}, Base URL: {self.base_url}, Messages count: {len(messages)}")
+                return {
+                    "success": False,
+                    "error": f"Failed to get response from LLM: [{error_type}] {error_msg}"
+                }
 
             response_message = completion.choices[0].message
             response_data["tokens_used"] = completion.usage.total_tokens
 
             # Check if tool calls were made
             if response_message.tool_calls:
-                # Execute tool calls
-                messages.append(response_message)
+                # Ensure content field exists (some models omit it with tool calls)
+                # Convert response_message to dict format with guaranteed content field
+                response_message_dict = {
+                    "role": "assistant",
+                    "content": response_message.content if response_message.content else "",
+                    "tool_calls": [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.function.name,
+                                "arguments": tc.function.arguments
+                            }
+                        } for tc in response_message.tool_calls
+                    ]
+                }
+                messages.append(response_message_dict)
 
                 for tool_call in response_message.tool_calls:
                     function_name = tool_call.function.name
-                    function_args = json.loads(tool_call.function.arguments)
+                    try:
+                        function_args = json.loads(tool_call.function.arguments)
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Failed to parse tool arguments: {str(e)}")
+                        function_args = {}
 
                     logger.info(f"Calling tool: {function_name} with args: {function_args}")
 
-                    # Call MCP tool
-                    tool_result = await self.call_mcp_tool(
-                        mcp_server_url,
-                        protocol,
-                        function_name,
-                        function_args
-                    )
+                    # Call MCP tool with timeout
+                    try:
+                        tool_result = await asyncio.wait_for(
+                            self.call_mcp_tool(
+                                mcp_server_url,
+                                protocol,
+                                function_name,
+                                function_args
+                            ),
+                            timeout=60.0  # 60 second timeout per tool call
+                        )
+                    except asyncio.TimeoutError:
+                        logger.error(f"Tool {function_name} timed out after 60 seconds")
+                        tool_result = {
+                            "success": False,
+                            "error": f"Tool execution timed out after 60 seconds"
+                        }
+                    except Exception as e:
+                        logger.error(f"Tool {function_name} failed: {str(e)}", exc_info=True)
+                        tool_result = {
+                            "success": False,
+                            "error": f"Tool execution failed: {str(e)}"
+                        }
 
                     logger.info(f"Tool {function_name} result type: {type(tool_result)}")
                     logger.info(f"Tool {function_name} result: {str(tool_result)[:500]}")
@@ -304,10 +405,24 @@ class PlaygroundService:
                                     text_parts = []
                                     for item in result_data:
                                         if isinstance(item, dict):
+                                            # Dict format: {"type": "text", "text": "..."}
                                             if "text" in item:
                                                 text_parts.append(str(item["text"]))
                                             elif "type" in item and item["type"] == "text":
                                                 text_parts.append(str(item.get("text", "")))
+                                        elif hasattr(item, 'text'):
+                                            # Object format: TextContent(type='text', text='...')
+                                            text_parts.append(str(item.text))
+                                        elif hasattr(item, '__dict__'):
+                                            # Other object with __dict__
+                                            if 'text' in item.__dict__:
+                                                text_parts.append(str(item.__dict__['text']))
+                                            else:
+                                                # Try str() on the whole object
+                                                text_parts.append(str(item))
+                                        else:
+                                            # Unknown type, convert to string
+                                            text_parts.append(str(item))
 
                                     if text_parts:
                                         tool_content = "\n".join(text_parts)
@@ -381,13 +496,21 @@ class PlaygroundService:
                     })
 
                 # Get final response after tool execution
-                second_completion = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages
-                )
+                try:
+                    second_completion = await asyncio.to_thread(
+                        self.client.chat.completions.create,
+                        model=self.model,
+                        messages=messages
+                    )
 
-                response_data["response"] = second_completion.choices[0].message.content
-                response_data["tokens_used"] += second_completion.usage.total_tokens
+                    response_data["response"] = second_completion.choices[0].message.content
+                    response_data["tokens_used"] += second_completion.usage.total_tokens
+                except Exception as e:
+                    logger.error(f"Second OpenAI API call failed: {str(e)}", exc_info=True)
+                    return {
+                        "success": False,
+                        "error": f"Failed to get final response from LLM: {str(e)}"
+                    }
             else:
                 # No tool calls, just return the response
                 response_data["response"] = response_message.content

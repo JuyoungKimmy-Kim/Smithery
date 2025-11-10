@@ -647,7 +647,10 @@ export default function MCPServerDetail() {
               Test this MCP server directly in your browser. Ask questions and see the tools in action.
             </p>
           </div>
-          <PlaygroundChat mcpServerId={parseInt(mcp.id)} />
+          <PlaygroundChat
+            mcpServerId={parseInt(mcp.id)}
+            tools={mcp.tools || []}
+          />
         </div>
 
         {/* 댓글 섹션 */}

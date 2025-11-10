@@ -52,4 +52,4 @@ ENV PATH=/usr/local/bin:$PATH
 RUN echo "Asia/Seoul" > /etc/timezone
 
 EXPOSE 10001
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "10001"]
+CMD ["python", "-m", "backend.main"]

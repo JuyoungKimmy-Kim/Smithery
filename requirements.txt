@@ -19,3 +19,5 @@ openai
 python-dateutil
 python-dotenv
 pytz
+psutil
+slowapi

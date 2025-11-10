@@ -10,6 +10,8 @@ import {
 } from "@heroicons/react/24/outline";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api-client";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface Message {
   role: "user" | "assistant" | "system";
@@ -22,11 +24,17 @@ interface Message {
   tokens_used?: number;
 }
 
-interface PlaygroundChatProps {
-  mcpServerId: number;
+interface Tool {
+  name: string;
+  description: string;
 }
 
-export default function PlaygroundChat({ mcpServerId }: PlaygroundChatProps) {
+interface PlaygroundChatProps {
+  mcpServerId: number;
+  tools?: Tool[];
+}
+
+export default function PlaygroundChat({ mcpServerId, tools = [] }: PlaygroundChatProps) {
   const { isAuthenticated } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
@@ -37,6 +45,7 @@ export default function PlaygroundChat({ mcpServerId }: PlaygroundChatProps) {
     used: number;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showGuidance, setShowGuidance] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -75,6 +84,11 @@ export default function PlaygroundChat({ mcpServerId }: PlaygroundChatProps) {
     if (!rateLimit?.allowed) {
       setError("You have reached your daily query limit. Please try again tomorrow.");
       return;
+    }
+
+    // Hide guidance when user sends first message
+    if (showGuidance) {
+      setShowGuidance(false);
     }
 
     const userMessage: Message = {
@@ -164,6 +178,17 @@ export default function PlaygroundChat({ mcpServerId }: PlaygroundChatProps) {
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col h-[600px]">
+      {/* Info Banner */}
+      <div className="bg-blue-50 border-b border-blue-100 px-4 py-3">
+        <div className="flex items-start gap-2">
+          <ExclamationTriangleIcon className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-blue-800">
+            <strong className="font-semibold">Note:</strong> This playground uses an LLM to test MCP tools interactively.
+            Results may differ from native MCP clients (Claude Desktop, Roo Code, etc.) due to different prompting strategies and tool calling implementations.
+          </div>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="border-b border-gray-200 p-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -198,7 +223,36 @@ export default function PlaygroundChat({ mcpServerId }: PlaygroundChatProps) {
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 && (
+        {messages.length === 0 && showGuidance && tools.length > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+            <div className="text-sm text-gray-700">
+              <p className="font-medium mb-2">💡 How to use the playground</p>
+              <p className="text-gray-600 mb-3">
+                Check the <strong>Tools tab above</strong> to see available capabilities, then ask questions that would benefit from using those tools.
+              </p>
+
+              <div className="mt-3 pt-3 border-t border-blue-200">
+                <p className="text-gray-600 font-medium mb-2">Example questions:</p>
+                <ul className="space-y-1.5 text-gray-600">
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-600 mt-0.5">•</span>
+                    <span>
+                      If you have <span className="font-mono text-xs bg-blue-100 px-1 py-0.5 rounded">search_doc</span>, try: "Can you search for information about..."
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-600 mt-0.5">•</span>
+                    <span>
+                      If you have <span className="font-mono text-xs bg-blue-100 px-1 py-0.5 rounded">get_weather</span>, try: "What can you tell me about..."
+                    </span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {messages.length === 0 && (!showGuidance || tools.length === 0) && (
           <div className="text-center text-gray-500 mt-8">
             <p className="mb-2">Start a conversation!</p>
             <p className="text-sm">
@@ -222,8 +276,77 @@ export default function PlaygroundChat({ mcpServerId }: PlaygroundChatProps) {
                   : "bg-gray-100 text-gray-900"
               }`}
             >
-              <div className="whitespace-pre-wrap break-words">
-                {message.content}
+              <div className="prose prose-sm max-w-none break-words">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    // Custom styling for markdown elements
+                    p: ({ node, ...props }) => (
+                      <p className="mb-2 last:mb-0" {...props} />
+                    ),
+                    code: ({ node, inline, ...props }: any) =>
+                      inline ? (
+                        <code
+                          className={`${
+                            message.role === "user"
+                              ? "bg-blue-700 text-white"
+                              : "bg-gray-200 text-gray-900"
+                          } px-1 py-0.5 rounded text-sm`}
+                          {...props}
+                        />
+                      ) : (
+                        <code
+                          className="block bg-gray-800 text-gray-100 p-2 rounded text-sm overflow-x-auto"
+                          {...props}
+                        />
+                      ),
+                    pre: ({ node, ...props }) => (
+                      <pre className="my-2 overflow-x-auto" {...props} />
+                    ),
+                    ul: ({ node, ...props }) => (
+                      <ul className="list-disc list-inside mb-2" {...props} />
+                    ),
+                    ol: ({ node, ...props }) => (
+                      <ol className="list-decimal list-inside mb-2" {...props} />
+                    ),
+                    li: ({ node, ...props }) => (
+                      <li className="mb-1" {...props} />
+                    ),
+                    a: ({ node, ...props }) => (
+                      <a
+                        className={`underline ${
+                          message.role === "user"
+                            ? "text-blue-200 hover:text-blue-100"
+                            : "text-blue-600 hover:text-blue-800"
+                        }`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        {...props}
+                      />
+                    ),
+                    blockquote: ({ node, ...props }) => (
+                      <blockquote
+                        className={`border-l-4 pl-3 my-2 italic ${
+                          message.role === "user"
+                            ? "border-blue-400"
+                            : "border-gray-400"
+                        }`}
+                        {...props}
+                      />
+                    ),
+                    h1: ({ node, ...props }) => (
+                      <h1 className="text-xl font-bold mb-2 mt-2" {...props} />
+                    ),
+                    h2: ({ node, ...props }) => (
+                      <h2 className="text-lg font-bold mb-2 mt-2" {...props} />
+                    ),
+                    h3: ({ node, ...props }) => (
+                      <h3 className="text-md font-bold mb-1 mt-1" {...props} />
+                    ),
+                  }}
+                >
+                  {message.content}
+                </ReactMarkdown>
               </div>
 
               {/* Tool Calls */}
