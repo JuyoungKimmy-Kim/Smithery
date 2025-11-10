@@ -166,6 +166,17 @@ export default function PlaygroundChat({ mcpServerId }: PlaygroundChatProps) {
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col h-[600px]">
+      {/* Info Banner */}
+      <div className="bg-blue-50 border-b border-blue-100 px-4 py-3">
+        <div className="flex items-start gap-2">
+          <ExclamationTriangleIcon className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-blue-800">
+            <strong className="font-semibold">Note:</strong> This playground uses an LLM to test MCP tools interactively.
+            Results may differ from native MCP clients (Claude Desktop, Roo Code, etc.) due to different prompting strategies and tool calling implementations.
+          </div>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="border-b border-gray-200 p-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
