@@ -129,19 +129,20 @@ class PlaygroundService:
 
         db.commit()
 
-    async def get_mcp_tools(self, mcp_server_url: str, protocol: str) -> List[Dict[str, Any]]:
+    async def get_mcp_tools(self, mcp_server_url: str, protocol: str, user_token: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Fetch tools from MCP server
 
         Args:
             mcp_server_url: MCP server URL or command
             protocol: Protocol type (stdio, sse, http, etc.)
+            user_token: Optional authentication token for MCP server
 
         Returns:
             List of tools in OpenAI function format
         """
         try:
-            result = await MCPProxyService.fetch_tools(mcp_server_url, protocol)
+            result = await MCPProxyService.fetch_tools(mcp_server_url, protocol, user_token)
 
             if not result.get("success"):
                 logger.error(f"Failed to fetch MCP tools: {result.get('message')}")
@@ -194,6 +195,7 @@ class PlaygroundService:
             protocol: Protocol type
             tool_name: Name of the tool to call
             arguments: Arguments to pass to the tool
+            user_token: Optional authentication token for MCP server
 
         Returns:
             Tool execution result
@@ -204,7 +206,8 @@ class PlaygroundService:
                 mcp_server_url,
                 protocol,
                 tool_name,
-                arguments
+                arguments,
+                user_token
             )
 
             return result
@@ -221,7 +224,8 @@ class PlaygroundService:
         message: str,
         mcp_server_url: str,
         protocol: str,
-        conversation_history: Optional[List[Dict[str, str]]] = None
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+        user_token: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Send a chat message and get response with MCP tool integration
@@ -231,6 +235,7 @@ class PlaygroundService:
             mcp_server_url: MCP server URL or command
             protocol: Protocol type
             conversation_history: Previous conversation messages
+            user_token: Optional authentication token for MCP server
 
         Returns:
             Dict with response, tool_calls, and metadata
@@ -245,7 +250,7 @@ class PlaygroundService:
             # Wrap entire chat logic in a timeout to prevent hanging
             # Must be less than endpoint timeout (180s) to allow proper cleanup
             return await asyncio.wait_for(
-                self._chat_internal(message, mcp_server_url, protocol, conversation_history),
+                self._chat_internal(message, mcp_server_url, protocol, conversation_history, user_token),
                 timeout=170.0  # Maximum 170s (less than endpoint's 180s)
             )
         except asyncio.TimeoutError:
@@ -266,14 +271,15 @@ class PlaygroundService:
         message: str,
         mcp_server_url: str,
         protocol: str,
-        conversation_history: Optional[List[Dict[str, str]]] = None
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+        user_token: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Internal chat implementation with error handling
         """
         try:
             # Get MCP tools
-            tools = await self.get_mcp_tools(mcp_server_url, protocol)
+            tools = await self.get_mcp_tools(mcp_server_url, protocol, user_token)
 
             # Build messages
             messages = conversation_history or []
@@ -371,7 +377,8 @@ class PlaygroundService:
                                 mcp_server_url,
                                 protocol,
                                 function_name,
-                                function_args
+                                function_args,
+                                user_token
                             ),
                             timeout=60.0  # 60 second timeout per tool call
                         )
