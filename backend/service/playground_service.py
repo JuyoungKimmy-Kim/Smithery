@@ -29,6 +29,10 @@ class PlaygroundService:
     # Rate limiting constants
     DAILY_QUERY_LIMIT = 5
 
+    # Shared OpenAI client (singleton pattern to reuse connections)
+    _shared_client = None
+    _client_config = None
+
     def __init__(self, api_key: str = None, model: str = "gpt-4-turbo-preview", base_url: str = None):
         """
         Initialize PlaygroundService
@@ -43,21 +47,29 @@ class PlaygroundService:
         self.base_url = base_url or os.getenv("LLM_BASE_URL")
 
         if self.api_key:
-            # Use default OpenAI client without custom http_client to avoid connection leaks
-            # OpenAI SDK handles connection pooling internally
-            if self.base_url:
-                self.client = OpenAI(
-                    api_key=self.api_key,
-                    base_url=self.base_url,
-                    max_retries=2,  # Limit retries to prevent hanging
-                    timeout=180.0   # Overall timeout (3 minutes)
-                )
-            else:
-                self.client = OpenAI(
-                    api_key=self.api_key,
-                    max_retries=2,
-                    timeout=180.0
-                )
+            # Reuse shared client if config matches to avoid creating multiple connection pools
+            current_config = (self.api_key, self.base_url)
+
+            if PlaygroundService._shared_client is None or PlaygroundService._client_config != current_config:
+                logger.info("Creating new shared OpenAI client")
+                # Use default OpenAI client without custom http_client to avoid connection leaks
+                # OpenAI SDK handles connection pooling internally
+                if self.base_url:
+                    PlaygroundService._shared_client = OpenAI(
+                        api_key=self.api_key,
+                        base_url=self.base_url,
+                        max_retries=2,  # Limit retries to prevent excessive server load
+                        timeout=180.0   # Overall timeout (3 minutes)
+                    )
+                else:
+                    PlaygroundService._shared_client = OpenAI(
+                        api_key=self.api_key,
+                        max_retries=2,
+                        timeout=180.0
+                    )
+                PlaygroundService._client_config = current_config
+
+            self.client = PlaygroundService._shared_client
         else:
             self.client = None
 
@@ -231,12 +243,13 @@ class PlaygroundService:
 
         try:
             # Wrap entire chat logic in a timeout to prevent hanging
+            # Must be less than endpoint timeout (180s) to allow proper cleanup
             return await asyncio.wait_for(
                 self._chat_internal(message, mcp_server_url, protocol, conversation_history),
-                timeout=240.0  # Maximum 4 minutes for entire operation
+                timeout=170.0  # Maximum 170s (less than endpoint's 180s)
             )
         except asyncio.TimeoutError:
-            logger.error("Chat operation timed out after 240 seconds")
+            logger.error("Chat operation timed out after 170 seconds")
             return {
                 "success": False,
                 "error": "Request timed out. The operation took too long to complete."

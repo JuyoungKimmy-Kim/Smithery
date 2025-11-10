@@ -18,6 +18,10 @@ from backend.database.model.user import User
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# Semaphore to limit concurrent LLM requests to prevent server overload
+# Only allow 5 concurrent playground requests at a time
+_playground_semaphore = asyncio.Semaphore(5)
+
 
 @router.get("/mcp-servers/{server_id}/playground/rate-limit")
 async def get_rate_limit(
@@ -120,25 +124,28 @@ async def playground_chat(
             for msg in chat_request.conversation_history
         ]
 
-        # Send chat message with timeout (3 minutes max for entire operation)
-        try:
-            logger.info(f"[Playground] Starting chat for user_id={user_id}, server_id={server_id}")
-            result = await asyncio.wait_for(
-                playground_service.chat(
-                    message=chat_request.message,
-                    mcp_server_url=server_url,
-                    protocol=mcp_server.protocol,
-                    conversation_history=conversation_history
-                ),
-                timeout=180  # 3 minutes max for entire playground request
-            )
-            logger.info(f"[Playground] Chat completed for user_id={user_id}, server_id={server_id}")
-        except asyncio.TimeoutError:
-            logger.error(f"[Playground] Request timed out after 180s (user_id={user_id}, server_id={server_id})")
-            raise HTTPException(
-                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-                detail="Playground request timed out after 180 seconds"
-            )
+        # Use semaphore to limit concurrent LLM requests
+        async with _playground_semaphore:
+            logger.info(f"[Playground] Acquired semaphore. Starting chat for user_id={user_id}, server_id={server_id}")
+
+            # Send chat message with timeout (3 minutes max for entire operation)
+            try:
+                result = await asyncio.wait_for(
+                    playground_service.chat(
+                        message=chat_request.message,
+                        mcp_server_url=server_url,
+                        protocol=mcp_server.protocol,
+                        conversation_history=conversation_history
+                    ),
+                    timeout=180  # 3 minutes max for entire playground request
+                )
+                logger.info(f"[Playground] Chat completed for user_id={user_id}, server_id={server_id}")
+            except asyncio.TimeoutError:
+                logger.error(f"[Playground] Request timed out after 180s (user_id={user_id}, server_id={server_id})")
+                raise HTTPException(
+                    status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                    detail="Playground request timed out after 180 seconds"
+                )
 
         # Check if client disconnected during processing
         if await request.is_disconnected():
