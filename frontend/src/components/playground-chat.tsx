@@ -24,11 +24,17 @@ interface Message {
   tokens_used?: number;
 }
 
-interface PlaygroundChatProps {
-  mcpServerId: number;
+interface Tool {
+  name: string;
+  description: string;
 }
 
-export default function PlaygroundChat({ mcpServerId }: PlaygroundChatProps) {
+interface PlaygroundChatProps {
+  mcpServerId: number;
+  tools?: Tool[];
+}
+
+export default function PlaygroundChat({ mcpServerId, tools = [] }: PlaygroundChatProps) {
   const { isAuthenticated } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
@@ -39,6 +45,7 @@ export default function PlaygroundChat({ mcpServerId }: PlaygroundChatProps) {
     used: number;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showGuidance, setShowGuidance] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -77,6 +84,11 @@ export default function PlaygroundChat({ mcpServerId }: PlaygroundChatProps) {
     if (!rateLimit?.allowed) {
       setError("You have reached your daily query limit. Please try again tomorrow.");
       return;
+    }
+
+    // Hide guidance when user sends first message
+    if (showGuidance) {
+      setShowGuidance(false);
     }
 
     const userMessage: Message = {
@@ -211,7 +223,36 @@ export default function PlaygroundChat({ mcpServerId }: PlaygroundChatProps) {
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 && (
+        {messages.length === 0 && showGuidance && tools.length > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+            <div className="text-sm text-gray-700">
+              <p className="font-medium mb-2">💡 How to use the playground</p>
+              <p className="text-gray-600 mb-3">
+                Check the <strong>Tools tab above</strong> to see available capabilities, then ask questions that would benefit from using those tools.
+              </p>
+
+              <div className="mt-3 pt-3 border-t border-blue-200">
+                <p className="text-gray-600 font-medium mb-2">Example questions:</p>
+                <ul className="space-y-1.5 text-gray-600">
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-600 mt-0.5">•</span>
+                    <span>
+                      If you have <span className="font-mono text-xs bg-blue-100 px-1 py-0.5 rounded">search_doc</span>, try: "Can you search for information about..."
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-600 mt-0.5">•</span>
+                    <span>
+                      If you have <span className="font-mono text-xs bg-blue-100 px-1 py-0.5 rounded">get_weather</span>, try: "What can you tell me about..."
+                    </span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {messages.length === 0 && (!showGuidance || tools.length === 0) && (
           <div className="text-center text-gray-500 mt-8">
             <p className="mb-2">Start a conversation!</p>
             <p className="text-sm">
