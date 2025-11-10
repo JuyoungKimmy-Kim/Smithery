@@ -304,10 +304,24 @@ class PlaygroundService:
                                     text_parts = []
                                     for item in result_data:
                                         if isinstance(item, dict):
+                                            # Dict format: {"type": "text", "text": "..."}
                                             if "text" in item:
                                                 text_parts.append(str(item["text"]))
                                             elif "type" in item and item["type"] == "text":
                                                 text_parts.append(str(item.get("text", "")))
+                                        elif hasattr(item, 'text'):
+                                            # Object format: TextContent(type='text', text='...')
+                                            text_parts.append(str(item.text))
+                                        elif hasattr(item, '__dict__'):
+                                            # Other object with __dict__
+                                            if 'text' in item.__dict__:
+                                                text_parts.append(str(item.__dict__['text']))
+                                            else:
+                                                # Try str() on the whole object
+                                                text_parts.append(str(item))
+                                        else:
+                                            # Unknown type, convert to string
+                                            text_parts.append(str(item))
 
                                     if text_parts:
                                         tool_content = "\n".join(text_parts)
