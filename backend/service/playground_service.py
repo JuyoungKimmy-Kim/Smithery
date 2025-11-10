@@ -11,7 +11,6 @@ from datetime import datetime
 import pytz
 from sqlalchemy.orm import Session
 from openai import OpenAI
-import httpx
 
 from backend.database.model.playground_usage import PlaygroundUsage
 from backend.service.mcp_proxy_service import MCPProxyService
@@ -44,33 +43,19 @@ class PlaygroundService:
         self.base_url = base_url or os.getenv("LLM_BASE_URL")
 
         if self.api_key:
-            # Configure HTTP client with reasonable timeouts and retry limits
-            http_client = httpx.Client(
-                timeout=httpx.Timeout(
-                    connect=30.0,    # Connection timeout
-                    read=180.0,      # Read timeout (LLM responses can be slow)
-                    write=30.0,      # Write timeout
-                    pool=30.0        # Pool timeout
-                ),
-                limits=httpx.Limits(
-                    max_connections=10,
-                    max_keepalive_connections=5
-                )
-            )
-
+            # Use default OpenAI client without custom http_client to avoid connection leaks
+            # OpenAI SDK handles connection pooling internally
             if self.base_url:
                 self.client = OpenAI(
                     api_key=self.api_key,
                     base_url=self.base_url,
-                    http_client=http_client,
-                    max_retries=3,  # Allow reasonable retries
+                    max_retries=2,  # Limit retries to prevent hanging
                     timeout=180.0   # Overall timeout (3 minutes)
                 )
             else:
                 self.client = OpenAI(
                     api_key=self.api_key,
-                    http_client=http_client,
-                    max_retries=3,
+                    max_retries=2,
                     timeout=180.0
                 )
         else:
@@ -324,10 +309,13 @@ class PlaygroundService:
                         messages=messages
                     )
             except Exception as e:
-                logger.error(f"OpenAI API call failed: {str(e)}", exc_info=True)
+                error_type = type(e).__name__
+                error_msg = str(e)
+                logger.error(f"OpenAI API call failed - Type: {error_type}, Message: {error_msg}", exc_info=True)
+                logger.error(f"Model: {self.model}, Base URL: {self.base_url}, Messages count: {len(messages)}")
                 return {
                     "success": False,
-                    "error": f"Failed to get response from LLM: {str(e)}"
+                    "error": f"Failed to get response from LLM: [{error_type}] {error_msg}"
                 }
 
             response_message = completion.choices[0].message
