@@ -336,8 +336,23 @@ class PlaygroundService:
 
             # Check if tool calls were made
             if response_message.tool_calls:
-                # Execute tool calls
-                messages.append(response_message)
+                # Ensure content field exists (some models omit it with tool calls)
+                # Convert response_message to dict format with guaranteed content field
+                response_message_dict = {
+                    "role": "assistant",
+                    "content": response_message.content if response_message.content else "",
+                    "tool_calls": [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.function.name,
+                                "arguments": tc.function.arguments
+                            }
+                        } for tc in response_message.tool_calls
+                    ]
+                }
+                messages.append(response_message_dict)
 
                 for tool_call in response_message.tool_calls:
                     function_name = tool_call.function.name
