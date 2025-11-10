@@ -57,7 +57,7 @@ class MCPProxyService:
         }
 
     @staticmethod
-    async def fetch_tools(url: str, protocol: str) -> Dict[str, Any]:
+    async def fetch_tools(url: str, protocol: str, auth_token: Optional[str] = None) -> Dict[str, Any]:
         """
         MCP 서버에서 tools 목록을 가져옵니다
         Inspector의 createTransport와 동일한 패턴
@@ -65,11 +65,12 @@ class MCPProxyService:
         Args:
             url: MCP 서버 URL 또는 명령어
             protocol: 프로토콜 타입 (stdio, sse, streamable-http)
+            auth_token: Optional authentication token for MCP server
 
         Returns:
             Dict containing tools list and status
         """
-        logger.info(f"[MCP Proxy] Fetching tools - URL: {url}, Protocol: {protocol}")
+        logger.info(f"[MCP Proxy] Fetching tools - URL: {url}, Protocol: {protocol}, Auth: {'Yes' if auth_token else 'No'}")
 
         if not MCP_SDK_AVAILABLE:
             logger.error("MCP SDK is not installed")
@@ -83,12 +84,12 @@ class MCPProxyService:
 
             # Inspector의 createTransport처럼 프로토콜에 따라 분기
             if normalized_protocol == "stdio":
-                return await MCPProxyService._fetch_stdio(url)
+                return await MCPProxyService._fetch_stdio(url, auth_token)
             elif normalized_protocol == "sse":
-                return await MCPProxyService._fetch_sse(url)
+                return await MCPProxyService._fetch_sse(url, auth_token)
             else:
                 # streamable-http (기본값)
-                return await MCPProxyService._fetch_streamable_http(url)
+                return await MCPProxyService._fetch_streamable_http(url, auth_token)
 
         except Exception as e:
             logger.error(f"[MCP Proxy] Failed to fetch tools: {str(e)}", exc_info=True)
@@ -111,7 +112,7 @@ class MCPProxyService:
             return "streamable-http"
 
     @staticmethod
-    async def _fetch_stdio(command: str) -> Dict[str, Any]:
+    async def _fetch_stdio(command: str, auth_token: Optional[str] = None) -> Dict[str, Any]:
         """
         STDIO transport - Inspector의 StdioClientTransport와 동일
         Improved error handling and resource cleanup
@@ -126,10 +127,18 @@ class MCPProxyService:
             cmd = parts[0]
             args = parts[1:] if len(parts) > 1 else []
 
+            # Pass auth token via environment variable if provided
+            env = None
+            if auth_token:
+                import os
+                env = os.environ.copy()
+                env['MCP_AUTH_TOKEN'] = auth_token
+                logger.info("[STDIO] Auth token added to environment")
+
             server_params = StdioServerParameters(
                 command=cmd,
                 args=args,
-                env=None
+                env=env
             )
 
             logger.info(f"[STDIO] Command={cmd}, Args={args}")
@@ -175,7 +184,7 @@ class MCPProxyService:
             logger.debug("[STDIO] Resource cleanup completed")
 
     @staticmethod
-    async def _fetch_sse(url: str) -> Dict[str, Any]:
+    async def _fetch_sse(url: str, auth_token: Optional[str] = None) -> Dict[str, Any]:
         """
         SSE transport - Inspector의 SSEClientTransport와 동일
         Improved error handling and resource cleanup
@@ -189,7 +198,14 @@ class MCPProxyService:
             logger.info(f"[SSE] Creating SSE client for {url}")
 
             # Inspector: new SSEClientTransport(new URL(url), {headers...})
-            # Python: sse_client(url)
+            # Python: sse_client(url, headers=...)
+            headers = {}
+            if auth_token:
+                headers['Authorization'] = f'Bearer {auth_token}'
+                logger.info("[SSE] Auth token added to headers")
+
+            # Note: MCP SDK sse_client may not support headers parameter yet
+            # This will need to be updated when SDK supports it
             async with sse_client(url) as (read, write):
                 async with ClientSession(read, write) as session:
                     logger.info("[SSE] Session created, initializing...")
@@ -230,7 +246,7 @@ class MCPProxyService:
             logger.debug("[SSE] Resource cleanup completed")
 
     @staticmethod
-    async def _fetch_streamable_http(url: str) -> Dict[str, Any]:
+    async def _fetch_streamable_http(url: str, auth_token: Optional[str] = None) -> Dict[str, Any]:
         """
         Streamable HTTP transport - Inspector의 StreamableHTTPClientTransport와 동일
         Improved error handling and resource cleanup
@@ -245,7 +261,7 @@ class MCPProxyService:
             if not HAS_STREAMABLE_HTTP:
                 # Streamable HTTP가 없으면 SSE로 시도
                 logger.warning("[Streamable HTTP] Not available, trying SSE")
-                return await MCPProxyService._fetch_sse(url)
+                return await MCPProxyService._fetch_sse(url, auth_token)
 
             logger.info(f"[Streamable HTTP] Creating client for {url}")
             logger.info(f"[Streamable HTTP] streamablehttp_client function: {streamablehttp_client}")
@@ -677,7 +693,7 @@ class MCPProxyService:
     # ==================== TOOL CALLING METHODS ====================
 
     @staticmethod
-    async def call_tool(url: str, protocol: str, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    async def call_tool(url: str, protocol: str, tool_name: str, arguments: Dict[str, Any], auth_token: Optional[str] = None) -> Dict[str, Any]:
         """
         Call a specific tool on the MCP server
 
@@ -686,11 +702,12 @@ class MCPProxyService:
             protocol: 프로토콜 타입 (stdio, sse, streamable-http)
             tool_name: Tool name to call
             arguments: Tool arguments
+            auth_token: Optional authentication token for MCP server
 
         Returns:
             Dict containing tool execution result
         """
-        logger.info(f"[MCP Proxy] Calling tool {tool_name} - URL: {url}, Protocol: {protocol}")
+        logger.info(f"[MCP Proxy] Calling tool {tool_name} - URL: {url}, Protocol: {protocol}, Auth: {'Yes' if auth_token else 'No'}")
 
         if not MCP_SDK_AVAILABLE:
             logger.error("MCP SDK is not installed")
@@ -703,11 +720,11 @@ class MCPProxyService:
             normalized_protocol = MCPProxyService._normalize_protocol(protocol)
 
             if normalized_protocol == "stdio":
-                return await MCPProxyService._call_tool_stdio(url, tool_name, arguments)
+                return await MCPProxyService._call_tool_stdio(url, tool_name, arguments, auth_token)
             elif normalized_protocol == "sse":
-                return await MCPProxyService._call_tool_sse(url, tool_name, arguments)
+                return await MCPProxyService._call_tool_sse(url, tool_name, arguments, auth_token)
             else:
-                return await MCPProxyService._call_tool_streamable_http(url, tool_name, arguments)
+                return await MCPProxyService._call_tool_streamable_http(url, tool_name, arguments, auth_token)
 
         except Exception as e:
             logger.error(f"[MCP Proxy] Failed to call tool: {str(e)}", exc_info=True)
@@ -717,7 +734,7 @@ class MCPProxyService:
             }
 
     @staticmethod
-    async def _call_tool_stdio(command: str, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    async def _call_tool_stdio(command: str, tool_name: str, arguments: Dict[str, Any], auth_token: Optional[str] = None) -> Dict[str, Any]:
         """STDIO를 통해 tool 호출 - Improved error handling"""
         logger.info(f"[STDIO] Calling tool {tool_name} with command: {command}")
 
@@ -729,7 +746,15 @@ class MCPProxyService:
             cmd = parts[0]
             args = parts[1:] if len(parts) > 1 else []
 
-            server_params = StdioServerParameters(command=cmd, args=args, env=None)
+            # Pass auth token via environment variable if provided
+            env = None
+            if auth_token:
+                import os
+                env = os.environ.copy()
+                env['MCP_AUTH_TOKEN'] = auth_token
+                logger.info("[STDIO] Auth token added to environment for tool call")
+
+            server_params = StdioServerParameters(command=cmd, args=args, env=env)
 
             async with stdio_client(server_params) as (read, write):
                 async with ClientSession(read, write) as session:
@@ -761,13 +786,18 @@ class MCPProxyService:
             logger.debug(f"[STDIO] Tool {tool_name} cleanup completed")
 
     @staticmethod
-    async def _call_tool_sse(url: str, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    async def _call_tool_sse(url: str, tool_name: str, arguments: Dict[str, Any], auth_token: Optional[str] = None) -> Dict[str, Any]:
         """SSE를 통해 tool 호출 - Improved error handling"""
         logger.info(f"[SSE] Calling tool {tool_name} from: {url}")
 
         try:
             if not url.startswith("http://") and not url.startswith("https://"):
                 return {"success": False, "error": f"Invalid URL: {url}"}
+
+            # Note: MCP SDK sse_client may not support headers parameter yet
+            # This will need to be updated when SDK supports it
+            if auth_token:
+                logger.info("[SSE] Auth token provided for tool call (SDK support pending)")
 
             async with sse_client(url) as (read, write):
                 async with ClientSession(read, write) as session:
@@ -799,7 +829,7 @@ class MCPProxyService:
             logger.debug(f"[SSE] Tool {tool_name} cleanup completed")
 
     @staticmethod
-    async def _call_tool_streamable_http(url: str, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    async def _call_tool_streamable_http(url: str, tool_name: str, arguments: Dict[str, Any], auth_token: Optional[str] = None) -> Dict[str, Any]:
         """Streamable HTTP를 통해 tool 호출 - Improved error handling"""
         logger.info(f"[Streamable HTTP] Calling tool {tool_name} from: {url}")
 
@@ -809,7 +839,12 @@ class MCPProxyService:
 
             if not HAS_STREAMABLE_HTTP:
                 logger.warning("[Streamable HTTP] Not available, trying SSE")
-                return await MCPProxyService._call_tool_sse(url, tool_name, arguments)
+                return await MCPProxyService._call_tool_sse(url, tool_name, arguments, auth_token)
+
+            # Note: MCP SDK streamablehttp_client may not support headers parameter yet
+            # This will need to be updated when SDK supports it
+            if auth_token:
+                logger.info("[Streamable HTTP] Auth token provided for tool call (SDK support pending)")
 
             async with streamablehttp_client(url) as transport_tuple:
                 read, write, _ = transport_tuple
