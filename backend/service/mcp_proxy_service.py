@@ -204,9 +204,7 @@ class MCPProxyService:
                 headers['Authorization'] = f'Bearer {auth_token}'
                 logger.info("[SSE] Auth token added to headers")
 
-            # Note: MCP SDK sse_client may not support headers parameter yet
-            # This will need to be updated when SDK supports it
-            async with sse_client(url) as (read, write):
+            async with sse_client(url, headers=headers) as (read, write):
                 async with ClientSession(read, write) as session:
                     logger.info("[SSE] Session created, initializing...")
 
@@ -264,12 +262,16 @@ class MCPProxyService:
                 return await MCPProxyService._fetch_sse(url, auth_token)
 
             logger.info(f"[Streamable HTTP] Creating client for {url}")
-            logger.info(f"[Streamable HTTP] streamablehttp_client function: {streamablehttp_client}")
 
             # Inspector: new StreamableHTTPClientTransport(new URL(url), {fetch...})
-            # Python: streamablehttp_client(url)
+            # Python: streamablehttp_client(url, headers=...)
+            headers = {}
+            if auth_token:
+                headers['Authorization'] = f'Bearer {auth_token}'
+                logger.info("[Streamable HTTP] Auth token added to headers")
+
             logger.info(f"[Streamable HTTP] About to call streamablehttp_client({url})")
-            async with streamablehttp_client(url) as transport_tuple:
+            async with streamablehttp_client(url, headers=headers) as transport_tuple:
                 logger.info(f"[Streamable HTTP] streamablehttp_client returned, unpacking...")
                 logger.info(f"[Streamable HTTP] transport_tuple type: {type(transport_tuple)}")
                 read, write, _ = transport_tuple
@@ -794,12 +796,12 @@ class MCPProxyService:
             if not url.startswith("http://") and not url.startswith("https://"):
                 return {"success": False, "error": f"Invalid URL: {url}"}
 
-            # Note: MCP SDK sse_client may not support headers parameter yet
-            # This will need to be updated when SDK supports it
+            headers = {}
             if auth_token:
-                logger.info("[SSE] Auth token provided for tool call (SDK support pending)")
+                headers['Authorization'] = f'Bearer {auth_token}'
+                logger.info("[SSE] Auth token added to headers for tool call")
 
-            async with sse_client(url) as (read, write):
+            async with sse_client(url, headers=headers) as (read, write):
                 async with ClientSession(read, write) as session:
                     await asyncio.wait_for(session.initialize(), timeout=MCPProxyService.DEFAULT_TIMEOUT)
 
@@ -841,12 +843,12 @@ class MCPProxyService:
                 logger.warning("[Streamable HTTP] Not available, trying SSE")
                 return await MCPProxyService._call_tool_sse(url, tool_name, arguments, auth_token)
 
-            # Note: MCP SDK streamablehttp_client may not support headers parameter yet
-            # This will need to be updated when SDK supports it
+            headers = {}
             if auth_token:
-                logger.info("[Streamable HTTP] Auth token provided for tool call (SDK support pending)")
+                headers['Authorization'] = f'Bearer {auth_token}'
+                logger.info("[Streamable HTTP] Auth token added to headers for tool call")
 
-            async with streamablehttp_client(url) as transport_tuple:
+            async with streamablehttp_client(url, headers=headers) as transport_tuple:
                 read, write, _ = transport_tuple
 
                 async with ClientSession(read, write) as session:
