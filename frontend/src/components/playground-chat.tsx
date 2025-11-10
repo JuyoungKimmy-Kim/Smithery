@@ -46,6 +46,9 @@ export default function PlaygroundChat({ mcpServerId, tools = [] }: PlaygroundCh
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showGuidance, setShowGuidance] = useState(true);
+  const [authToken, setAuthToken] = useState("");
+  const [tokenInputVisible, setTokenInputVisible] = useState(false);
+  const [tokenSaved, setTokenSaved] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -115,6 +118,7 @@ export default function PlaygroundChat({ mcpServerId, tools = [] }: PlaygroundCh
               role: m.role,
               content: m.content,
             })),
+            mcp_auth_token: authToken || undefined,
           }),
           requiresAuth: true,
         }
@@ -219,6 +223,72 @@ export default function PlaygroundChat({ mcpServerId, tools = [] }: PlaygroundCh
             Clear
           </button>
         </div>
+      </div>
+
+      {/* Auth Token Section */}
+      <div className="border-b border-gray-200 bg-gray-50">
+        <button
+          onClick={() => setTokenInputVisible(!tokenInputVisible)}
+          className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-100 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-700">
+              🔑 Authentication (Optional)
+            </span>
+            {tokenSaved && (
+              <CheckCircleIcon className="h-4 w-4 text-green-600" />
+            )}
+          </div>
+          <svg
+            className={`h-5 w-5 text-gray-500 transition-transform ${
+              tokenInputVisible ? "rotate-180" : ""
+            }`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        </button>
+
+        {tokenInputVisible && (
+          <div className="px-4 pb-4 space-y-2">
+            <p className="text-xs text-gray-600">
+              Some MCP servers require authentication. Enter your API token here if needed.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={authToken}
+                onChange={(e) => setAuthToken(e.target.value)}
+                placeholder="Enter API token..."
+                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={() => setTokenSaved(!!authToken)}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Save
+              </button>
+            </div>
+            {tokenSaved && authToken && (
+              <p className="text-xs text-green-600 flex items-center gap-1">
+                <CheckCircleIcon className="h-3 w-3" />
+                Token configured. It will be included in requests.
+              </p>
+            )}
+            {tokenSaved && !authToken && (
+              <p className="text-xs text-gray-500">
+                Token cleared.
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Messages Area */}
