@@ -181,6 +181,9 @@ export default function PlaygroundChat({ mcpServerId, tools = [] }: PlaygroundCh
   const handleUsageLimitOk = () => {
     setShowUsageLimitExplanation(false);
     setOnboardingStep(2);
+    // Automatically open Step 2 (auth section)
+    setTokenInputVisible(true);
+    setShowAuthExplanation(true);
   };
 
   const handleAuthSectionClick = () => {
@@ -195,6 +198,8 @@ export default function PlaygroundChat({ mcpServerId, tools = [] }: PlaygroundCh
   const handleAuthOk = () => {
     setShowAuthExplanation(false);
     setOnboardingStep(3);
+    // Automatically show Step 3 (input explanation)
+    setShowInputExplanation(true);
   };
 
   const handleInputClick = () => {
