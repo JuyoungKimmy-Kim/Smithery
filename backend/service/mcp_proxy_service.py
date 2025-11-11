@@ -114,74 +114,13 @@ class MCPProxyService:
     @staticmethod
     async def _fetch_stdio(command: str, auth_token: Optional[str] = None) -> Dict[str, Any]:
         """
-        STDIO transport - Inspector의 StdioClientTransport와 동일
-        Improved error handling and resource cleanup
+        STDIO transport - TODO: Not supported yet
+        STDIO는 현재 지원하지 않습니다.
         """
-        logger.info(f"[STDIO] Starting with command: {command}")
-
-        try:
-            parts = command.split()
-            if not parts:
-                return MCPProxyService._create_error_response("Empty command")
-
-            cmd = parts[0]
-            args = parts[1:] if len(parts) > 1 else []
-
-            # Pass auth token via environment variable if provided
-            env = None
-            if auth_token:
-                import os
-                env = os.environ.copy()
-                env['MCP_AUTH_TOKEN'] = auth_token
-                logger.info("[STDIO] Auth token added to environment")
-
-            server_params = StdioServerParameters(
-                command=cmd,
-                args=args,
-                env=env
-            )
-
-            logger.info(f"[STDIO] Command={cmd}, Args={args}")
-
-            # Inspector: await transport.start()
-            # Python: async with stdio_client
-            async with stdio_client(server_params) as (read, write):
-                async with ClientSession(read, write) as session:
-                    logger.info("[STDIO] Initializing session...")
-
-                    await asyncio.wait_for(
-                        session.initialize(),
-                        timeout=MCPProxyService.DEFAULT_TIMEOUT
-                    )
-
-                    logger.info("[STDIO] Listing tools...")
-
-                    result = await asyncio.wait_for(
-                        session.list_tools(),
-                        timeout=MCPProxyService.DEFAULT_TIMEOUT
-                    )
-
-                    tools = MCPProxyService._convert_tools(result.tools)
-
-                    logger.info(f"[STDIO] Success: {len(tools)} tools")
-                    return MCPProxyService._create_success_response(
-                        tools,
-                        f"Fetched {len(tools)} tools via STDIO"
-                    )
-
-        except asyncio.TimeoutError:
-            logger.error(f"[STDIO] Timeout after {MCPProxyService.DEFAULT_TIMEOUT}s")
-            return MCPProxyService._create_error_response(
-                f"STDIO timeout after {MCPProxyService.DEFAULT_TIMEOUT}s"
-            )
-        except asyncio.CancelledError:
-            logger.warning("[STDIO] Request was cancelled by client")
-            raise  # Re-raise to propagate cancellation properly
-        except Exception as e:
-            logger.error(f"[STDIO] Failed: {type(e).__name__}: {str(e)}", exc_info=True)
-            return MCPProxyService._create_error_response(f"STDIO failed: {str(e)}")
-        finally:
-            logger.debug("[STDIO] Resource cleanup completed")
+        logger.warning(f"[STDIO] Not supported - command: {command}")
+        return MCPProxyService._create_error_response(
+            "STDIO transport is not currently supported. Please use HTTP or SSE protocols."
+        )
 
     @staticmethod
     async def _fetch_sse(url: str, auth_token: Optional[str] = None) -> Dict[str, Any]:
@@ -416,45 +355,12 @@ class MCPProxyService:
 
     @staticmethod
     async def _fetch_prompts_stdio(command: str) -> Dict[str, Any]:
-        """STDIO를 통해 prompts 가져오기"""
-        logger.info(f"[STDIO] Fetching prompts with command: {command}")
-
-        try:
-            parts = command.split()
-            if not parts:
-                return MCPProxyService._create_error_response("Empty command", data_key="prompts")
-
-            cmd = parts[0]
-            args = parts[1:] if len(parts) > 1 else []
-
-            server_params = StdioServerParameters(command=cmd, args=args, env=None)
-
-            async with stdio_client(server_params) as (read, write):
-                async with ClientSession(read, write) as session:
-                    await asyncio.wait_for(session.initialize(), timeout=MCPProxyService.DEFAULT_TIMEOUT)
-
-                    result = await asyncio.wait_for(
-                        session.list_prompts(),
-                        timeout=MCPProxyService.DEFAULT_TIMEOUT
-                    )
-
-                    prompts = MCPProxyService._convert_prompts(result.prompts)
-                    logger.info(f"[STDIO] Success: {len(prompts)} prompts")
-
-                    return MCPProxyService._create_success_response(
-                        prompts,
-                        f"Fetched {len(prompts)} prompts via STDIO",
-                        data_key="prompts"
-                    )
-
-        except asyncio.TimeoutError:
-            return MCPProxyService._create_error_response(
-                f"STDIO timeout after {MCPProxyService.DEFAULT_TIMEOUT}s",
-                data_key="prompts"
-            )
-        except Exception as e:
-            logger.error(f"[STDIO] Failed: {str(e)}", exc_info=True)
-            return MCPProxyService._create_error_response(f"STDIO failed: {str(e)}", data_key="prompts")
+        """STDIO를 통해 prompts 가져오기 - TODO: Not supported yet"""
+        logger.warning(f"[STDIO] Prompts not supported - command: {command}")
+        return MCPProxyService._create_error_response(
+            "STDIO transport is not currently supported for prompts.",
+            data_key="prompts"
+        )
 
     @staticmethod
     async def _fetch_prompts_sse(url: str) -> Dict[str, Any]:
@@ -574,45 +480,12 @@ class MCPProxyService:
 
     @staticmethod
     async def _fetch_resources_stdio(command: str) -> Dict[str, Any]:
-        """STDIO를 통해 resources 가져오기"""
-        logger.info(f"[STDIO] Fetching resources with command: {command}")
-
-        try:
-            parts = command.split()
-            if not parts:
-                return MCPProxyService._create_error_response("Empty command", data_key="resources")
-
-            cmd = parts[0]
-            args = parts[1:] if len(parts) > 1 else []
-
-            server_params = StdioServerParameters(command=cmd, args=args, env=None)
-
-            async with stdio_client(server_params) as (read, write):
-                async with ClientSession(read, write) as session:
-                    await asyncio.wait_for(session.initialize(), timeout=MCPProxyService.DEFAULT_TIMEOUT)
-
-                    result = await asyncio.wait_for(
-                        session.list_resources(),
-                        timeout=MCPProxyService.DEFAULT_TIMEOUT
-                    )
-
-                    resources = MCPProxyService._convert_resources(result.resources)
-                    logger.info(f"[STDIO] Success: {len(resources)} resources")
-
-                    return MCPProxyService._create_success_response(
-                        resources,
-                        f"Fetched {len(resources)} resources via STDIO",
-                        data_key="resources"
-                    )
-
-        except asyncio.TimeoutError:
-            return MCPProxyService._create_error_response(
-                f"STDIO timeout after {MCPProxyService.DEFAULT_TIMEOUT}s",
-                data_key="resources"
-            )
-        except Exception as e:
-            logger.error(f"[STDIO] Failed: {str(e)}", exc_info=True)
-            return MCPProxyService._create_error_response(f"STDIO failed: {str(e)}", data_key="resources")
+        """STDIO를 통해 resources 가져오기 - TODO: Not supported yet"""
+        logger.warning(f"[STDIO] Resources not supported - command: {command}")
+        return MCPProxyService._create_error_response(
+            "STDIO transport is not currently supported for resources.",
+            data_key="resources"
+        )
 
     @staticmethod
     async def _fetch_resources_sse(url: str) -> Dict[str, Any]:
@@ -737,55 +610,12 @@ class MCPProxyService:
 
     @staticmethod
     async def _call_tool_stdio(command: str, tool_name: str, arguments: Dict[str, Any], auth_token: Optional[str] = None) -> Dict[str, Any]:
-        """STDIO를 통해 tool 호출 - Improved error handling"""
-        logger.info(f"[STDIO] Calling tool {tool_name} with command: {command}")
-
-        try:
-            parts = command.split()
-            if not parts:
-                return {"success": False, "error": "Empty command"}
-
-            cmd = parts[0]
-            args = parts[1:] if len(parts) > 1 else []
-
-            # Pass auth token via environment variable if provided
-            env = None
-            if auth_token:
-                import os
-                env = os.environ.copy()
-                env['MCP_AUTH_TOKEN'] = auth_token
-                logger.info("[STDIO] Auth token added to environment for tool call")
-
-            server_params = StdioServerParameters(command=cmd, args=args, env=env)
-
-            async with stdio_client(server_params) as (read, write):
-                async with ClientSession(read, write) as session:
-                    await asyncio.wait_for(session.initialize(), timeout=MCPProxyService.DEFAULT_TIMEOUT)
-
-                    result = await asyncio.wait_for(
-                        session.call_tool(tool_name, arguments),
-                        timeout=MCPProxyService.DEFAULT_TIMEOUT
-                    )
-
-                    logger.info(f"[STDIO] Tool {tool_name} executed successfully")
-                    return {
-                        "success": True,
-                        "result": result.content if hasattr(result, 'content') else result
-                    }
-
-        except asyncio.TimeoutError:
-            return {
-                "success": False,
-                "error": f"STDIO timeout after {MCPProxyService.DEFAULT_TIMEOUT}s"
-            }
-        except asyncio.CancelledError:
-            logger.warning(f"[STDIO] Tool call {tool_name} was cancelled by client")
-            raise
-        except Exception as e:
-            logger.error(f"[STDIO] Failed: {str(e)}", exc_info=True)
-            return {"success": False, "error": str(e)}
-        finally:
-            logger.debug(f"[STDIO] Tool {tool_name} cleanup completed")
+        """STDIO를 통해 tool 호출 - TODO: Not supported yet"""
+        logger.warning(f"[STDIO] Tool calling not supported - command: {command}, tool: {tool_name}")
+        return {
+            "success": False,
+            "error": "STDIO transport is not currently supported for tool calling."
+        }
 
     @staticmethod
     async def _call_tool_sse(url: str, tool_name: str, arguments: Dict[str, Any], auth_token: Optional[str] = None) -> Dict[str, Any]:
