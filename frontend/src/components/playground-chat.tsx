@@ -53,18 +53,6 @@ export default function PlaygroundChat({ mcpServerId, tools = [] }: PlaygroundCh
   const [showUsageLimitExplanation, setShowUsageLimitExplanation] = useState(false);
   const [showAuthExplanation, setShowAuthExplanation] = useState(false);
   const [showInputExplanation, setShowInputExplanation] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    // Only scroll when there are actual messages
-    if (messages.length > 0) {
-      scrollToBottom();
-    }
-  }, [messages]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -541,8 +529,6 @@ export default function PlaygroundChat({ mcpServerId, tools = [] }: PlaygroundCh
             </div>
           </div>
         )}
-
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Error Display */}
