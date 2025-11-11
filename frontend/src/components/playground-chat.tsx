@@ -60,7 +60,10 @@ export default function PlaygroundChat({ mcpServerId, tools = [] }: PlaygroundCh
   };
 
   useEffect(() => {
-    scrollToBottom();
+    // Only scroll when there are actual messages
+    if (messages.length > 0) {
+      scrollToBottom();
+    }
   }, [messages]);
 
   useEffect(() => {
