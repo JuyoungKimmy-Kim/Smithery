@@ -579,19 +579,35 @@ export default function MCPServerDetail() {
           </div>
         </div>
 
+        {/* Playground Section */}
+        <div className="bg-white rounded-lg shadow-sm p-8 mb-8">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              🎮 Try it out!
+            </h2>
+            <p className="text-gray-600">
+              Test this MCP server directly in your browser. Ask questions and see the tools in action.
+            </p>
+          </div>
+          <PlaygroundChat
+            mcpServerId={parseInt(mcp.id)}
+            tools={mcp.tools || []}
+          />
+        </div>
+
         {/* Metadata Section */}
         <div className="bg-white rounded-lg shadow-sm p-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">
             등록 정보
           </h2>
-          
-          <div className="grid gap-4 md:grid-cols-2">       
+
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
               <p className="text-sm font-medium text-gray-600">
                 Owner
               </p>
               {mcp.owner ? (
-                <button 
+                <button
                   className="text-blue-600 hover:text-blue-800 hover:underline"
                   onClick={() => router.push(`/user/${mcp.owner?.username}`)}
                 >
@@ -605,14 +621,14 @@ export default function MCPServerDetail() {
               <p className="text-sm font-medium text-gray-600">
                 GitHub Link
               </p>
-              <button 
+              <button
                 className="text-blue-600 hover:text-blue-800 hover:underline"
                 onClick={() => window.open(mcp.github_link, '_blank')}
               >
                 {mcp.github_link}
               </button>
             </div>
-            
+
             {mcp.created_at && (
               <div>
                 <p className="text-sm font-medium text-gray-600">
@@ -623,7 +639,7 @@ export default function MCPServerDetail() {
                 </p>
               </div>
             )}
-            
+
             {mcp.updated_at && (
               <div>
                 <p className="text-sm font-medium text-gray-600">
@@ -635,22 +651,6 @@ export default function MCPServerDetail() {
               </div>
             )}
           </div>
-        </div>
-
-        {/* Playground Section */}
-        <div className="mt-8 bg-white rounded-lg shadow-sm p-8">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              🎮 Try it out!
-            </h2>
-            <p className="text-gray-600">
-              Test this MCP server directly in your browser. Ask questions and see the tools in action.
-            </p>
-          </div>
-          <PlaygroundChat
-            mcpServerId={parseInt(mcp.id)}
-            tools={mcp.tools || []}
-          />
         </div>
 
         {/* 댓글 섹션 */}
