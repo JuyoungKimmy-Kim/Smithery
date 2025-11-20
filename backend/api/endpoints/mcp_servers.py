@@ -8,6 +8,7 @@ from backend.database import get_db
 
 logger = logging.getLogger(__name__)
 from backend.service import MCPServerService, UserService, MCPProxyService
+from backend.service.notification_service import NotificationService
 from backend.database.model import User
 from backend.api.schemas import (
     MCPServerCreate, MCPServerResponse, MCPServerUpdate,
@@ -240,8 +241,14 @@ def add_favorite(
     """MCP 서버를 즐겨찾기에 추가합니다."""
     user_service = UserService(db)
     success = user_service.add_favorite(current_user.id, mcp_server_id)
-    
+
     if success:
+        # 알림 생성 (MCP 소유자에게)
+        notification_service = NotificationService(db)
+        notification_service.create_favorite_notification(
+            mcp_server_id=mcp_server_id,
+            favoriter_user_id=current_user.id
+        )
         return FavoriteResponse(success=True, message="즐겨찾기에 추가되었습니다.")
     else:
         return FavoriteResponse(success=False, message="이미 즐겨찾기에 추가되어 있습니다.")
