@@ -7,6 +7,7 @@ import BlogPostCard from "@/components/blog-post-card";
 import { MCPServer } from "@/types/mcp";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { stripMarkdown } from "@/lib/markdown-utils";
 
 interface Post {
   category: string;
@@ -573,7 +574,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                                 </div>
                               )}
                             </div>
-                            <p className="text-xs text-gray-600 mb-1 truncate">{String(desc || '')}</p>
+                            <p className="text-xs text-gray-600 mb-1 truncate">{stripMarkdown(String(desc || ''))}</p>
                             <div className="flex items-center space-x-3 text-xs text-gray-500">
                               <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs">
                                 {tags ? (() => {

@@ -6,9 +6,11 @@ export function stripMarkdown(markdown: string): string {
 
   let text = markdown;
 
-  // Remove code blocks
-  text = text.replace(/```[\s\S]*?```/g, '');
-  text = text.replace(/`[^`]+`/g, '');
+  // Remove code blocks (keep content)
+  text = text.replace(/```[\s\S]*?```/g, '[code block]');
+
+  // Remove inline code backticks (keep content)
+  text = text.replace(/`([^`]+)`/g, '$1');
 
   // Remove headers
   text = text.replace(/#{1,6}\s+/g, '');
