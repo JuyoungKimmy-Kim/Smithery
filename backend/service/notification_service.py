@@ -4,6 +4,7 @@ from backend.database.dao.notification_dao import NotificationDAO
 from backend.database.dao.user_dao import UserDAO
 from backend.database.dao.mcp_server_dao import MCPServerDAO
 from backend.database.model.notification import Notification
+from backend.database.model.user import User
 
 class NotificationService:
     def __init__(self, db: Session):
@@ -126,9 +127,6 @@ class NotificationService:
             return []
 
         # 모든 관리자 조회
-        admins = self.db.query(self.user_dao.db.query(User).filter(User.is_admin == 'admin').all())
-        # 간단히 쿼리 수정
-        from backend.database.model.user import User
         admins = self.db.query(User).filter(User.is_admin == 'admin').all()
 
         notifications = []
