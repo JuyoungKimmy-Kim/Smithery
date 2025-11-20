@@ -9,16 +9,19 @@ import {
   ChevronDownIcon,
   LanguageIcon,
   BookOpenIcon,
+  BellIcon,
 } from "@heroicons/react/24/solid";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { apiFetch } from "@/lib/api-client";
 
 export function Navbar() {
   const [open, setOpen] = React.useState(false);
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
   const [wikiMenuOpen, setWikiMenuOpen] = React.useState(false);
   const [showSignInModal, setShowSignInModal] = React.useState(false);
+  const [unreadCount, setUnreadCount] = React.useState(0);
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
   const { language, setLanguage, t } = useLanguage();
@@ -77,6 +80,29 @@ export function Navbar() {
     // 페이지 새로고침하여 검색 상태 초기화
     window.location.href = '/';
   };
+
+  const fetchUnreadCount = async () => {
+    if (!isAuthenticated) return;
+
+    try {
+      const response = await apiFetch('/api/notifications/unread-count', {
+        requiresAuth: true
+      });
+      const data = await response.json();
+      setUnreadCount(data.count || 0);
+    } catch (error) {
+      console.error('Failed to fetch unread count:', error);
+    }
+  };
+
+  // Fetch unread count on mount and when authentication changes
+  React.useEffect(() => {
+    fetchUnreadCount();
+
+    // Poll every 30 seconds for new notifications
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
 
   React.useEffect(() => {
     window.addEventListener(
@@ -161,7 +187,21 @@ export function Navbar() {
               <LanguageIcon className="h-5 w-5" />
               <span className="text-sm font-medium">{language === 'ko' ? 'KO' : 'EN'}</span>
             </button>
-            
+
+            {isAuthenticated && (
+              <button
+                className="relative p-2 text-gray-700 hover:text-gray-900 transition-colors rounded-lg hover:bg-gray-100"
+                title="알림"
+              >
+                <BellIcon className="h-5 w-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </button>
+            )}
+
             {isAuthenticated ? (
               <div className="relative user-menu">
                 <button
