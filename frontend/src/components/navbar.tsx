@@ -71,6 +71,13 @@ export function Navbar() {
     setOpen(false);
   };
 
+  const handleHomeClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    router.push('/');
+    // 페이지 새로고침하여 검색 상태 초기화
+    window.location.href = '/';
+  };
+
   React.useEffect(() => {
     window.addEventListener(
       "resize",
@@ -98,13 +105,14 @@ export function Navbar() {
     <>
       <nav className="sticky top-0 z-50 bg-blue-50 shadow-lg">
         <div className="container mx-auto flex items-center justify-between px-4 py-3">
-          <Link
+          <a
             href="/"
-            className="text-lg font-bold text-blue-gray-900 nav-link"
+            onClick={handleHomeClick}
+            className="text-lg font-bold text-blue-gray-900 nav-link cursor-pointer"
             data-nav-link="true"
           >
             MCP Server Hub
-          </Link>
+          </a>
 
           <div className="hidden items-center gap-4 lg:flex">
             {/* Wiki Dropdown */}
