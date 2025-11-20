@@ -211,7 +211,7 @@ export default function Comments({ mcpServerId }: CommentsProps) {
       {/* 댓글 작성 폼 */}
       {isAuthenticated ? (
         <form onSubmit={handleSubmitComment} className="mb-6">
-          <div className="flex gap-3">
+          <div className="flex gap-3 items-end">
             <div className="flex-1">
               <div className="mb-2">
                 <StarRatingInput value={newRating} onChange={setNewRating} />
@@ -220,8 +220,7 @@ export default function Comments({ mcpServerId }: CommentsProps) {
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
                 placeholder={t('comments.writeComment')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none h-20"
                 maxLength={500}
               />
               <div className="text-right text-xs text-gray-500 mt-1">
@@ -231,7 +230,7 @@ export default function Comments({ mcpServerId }: CommentsProps) {
             <button
               type="submit"
               disabled={!newComment.trim() || submitting}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2 h-20 mb-6"
             >
               {submitting ? (
                 t('comments.submitting')

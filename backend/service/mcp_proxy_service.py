@@ -57,7 +57,7 @@ class MCPProxyService:
         }
 
     @staticmethod
-    async def fetch_tools(url: str, protocol: str) -> Dict[str, Any]:
+    async def fetch_tools(url: str, protocol: str, auth_token: Optional[str] = None) -> Dict[str, Any]:
         """
         MCP 서버에서 tools 목록을 가져옵니다
         Inspector의 createTransport와 동일한 패턴
@@ -65,11 +65,12 @@ class MCPProxyService:
         Args:
             url: MCP 서버 URL 또는 명령어
             protocol: 프로토콜 타입 (stdio, sse, streamable-http)
+            auth_token: Optional authentication token for MCP server
 
         Returns:
             Dict containing tools list and status
         """
-        logger.info(f"[MCP Proxy] Fetching tools - URL: {url}, Protocol: {protocol}")
+        logger.info(f"[MCP Proxy] Fetching tools - URL: {url}, Protocol: {protocol}, Auth: {'Yes' if auth_token else 'No'}")
 
         if not MCP_SDK_AVAILABLE:
             logger.error("MCP SDK is not installed")
@@ -83,12 +84,12 @@ class MCPProxyService:
 
             # Inspector의 createTransport처럼 프로토콜에 따라 분기
             if normalized_protocol == "stdio":
-                return await MCPProxyService._fetch_stdio(url)
+                return await MCPProxyService._fetch_stdio(url, auth_token)
             elif normalized_protocol == "sse":
-                return await MCPProxyService._fetch_sse(url)
+                return await MCPProxyService._fetch_sse(url, auth_token)
             else:
                 # streamable-http (기본값)
-                return await MCPProxyService._fetch_streamable_http(url)
+                return await MCPProxyService._fetch_streamable_http(url, auth_token)
 
         except Exception as e:
             logger.error(f"[MCP Proxy] Failed to fetch tools: {str(e)}", exc_info=True)
@@ -111,71 +112,18 @@ class MCPProxyService:
             return "streamable-http"
 
     @staticmethod
-    async def _fetch_stdio(command: str) -> Dict[str, Any]:
+    async def _fetch_stdio(command: str, auth_token: Optional[str] = None) -> Dict[str, Any]:
         """
-        STDIO transport - Inspector의 StdioClientTransport와 동일
-        Improved error handling and resource cleanup
+        STDIO transport - TODO: Not supported yet
+        STDIO는 현재 지원하지 않습니다.
         """
-        logger.info(f"[STDIO] Starting with command: {command}")
-
-        try:
-            parts = command.split()
-            if not parts:
-                return MCPProxyService._create_error_response("Empty command")
-
-            cmd = parts[0]
-            args = parts[1:] if len(parts) > 1 else []
-
-            server_params = StdioServerParameters(
-                command=cmd,
-                args=args,
-                env=None
-            )
-
-            logger.info(f"[STDIO] Command={cmd}, Args={args}")
-
-            # Inspector: await transport.start()
-            # Python: async with stdio_client
-            async with stdio_client(server_params) as (read, write):
-                async with ClientSession(read, write) as session:
-                    logger.info("[STDIO] Initializing session...")
-
-                    await asyncio.wait_for(
-                        session.initialize(),
-                        timeout=MCPProxyService.DEFAULT_TIMEOUT
-                    )
-
-                    logger.info("[STDIO] Listing tools...")
-
-                    result = await asyncio.wait_for(
-                        session.list_tools(),
-                        timeout=MCPProxyService.DEFAULT_TIMEOUT
-                    )
-
-                    tools = MCPProxyService._convert_tools(result.tools)
-
-                    logger.info(f"[STDIO] Success: {len(tools)} tools")
-                    return MCPProxyService._create_success_response(
-                        tools,
-                        f"Fetched {len(tools)} tools via STDIO"
-                    )
-
-        except asyncio.TimeoutError:
-            logger.error(f"[STDIO] Timeout after {MCPProxyService.DEFAULT_TIMEOUT}s")
-            return MCPProxyService._create_error_response(
-                f"STDIO timeout after {MCPProxyService.DEFAULT_TIMEOUT}s"
-            )
-        except asyncio.CancelledError:
-            logger.warning("[STDIO] Request was cancelled by client")
-            raise  # Re-raise to propagate cancellation properly
-        except Exception as e:
-            logger.error(f"[STDIO] Failed: {type(e).__name__}: {str(e)}", exc_info=True)
-            return MCPProxyService._create_error_response(f"STDIO failed: {str(e)}")
-        finally:
-            logger.debug("[STDIO] Resource cleanup completed")
+        logger.warning(f"[STDIO] Not supported - command: {command}")
+        return MCPProxyService._create_error_response(
+            "STDIO transport is not currently supported. Please use HTTP or SSE protocols."
+        )
 
     @staticmethod
-    async def _fetch_sse(url: str) -> Dict[str, Any]:
+    async def _fetch_sse(url: str, auth_token: Optional[str] = None) -> Dict[str, Any]:
         """
         SSE transport - Inspector의 SSEClientTransport와 동일
         Improved error handling and resource cleanup
@@ -189,8 +137,13 @@ class MCPProxyService:
             logger.info(f"[SSE] Creating SSE client for {url}")
 
             # Inspector: new SSEClientTransport(new URL(url), {headers...})
-            # Python: sse_client(url)
-            async with sse_client(url) as (read, write):
+            # Python: sse_client(url, headers=...)
+            headers = {}
+            if auth_token:
+                headers['Authorization'] = f'Bearer {auth_token}'
+                logger.info("[SSE] Auth token added to headers")
+
+            async with sse_client(url, headers=headers) as (read, write):
                 async with ClientSession(read, write) as session:
                     logger.info("[SSE] Session created, initializing...")
 
@@ -230,7 +183,7 @@ class MCPProxyService:
             logger.debug("[SSE] Resource cleanup completed")
 
     @staticmethod
-    async def _fetch_streamable_http(url: str) -> Dict[str, Any]:
+    async def _fetch_streamable_http(url: str, auth_token: Optional[str] = None) -> Dict[str, Any]:
         """
         Streamable HTTP transport - Inspector의 StreamableHTTPClientTransport와 동일
         Improved error handling and resource cleanup
@@ -245,15 +198,19 @@ class MCPProxyService:
             if not HAS_STREAMABLE_HTTP:
                 # Streamable HTTP가 없으면 SSE로 시도
                 logger.warning("[Streamable HTTP] Not available, trying SSE")
-                return await MCPProxyService._fetch_sse(url)
+                return await MCPProxyService._fetch_sse(url, auth_token)
 
             logger.info(f"[Streamable HTTP] Creating client for {url}")
-            logger.info(f"[Streamable HTTP] streamablehttp_client function: {streamablehttp_client}")
 
             # Inspector: new StreamableHTTPClientTransport(new URL(url), {fetch...})
-            # Python: streamablehttp_client(url)
+            # Python: streamablehttp_client(url, headers=...)
+            headers = {}
+            if auth_token:
+                headers['Authorization'] = f'Bearer {auth_token}'
+                logger.info("[Streamable HTTP] Auth token added to headers")
+
             logger.info(f"[Streamable HTTP] About to call streamablehttp_client({url})")
-            async with streamablehttp_client(url) as transport_tuple:
+            async with streamablehttp_client(url, headers=headers) as transport_tuple:
                 logger.info(f"[Streamable HTTP] streamablehttp_client returned, unpacking...")
                 logger.info(f"[Streamable HTTP] transport_tuple type: {type(transport_tuple)}")
                 read, write, _ = transport_tuple
@@ -398,45 +355,12 @@ class MCPProxyService:
 
     @staticmethod
     async def _fetch_prompts_stdio(command: str) -> Dict[str, Any]:
-        """STDIO를 통해 prompts 가져오기"""
-        logger.info(f"[STDIO] Fetching prompts with command: {command}")
-
-        try:
-            parts = command.split()
-            if not parts:
-                return MCPProxyService._create_error_response("Empty command", data_key="prompts")
-
-            cmd = parts[0]
-            args = parts[1:] if len(parts) > 1 else []
-
-            server_params = StdioServerParameters(command=cmd, args=args, env=None)
-
-            async with stdio_client(server_params) as (read, write):
-                async with ClientSession(read, write) as session:
-                    await asyncio.wait_for(session.initialize(), timeout=MCPProxyService.DEFAULT_TIMEOUT)
-
-                    result = await asyncio.wait_for(
-                        session.list_prompts(),
-                        timeout=MCPProxyService.DEFAULT_TIMEOUT
-                    )
-
-                    prompts = MCPProxyService._convert_prompts(result.prompts)
-                    logger.info(f"[STDIO] Success: {len(prompts)} prompts")
-
-                    return MCPProxyService._create_success_response(
-                        prompts,
-                        f"Fetched {len(prompts)} prompts via STDIO",
-                        data_key="prompts"
-                    )
-
-        except asyncio.TimeoutError:
-            return MCPProxyService._create_error_response(
-                f"STDIO timeout after {MCPProxyService.DEFAULT_TIMEOUT}s",
-                data_key="prompts"
-            )
-        except Exception as e:
-            logger.error(f"[STDIO] Failed: {str(e)}", exc_info=True)
-            return MCPProxyService._create_error_response(f"STDIO failed: {str(e)}", data_key="prompts")
+        """STDIO를 통해 prompts 가져오기 - TODO: Not supported yet"""
+        logger.warning(f"[STDIO] Prompts not supported - command: {command}")
+        return MCPProxyService._create_error_response(
+            "STDIO transport is not currently supported for prompts.",
+            data_key="prompts"
+        )
 
     @staticmethod
     async def _fetch_prompts_sse(url: str) -> Dict[str, Any]:
@@ -556,45 +480,12 @@ class MCPProxyService:
 
     @staticmethod
     async def _fetch_resources_stdio(command: str) -> Dict[str, Any]:
-        """STDIO를 통해 resources 가져오기"""
-        logger.info(f"[STDIO] Fetching resources with command: {command}")
-
-        try:
-            parts = command.split()
-            if not parts:
-                return MCPProxyService._create_error_response("Empty command", data_key="resources")
-
-            cmd = parts[0]
-            args = parts[1:] if len(parts) > 1 else []
-
-            server_params = StdioServerParameters(command=cmd, args=args, env=None)
-
-            async with stdio_client(server_params) as (read, write):
-                async with ClientSession(read, write) as session:
-                    await asyncio.wait_for(session.initialize(), timeout=MCPProxyService.DEFAULT_TIMEOUT)
-
-                    result = await asyncio.wait_for(
-                        session.list_resources(),
-                        timeout=MCPProxyService.DEFAULT_TIMEOUT
-                    )
-
-                    resources = MCPProxyService._convert_resources(result.resources)
-                    logger.info(f"[STDIO] Success: {len(resources)} resources")
-
-                    return MCPProxyService._create_success_response(
-                        resources,
-                        f"Fetched {len(resources)} resources via STDIO",
-                        data_key="resources"
-                    )
-
-        except asyncio.TimeoutError:
-            return MCPProxyService._create_error_response(
-                f"STDIO timeout after {MCPProxyService.DEFAULT_TIMEOUT}s",
-                data_key="resources"
-            )
-        except Exception as e:
-            logger.error(f"[STDIO] Failed: {str(e)}", exc_info=True)
-            return MCPProxyService._create_error_response(f"STDIO failed: {str(e)}", data_key="resources")
+        """STDIO를 통해 resources 가져오기 - TODO: Not supported yet"""
+        logger.warning(f"[STDIO] Resources not supported - command: {command}")
+        return MCPProxyService._create_error_response(
+            "STDIO transport is not currently supported for resources.",
+            data_key="resources"
+        )
 
     @staticmethod
     async def _fetch_resources_sse(url: str) -> Dict[str, Any]:
@@ -677,7 +568,7 @@ class MCPProxyService:
     # ==================== TOOL CALLING METHODS ====================
 
     @staticmethod
-    async def call_tool(url: str, protocol: str, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    async def call_tool(url: str, protocol: str, tool_name: str, arguments: Dict[str, Any], auth_token: Optional[str] = None) -> Dict[str, Any]:
         """
         Call a specific tool on the MCP server
 
@@ -686,11 +577,12 @@ class MCPProxyService:
             protocol: 프로토콜 타입 (stdio, sse, streamable-http)
             tool_name: Tool name to call
             arguments: Tool arguments
+            auth_token: Optional authentication token for MCP server
 
         Returns:
             Dict containing tool execution result
         """
-        logger.info(f"[MCP Proxy] Calling tool {tool_name} - URL: {url}, Protocol: {protocol}")
+        logger.info(f"[MCP Proxy] Calling tool {tool_name} - URL: {url}, Protocol: {protocol}, Auth: {'Yes' if auth_token else 'No'}")
 
         if not MCP_SDK_AVAILABLE:
             logger.error("MCP SDK is not installed")
@@ -703,11 +595,11 @@ class MCPProxyService:
             normalized_protocol = MCPProxyService._normalize_protocol(protocol)
 
             if normalized_protocol == "stdio":
-                return await MCPProxyService._call_tool_stdio(url, tool_name, arguments)
+                return await MCPProxyService._call_tool_stdio(url, tool_name, arguments, auth_token)
             elif normalized_protocol == "sse":
-                return await MCPProxyService._call_tool_sse(url, tool_name, arguments)
+                return await MCPProxyService._call_tool_sse(url, tool_name, arguments, auth_token)
             else:
-                return await MCPProxyService._call_tool_streamable_http(url, tool_name, arguments)
+                return await MCPProxyService._call_tool_streamable_http(url, tool_name, arguments, auth_token)
 
         except Exception as e:
             logger.error(f"[MCP Proxy] Failed to call tool: {str(e)}", exc_info=True)
@@ -717,51 +609,16 @@ class MCPProxyService:
             }
 
     @staticmethod
-    async def _call_tool_stdio(command: str, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """STDIO를 통해 tool 호출 - Improved error handling"""
-        logger.info(f"[STDIO] Calling tool {tool_name} with command: {command}")
-
-        try:
-            parts = command.split()
-            if not parts:
-                return {"success": False, "error": "Empty command"}
-
-            cmd = parts[0]
-            args = parts[1:] if len(parts) > 1 else []
-
-            server_params = StdioServerParameters(command=cmd, args=args, env=None)
-
-            async with stdio_client(server_params) as (read, write):
-                async with ClientSession(read, write) as session:
-                    await asyncio.wait_for(session.initialize(), timeout=MCPProxyService.DEFAULT_TIMEOUT)
-
-                    result = await asyncio.wait_for(
-                        session.call_tool(tool_name, arguments),
-                        timeout=MCPProxyService.DEFAULT_TIMEOUT
-                    )
-
-                    logger.info(f"[STDIO] Tool {tool_name} executed successfully")
-                    return {
-                        "success": True,
-                        "result": result.content if hasattr(result, 'content') else result
-                    }
-
-        except asyncio.TimeoutError:
-            return {
-                "success": False,
-                "error": f"STDIO timeout after {MCPProxyService.DEFAULT_TIMEOUT}s"
-            }
-        except asyncio.CancelledError:
-            logger.warning(f"[STDIO] Tool call {tool_name} was cancelled by client")
-            raise
-        except Exception as e:
-            logger.error(f"[STDIO] Failed: {str(e)}", exc_info=True)
-            return {"success": False, "error": str(e)}
-        finally:
-            logger.debug(f"[STDIO] Tool {tool_name} cleanup completed")
+    async def _call_tool_stdio(command: str, tool_name: str, arguments: Dict[str, Any], auth_token: Optional[str] = None) -> Dict[str, Any]:
+        """STDIO를 통해 tool 호출 - TODO: Not supported yet"""
+        logger.warning(f"[STDIO] Tool calling not supported - command: {command}, tool: {tool_name}")
+        return {
+            "success": False,
+            "error": "STDIO transport is not currently supported for tool calling."
+        }
 
     @staticmethod
-    async def _call_tool_sse(url: str, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    async def _call_tool_sse(url: str, tool_name: str, arguments: Dict[str, Any], auth_token: Optional[str] = None) -> Dict[str, Any]:
         """SSE를 통해 tool 호출 - Improved error handling"""
         logger.info(f"[SSE] Calling tool {tool_name} from: {url}")
 
@@ -769,7 +626,12 @@ class MCPProxyService:
             if not url.startswith("http://") and not url.startswith("https://"):
                 return {"success": False, "error": f"Invalid URL: {url}"}
 
-            async with sse_client(url) as (read, write):
+            headers = {}
+            if auth_token:
+                headers['Authorization'] = f'Bearer {auth_token}'
+                logger.info("[SSE] Auth token added to headers for tool call")
+
+            async with sse_client(url, headers=headers) as (read, write):
                 async with ClientSession(read, write) as session:
                     await asyncio.wait_for(session.initialize(), timeout=MCPProxyService.DEFAULT_TIMEOUT)
 
@@ -799,7 +661,7 @@ class MCPProxyService:
             logger.debug(f"[SSE] Tool {tool_name} cleanup completed")
 
     @staticmethod
-    async def _call_tool_streamable_http(url: str, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    async def _call_tool_streamable_http(url: str, tool_name: str, arguments: Dict[str, Any], auth_token: Optional[str] = None) -> Dict[str, Any]:
         """Streamable HTTP를 통해 tool 호출 - Improved error handling"""
         logger.info(f"[Streamable HTTP] Calling tool {tool_name} from: {url}")
 
@@ -809,9 +671,14 @@ class MCPProxyService:
 
             if not HAS_STREAMABLE_HTTP:
                 logger.warning("[Streamable HTTP] Not available, trying SSE")
-                return await MCPProxyService._call_tool_sse(url, tool_name, arguments)
+                return await MCPProxyService._call_tool_sse(url, tool_name, arguments, auth_token)
 
-            async with streamablehttp_client(url) as transport_tuple:
+            headers = {}
+            if auth_token:
+                headers['Authorization'] = f'Bearer {auth_token}'
+                logger.info("[Streamable HTTP] Auth token added to headers for tool call")
+
+            async with streamablehttp_client(url, headers=headers) as transport_tuple:
                 read, write, _ = transport_tuple
 
                 async with ClientSession(read, write) as session:

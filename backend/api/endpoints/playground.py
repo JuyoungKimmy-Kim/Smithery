@@ -135,7 +135,8 @@ async def playground_chat(
                         message=chat_request.message,
                         mcp_server_url=server_url,
                         protocol=mcp_server.protocol,
-                        conversation_history=conversation_history
+                        conversation_history=conversation_history,
+                        user_token=chat_request.mcp_auth_token
                     ),
                     timeout=180  # 3 minutes max for entire playground request
                 )
