@@ -37,7 +37,7 @@ class NotificationService:
             return None
 
         # 알림 메시지 생성
-        message = f"{commenter.nickname}님이 '{mcp_server.name}' MCP에 댓글을 남겼습니다."
+        message = f"{commenter.nickname} commented on '{mcp_server.name}'."
 
         return self.notification_dao.create_notification(
             user_id=owner_id,
@@ -71,7 +71,7 @@ class NotificationService:
             return None
 
         # 알림 메시지 생성
-        message = f"{favoriter.nickname}님이 '{mcp_server.name}' MCP를 즐겨찾기에 추가하였습니다."
+        message = f"{favoriter.nickname} added '{mcp_server.name}' to favorites."
 
         return self.notification_dao.create_notification(
             user_id=owner_id,
@@ -101,7 +101,7 @@ class NotificationService:
         owner_id = mcp_server.owner_id
 
         # 알림 메시지 생성
-        message = f"'{mcp_server.name}' MCP가 관리자의 승인을 받았습니다."
+        message = f"'{mcp_server.name}' MCP has been approved by an administrator."
 
         return self.notification_dao.create_notification(
             user_id=owner_id,
@@ -132,7 +132,7 @@ class NotificationService:
         notifications = []
         for admin in admins:
             # 알림 메시지 생성
-            message = f"{submitter.nickname}님이 새로운 MCP '{mcp_server.name}'를 등록했습니다."
+            message = f"{submitter.nickname} registered a new MCP '{mcp_server.name}'."
 
             notification = self.notification_dao.create_notification(
                 user_id=admin.id,

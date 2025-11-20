@@ -91,25 +91,25 @@ export default function NotificationDropdown({ onClose, onNotificationRead }: No
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
 
-    if (diffMins < 1) return '방금 전';
-    if (diffMins < 60) return `${diffMins}분 전`;
-    if (diffHours < 24) return `${diffHours}시간 전`;
-    if (diffDays < 7) return `${diffDays}일 전`;
-    return date.toLocaleDateString('ko-KR');
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} min ago`;
+    if (diffHours < 24) return `${diffHours} hr ago`;
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return date.toLocaleDateString('en-US');
   };
 
   return (
     <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900">알림</h3>
+        <h3 className="text-lg font-semibold text-gray-900">Notifications</h3>
         <div className="flex items-center gap-2">
           {notifications.some(n => !n.is_read) && (
             <button
               onClick={markAllAsRead}
               className="text-sm text-blue-600 hover:text-blue-700 font-medium"
             >
-              모두 읽음
+              Mark all as read
             </button>
           )}
           <button
@@ -126,11 +126,11 @@ export default function NotificationDropdown({ onClose, onNotificationRead }: No
         {loading ? (
           <div className="px-4 py-8 text-center text-gray-500">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-2 text-sm">로딩 중...</p>
+            <p className="mt-2 text-sm">Loading...</p>
           </div>
         ) : notifications.length === 0 ? (
           <div className="px-4 py-8 text-center text-gray-500">
-            <p className="text-sm">새로운 알림이 없습니다</p>
+            <p className="text-sm">No new notifications</p>
           </div>
         ) : (
           <div>
@@ -175,7 +175,7 @@ export default function NotificationDropdown({ onClose, onNotificationRead }: No
             }}
             className="text-sm text-blue-600 hover:text-blue-700 font-medium"
           >
-            모든 알림 보기
+            View all notifications
           </button>
         </div>
       )}

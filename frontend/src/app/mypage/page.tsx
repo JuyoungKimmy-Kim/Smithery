@@ -29,7 +29,7 @@ export default function MyPage() {
   const { user, isAuthenticated } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("my-servers");
+  const [activeTab, setActiveTab] = useState("notifications");
   const [myServers, setMyServers] = useState<Post[]>([]);
   const [favorites, setFavorites] = useState<Post[]>([]);
   const [pendingServers, setPendingServers] = useState<Post[]>([]);
@@ -202,6 +202,16 @@ export default function MyPage() {
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">
               <button
+                onClick={() => setActiveTab("notifications")}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "notifications"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                Notifications ({notifications.length})
+              </button>
+              <button
                 onClick={() => setActiveTab("my-servers")}
                 className={`py-2 px-1 border-b-2 font-medium text-sm ${
                   activeTab === "my-servers"
@@ -220,16 +230,6 @@ export default function MyPage() {
                 }`}
               >
                 {t('mypage.favorites')} ({favorites.length})
-              </button>
-              <button
-                onClick={() => setActiveTab("notifications")}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === "notifications"
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }`}
-              >
-                알림 ({notifications.length})
               </button>
               {isAdmin && (
                 <button
@@ -489,11 +489,11 @@ function NotificationsTab({
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
 
-    if (diffMins < 1) return '방금 전';
-    if (diffMins < 60) return `${diffMins}분 전`;
-    if (diffHours < 24) return `${diffHours}시간 전`;
-    if (diffDays < 7) return `${diffDays}일 전`;
-    return date.toLocaleDateString('ko-KR');
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} min ago`;
+    if (diffHours < 24) return `${diffHours} hr ago`;
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return date.toLocaleDateString('en-US');
   };
 
   const getNotificationIcon = (type: string) => {
@@ -521,7 +521,7 @@ function NotificationsTab({
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              전체 ({notifications.length})
+              All ({notifications.length})
             </button>
             <button
               onClick={() => setFilter('unread')}
@@ -531,7 +531,7 @@ function NotificationsTab({
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              읽지 않음 ({notifications.filter(n => !n.is_read).length})
+              Unread ({notifications.filter(n => !n.is_read).length})
             </button>
           </div>
 
@@ -541,7 +541,7 @@ function NotificationsTab({
               onClick={markAllAsRead}
               className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
             >
-              모두 읽음
+              Mark all as read
             </button>
           )}
         </div>
@@ -553,7 +553,7 @@ function NotificationsTab({
           <div className="px-6 py-12 text-center">
             <div className="text-6xl mb-4">🔔</div>
             <p className="text-gray-500 text-lg">
-              {filter === 'unread' ? '읽지 않은 알림이 없습니다' : '알림이 없습니다'}
+              {filter === 'unread' ? 'No unread notifications' : 'No notifications'}
             </p>
           </div>
         ) : (
