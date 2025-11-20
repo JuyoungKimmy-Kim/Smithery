@@ -170,7 +170,7 @@ export default function NotificationDropdown({ onClose, onNotificationRead }: No
         <div className="px-4 py-3 border-t border-gray-200 text-center">
           <button
             onClick={() => {
-              router.push('/notifications');
+              router.push('/mypage');
               onClose();
             }}
             className="text-sm text-blue-600 hover:text-blue-700 font-medium"
