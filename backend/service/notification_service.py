@@ -37,7 +37,7 @@ class NotificationService:
             return None
 
         # 알림 메시지 생성
-        message = f"{commenter.nickname} commented on '{mcp_server.name}'."
+        message = f"{commenter.nickname} left a comment on your MCP '{mcp_server.name}'."
 
         return self.notification_dao.create_notification(
             user_id=owner_id,
@@ -71,7 +71,7 @@ class NotificationService:
             return None
 
         # 알림 메시지 생성
-        message = f"{favoriter.nickname} added '{mcp_server.name}' to favorites."
+        message = f"{favoriter.nickname} added your MCP '{mcp_server.name}' to their favorites."
 
         return self.notification_dao.create_notification(
             user_id=owner_id,
@@ -101,7 +101,7 @@ class NotificationService:
         owner_id = mcp_server.owner_id
 
         # 알림 메시지 생성
-        message = f"'{mcp_server.name}' MCP has been approved by an administrator."
+        message = f"Your MCP '{mcp_server.name}' has been approved and is now live."
 
         return self.notification_dao.create_notification(
             user_id=owner_id,
@@ -132,7 +132,7 @@ class NotificationService:
         notifications = []
         for admin in admins:
             # 알림 메시지 생성
-            message = f"{submitter.nickname} registered a new MCP '{mcp_server.name}'."
+            message = f"{submitter.nickname} submitted a new MCP server '{mcp_server.name}' for review."
 
             notification = self.notification_dao.create_notification(
                 user_id=admin.id,
