@@ -60,11 +60,15 @@ async def create_comment(
     )
 
     # 알림 생성 (MCP 소유자에게)
-    notification_service = NotificationService(db)
-    notification_service.create_comment_notification(
-        mcp_server_id=mcp_server_id,
-        commenter_user_id=current_user.id
-    )
+    try:
+        notification_service = NotificationService(db)
+        notification_service.create_comment_notification(
+            mcp_server_id=mcp_server_id,
+            commenter_user_id=current_user.id
+        )
+    except Exception as e:
+        print(f"Failed to create comment notification: {e}")
+        # 알림 생성 실패해도 댓글은 성공으로 처리
 
     return CommentResponse(
         id=comment.id,

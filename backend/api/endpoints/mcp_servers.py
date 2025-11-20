@@ -244,11 +244,15 @@ def add_favorite(
 
     if success:
         # 알림 생성 (MCP 소유자에게)
-        notification_service = NotificationService(db)
-        notification_service.create_favorite_notification(
-            mcp_server_id=mcp_server_id,
-            favoriter_user_id=current_user.id
-        )
+        try:
+            notification_service = NotificationService(db)
+            notification_service.create_favorite_notification(
+                mcp_server_id=mcp_server_id,
+                favoriter_user_id=current_user.id
+            )
+        except Exception as e:
+            logger.error(f"Failed to create favorite notification: {e}")
+            # 알림 생성 실패해도 즐겨찾기는 성공으로 처리
         return FavoriteResponse(success=True, message="즐겨찾기에 추가되었습니다.")
     else:
         return FavoriteResponse(success=False, message="이미 즐겨찾기에 추가되어 있습니다.")

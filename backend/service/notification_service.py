@@ -20,7 +20,7 @@ class NotificationService:
     ) -> Optional[Notification]:
         """댓글 알림을 생성합니다."""
         # MCP 서버 정보 조회
-        mcp_server = self.mcp_dao.get_server_by_id(mcp_server_id)
+        mcp_server = self.mcp_dao.get_mcp_server_by_id(mcp_server_id)
         if not mcp_server:
             return None
 
@@ -54,7 +54,7 @@ class NotificationService:
     ) -> Optional[Notification]:
         """즐겨찾기 알림을 생성합니다."""
         # MCP 서버 정보 조회
-        mcp_server = self.mcp_dao.get_server_by_id(mcp_server_id)
+        mcp_server = self.mcp_dao.get_mcp_server_by_id(mcp_server_id)
         if not mcp_server:
             return None
 
@@ -93,7 +93,7 @@ class NotificationService:
             return None
 
         # MCP 서버 정보 조회
-        mcp_server = self.mcp_dao.get_server_by_id(mcp_server_id)
+        mcp_server = self.mcp_dao.get_mcp_server_by_id(mcp_server_id)
         if not mcp_server:
             return None
 
@@ -117,7 +117,7 @@ class NotificationService:
     ) -> List[Notification]:
         """새 MCP 등록 알림을 관리자들에게 생성합니다."""
         # MCP 서버 정보 조회
-        mcp_server = self.mcp_dao.get_server_by_id(mcp_server_id)
+        mcp_server = self.mcp_dao.get_mcp_server_by_id(mcp_server_id)
         if not mcp_server:
             return []
 
