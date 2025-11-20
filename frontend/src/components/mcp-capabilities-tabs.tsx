@@ -184,22 +184,26 @@ export default function MCPCapabilitiesTabs({
                             }`}
                           >
                             <p className="text-sm font-medium text-gray-900 mb-2">
-                              Input Properties:
+                              Parameters:
                             </p>
-                            <div className="space-y-1">
+                            <div className="space-y-3">
                               {tool.parameters.map((prop, propIndex) => (
-                                <div key={propIndex} className="flex items-center gap-2 text-xs">
-                                  <span className="font-medium">{prop.name}</span>
-                                  {prop.type && (
-                                    <span className="px-1 py-0.5 bg-blue-100 text-blue-800 text-xs rounded">
-                                      {prop.type}
-                                    </span>
-                                  )}
-                                  {prop.required && (
-                                    <span className="px-1 py-0.5 bg-red-100 text-red-800 text-xs rounded">Required</span>
-                                  )}
+                                <div key={propIndex} className="text-xs">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="font-medium">{prop.name}</span>
+                                    {prop.type && (
+                                      <span className="px-1 py-0.5 bg-blue-100 text-blue-800 text-xs rounded">
+                                        {prop.type}
+                                      </span>
+                                    )}
+                                    {prop.required && (
+                                      <span className="px-1 py-0.5 bg-red-100 text-red-800 text-xs rounded">Required</span>
+                                    )}
+                                  </div>
                                   {prop.description && (
-                                    <span className="text-gray-600">- {prop.description}</span>
+                                    <div className="text-gray-600 ml-0 mt-1">
+                                      {prop.description}
+                                    </div>
                                   )}
                                 </div>
                               ))}
