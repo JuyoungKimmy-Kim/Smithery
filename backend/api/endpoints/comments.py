@@ -7,6 +7,7 @@ from typing import Optional
 from backend.database import get_db
 from backend.database.model import User, Comment
 from backend.database.dao.comment_dao import CommentDAO
+from backend.service.notification_service import NotificationService
 from backend.api.auth import get_current_user
 
 router = APIRouter(prefix="/comments", tags=["comments"])
@@ -57,7 +58,14 @@ async def create_comment(
         content=comment_data.content,
         rating=comment_data.rating
     )
-    
+
+    # 알림 생성 (MCP 소유자에게)
+    notification_service = NotificationService(db)
+    notification_service.create_comment_notification(
+        mcp_server_id=mcp_server_id,
+        commenter_user_id=current_user.id
+    )
+
     return CommentResponse(
         id=comment.id,
         content=comment.content,
