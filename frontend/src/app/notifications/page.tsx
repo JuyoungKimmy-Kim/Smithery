@@ -5,7 +5,6 @@ import { Notification } from '@/types/notification';
 import { apiFetch } from '@/lib/api-client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Navbar } from '@/components/navbar';
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -112,8 +111,6 @@ export default function NotificationsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
-
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="bg-white rounded-lg shadow-sm">
           {/* Header */}
