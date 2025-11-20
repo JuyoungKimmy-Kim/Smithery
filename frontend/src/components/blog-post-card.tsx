@@ -6,6 +6,7 @@ import TagList from "./tag-list";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { apiFetch } from "@/lib/api-client";
+import { stripMarkdown } from "@/lib/markdown-utils";
 
 interface BlogPostCardProps {
   category: string;
@@ -213,7 +214,7 @@ export function BlogPostCard({
           )}
         </div>
         <p className="text-gray-600 mb-4 cursor-pointer line-clamp-3 flex-grow break-words overflow-hidden min-h-[4.5rem]">
-          {desc}
+          {stripMarkdown(desc)}
         </p>
         <div className="mb-4 min-h-[2rem] flex items-start">
           <TagList tags={tags} maxTags={4} onTagClick={onTagClick} />

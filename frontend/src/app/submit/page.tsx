@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { PlusIcon, TrashIcon, PencilIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import TagSelector from "@/components/tag-selector";
+import MarkdownEditor from "@/components/markdown-editor";
 import { apiFetch } from "@/lib/api-client";
 
 export default function SubmitMCPPage() {
@@ -1003,19 +1004,14 @@ export default function SubmitMCPPage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {t('submit.description')} *
             </label>
-            <textarea
-              required
+            <MarkdownEditor
               value={formData.description}
-              onChange={(e) => handleInputChange('description', e.target.value)}
-              rows={4}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                validationErrors.description ? 'border-red-500' : 'border-gray-300'
-              }`}
+              onChange={(value) => handleInputChange('description', value)}
               placeholder={t('submit.descriptionPlaceholder')}
+              required
+              error={validationErrors.description}
+              rows={10}
             />
-            {validationErrors.description && (
-              <p className="mt-1 text-sm text-red-600">{validationErrors.description}</p>
-            )}
           </div>
 
           {/* Tags */}

@@ -24,6 +24,11 @@ import Comments from "@/components/comments";
 import MCPCapabilitiesTabs from "@/components/mcp-capabilities-tabs";
 import PlaygroundChat from "@/components/playground-chat";
 import { apiFetch } from "@/lib/api-client";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
+import type { Components } from 'react-markdown';
 
 export default function MCPServerDetail() {
   const params = useParams();
@@ -43,6 +48,101 @@ export default function MCPServerDetail() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [isFavoriteLoading, setIsFavoriteLoading] = useState(false);
   const [favoritesCount, setFavoritesCount] = useState(0);
+
+  // Extended sanitize schema for Markdown
+  const sanitizeSchema = {
+    ...defaultSchema,
+    attributes: {
+      ...defaultSchema.attributes,
+      code: [...(defaultSchema.attributes?.code || []), 'className'],
+      div: [...(defaultSchema.attributes?.div || []), 'className'],
+      span: [...(defaultSchema.attributes?.span || []), 'className'],
+      pre: [...(defaultSchema.attributes?.pre || []), 'className'],
+      img: [...(defaultSchema.attributes?.img || []), 'alt', 'src', 'title', 'width', 'height'],
+      a: [...(defaultSchema.attributes?.a || []), 'href', 'title', 'target', 'rel'],
+      input: [...(defaultSchema.attributes?.input || []), 'type', 'checked', 'disabled'],
+    },
+    tagNames: [
+      ...(defaultSchema.tagNames || []),
+      'input',
+    ],
+  };
+
+  // Custom components for Markdown rendering
+  const markdownComponents: Components = {
+    code({ node, inline, className, children, ...props }: any) {
+      return !inline ? (
+        <pre
+          className="rounded p-4 overflow-x-auto my-4"
+          style={{
+            backgroundColor: '#1e293b',
+          }}
+        >
+          <code
+            className={className}
+            style={{
+              color: '#e2e8f0'
+            }}
+            {...props}
+          >
+            {children}
+          </code>
+        </pre>
+      ) : (
+        <code
+          style={{
+            backgroundColor: '#f1f5f9',
+            color: '#1e293b',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            fontFamily: 'monospace',
+            fontSize: '0.9em'
+          }}
+          {...props}
+        >
+          {children}
+        </code>
+      );
+    },
+    img({ node, ...props }: any) {
+      return (
+        <img
+          {...props}
+          className="max-w-full h-auto rounded-lg my-4"
+          loading="lazy"
+        />
+      );
+    },
+    a({ node, ...props }: any) {
+      return (
+        <a
+          {...props}
+          className="text-blue-600 hover:text-blue-800 underline"
+          target="_blank"
+          rel="noopener noreferrer"
+        />
+      );
+    },
+    table({ node, ...props }: any) {
+      return (
+        <div className="overflow-x-auto my-4">
+          <table className="min-w-full divide-y divide-gray-300 border border-gray-300" {...props} />
+        </div>
+      );
+    },
+    thead({ node, ...props }: any) {
+      return <thead className="bg-gray-50" {...props} />;
+    },
+    th({ node, ...props }: any) {
+      return <th className="px-4 py-2 text-left text-sm font-semibold text-gray-900 border border-gray-300" {...props} />;
+    },
+    td({ node, ...props }: any) {
+      return <td className="px-4 py-2 text-sm text-gray-700 border border-gray-300" {...props} />;
+    },
+    blockquote({ node, ...props }: any) {
+      return <blockquote className="border-l-4 border-gray-300 pl-4 italic my-4 text-gray-700" {...props} />;
+    },
+  };
 
   const handleCopyConfig = async () => {
     if (!mcp?.config) return;
@@ -545,9 +645,15 @@ export default function MCPServerDetail() {
                   Last checked: {new Date(mcp.last_health_check).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
                 </p>
               )}
-              <p className="text-lg text-gray-600 mb-6">
-                {mcp.description}
-              </p>
+              <div className="max-w-none text-gray-600 mb-6">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema]]}
+                  components={markdownComponents}
+                >
+                  {mcp.description}
+                </ReactMarkdown>
+              </div>
 
               {/* 공지사항 추가 버튼 - 공지사항이 없을 때만 표시 */}
               {isOwner && !mcp.announcement && (
