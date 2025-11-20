@@ -15,8 +15,9 @@ import {
   CheckIcon,
   MegaphoneIcon,
   ArrowPathIcon,
+  StarIcon,
 } from "@heroicons/react/24/outline";
-import { CheckCircleIcon, XCircleIcon, QuestionMarkCircleIcon } from "@heroicons/react/24/solid";
+import { CheckCircleIcon, XCircleIcon, QuestionMarkCircleIcon, StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import { MCPServer } from "@/types/mcp";
 import { useAuth } from "@/contexts/AuthContext";
 import Comments from "@/components/comments";
@@ -39,6 +40,9 @@ export default function MCPServerDetail() {
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
   const [lastHealthCheckTime, setLastHealthCheckTime] = useState<number>(0);
   const [remainingCooldown, setRemainingCooldown] = useState<number>(0);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isFavoriteLoading, setIsFavoriteLoading] = useState(false);
+  const [favoritesCount, setFavoritesCount] = useState(0);
 
   const handleCopyConfig = async () => {
     if (!mcp?.config) return;
@@ -134,6 +138,78 @@ export default function MCPServerDetail() {
     }
   };
 
+  // 즐겨찾기 수 가져오기
+  const fetchFavoritesCount = async () => {
+    if (!params.id) return;
+    try {
+      const response = await fetch(`/api/mcp-servers/${params.id}/favorites/count`);
+      if (response.ok) {
+        const data = await response.json();
+        setFavoritesCount(data.favorites_count);
+      }
+    } catch (error) {
+      console.error('Error fetching favorites count:', error);
+    }
+  };
+
+  // 즐겨찾기 상태 확인
+  const checkFavoriteStatus = async () => {
+    if (!params.id) return;
+    try {
+      const response = await apiFetch(`/api/mcp-servers/user/favorites`, {
+        requiresAuth: true
+      });
+
+      if (response.ok) {
+        const favorites = await response.json();
+        console.log('Detail page - Checking favorite status for id:', params.id, 'type:', typeof params.id);
+        console.log('Detail page - User favorites:', favorites.map((f: any) => ({ id: f.id, type: typeof f.id })));
+        // ID를 문자열로 변환하여 비교 (타입 불일치 방지)
+        const isFav = favorites.some((fav: any) => String(fav.id) === String(params.id));
+        console.log('Detail page - Is favorite:', isFav);
+        setIsFavorite(isFav);
+      }
+    } catch (error) {
+      console.error('Error checking favorite status:', error);
+    }
+  };
+
+  // 즐겨찾기 토글
+  const handleFavoriteClick = async () => {
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+
+    if (!params.id) return;
+
+    setIsFavoriteLoading(true);
+    try {
+      const url = `/api/mcp-servers/${params.id}/favorite`;
+      const method = isFavorite ? 'DELETE' : 'POST';
+
+      const response = await apiFetch(url, {
+        method,
+        requiresAuth: true
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Favorite toggle response:', data);
+        setIsFavorite(!isFavorite);
+        // 즐겨찾기 수 새로고침
+        await fetchFavoritesCount();
+      } else {
+        const errorText = await response.text();
+        console.error('Failed to toggle favorite:', response.status, errorText);
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    } finally {
+      setIsFavoriteLoading(false);
+    }
+  };
+
   useEffect(() => {
     const fetchMCP = async () => {
       try {
@@ -155,10 +231,33 @@ export default function MCPServerDetail() {
       }
     };
 
+    const loadFavoriteData = () => {
+      if (params.id) {
+        fetchFavoritesCount();
+        if (isAuthenticated) {
+          checkFavoriteStatus();
+        }
+      }
+    };
+
     if (params.id) {
       fetchMCP();
+      loadFavoriteData();
     }
-  }, [params.id]);
+
+    // 페이지가 다시 보일 때 자동 새로고침 (뒤로 가기 등)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadFavoriteData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [params.id, isAuthenticated]);
 
   // 현재 사용자가 이 MCP 서버의 소유자인지 확인
   const isOwner = mcp && user && (mcp as any).owner_id === user.id;
@@ -422,6 +521,23 @@ export default function MCPServerDetail() {
                     )}
                   </div>
                 )}
+                {/* Favorite Button */}
+                <button
+                  onClick={handleFavoriteClick}
+                  disabled={isFavoriteLoading}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm font-medium transition-all duration-200 ${
+                    isFavorite
+                      ? 'bg-yellow-50 border-yellow-300 text-yellow-700 hover:bg-yellow-100'
+                      : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                  } ${isFavoriteLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {isFavorite ? (
+                    <StarIconSolid className="h-4 w-4" />
+                  ) : (
+                    <StarIcon className="h-4 w-4" />
+                  )}
+                  <span>{favoritesCount}</span>
+                </button>
               </div>
               {/* Last health check time */}
               {mcp.last_health_check && (

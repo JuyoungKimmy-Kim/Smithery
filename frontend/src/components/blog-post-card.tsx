@@ -48,12 +48,29 @@ export function BlogPostCard({
     // 초기값 설정
     setFavoritesCount(initialFavoritesCount);
 
-    if (id) {
-      fetchFavoritesCount();
-      if (isAuthenticated) {
-        checkFavoriteStatus();
+    const loadFavoriteData = () => {
+      if (id) {
+        fetchFavoritesCount();
+        if (isAuthenticated) {
+          checkFavoriteStatus();
+        }
       }
-    }
+    };
+
+    loadFavoriteData();
+
+    // 페이지가 다시 보일 때 자동 새로고침 (뒤로 가기 등)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadFavoriteData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [isAuthenticated, id, initialFavoritesCount]);
 
   const fetchFavoritesCount = async () => {
@@ -73,10 +90,14 @@ export function BlogPostCard({
       const response = await apiFetch(`/api/mcp-servers/user/favorites`, {
         requiresAuth: true
       });
-      
+
       if (response.ok) {
         const favorites = await response.json();
-        const isFav = favorites.some((fav: any) => fav.id === id);
+        console.log('Checking favorite status for id:', id, 'type:', typeof id);
+        console.log('User favorites:', favorites.map((f: any) => ({ id: f.id, type: typeof f.id })));
+        // ID를 문자열로 변환하여 비교 (타입 불일치 방지)
+        const isFav = favorites.some((fav: any) => String(fav.id) === String(id));
+        console.log('Is favorite:', isFav);
         setIsFavorite(isFav);
       }
     } catch (error) {

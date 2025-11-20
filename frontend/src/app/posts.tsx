@@ -50,6 +50,22 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
     }
   }, [initialSearchTerm]);
 
+  // 페이지가 다시 보일 때 데이터 새로고침
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('Page became visible, refreshing data...');
+        setRefreshKey(prev => prev + 1);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   useEffect(() => {
     const fetchPosts = async () => {
       try {
@@ -57,20 +73,20 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
         const response = await fetch('/api/posts');
         console.log('Response status:', response.status);
         console.log('Response ok:', response.ok);
-        
+
         if (response.ok) {
           const data = await response.json();
           console.log('Fetched posts data:', data); // 전체 데이터 확인
           console.log('Number of posts:', data.length); // 포스트 개수 확인
           console.log('First post structure:', data[0]); // 첫 번째 포스트 구조 확인
-          
+
           // favorites_count와 health_status 확인
           console.log('Posts with favorites_count:', data.map((p: Post) => ({
             title: p.title,
             favorites_count: p.favorites_count,
             health_status: p.health_status
           })));
-          
+
           // favorites_count 기준으로 정렬 (내림차순)
           const sortedData = [...data].sort((a: Post, b: Post) => {
             const aCount = a.favorites_count || 0;
