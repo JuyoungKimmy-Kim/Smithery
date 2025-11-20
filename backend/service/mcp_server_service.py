@@ -72,6 +72,11 @@ class MCPServerService:
         if resources_data:
             self._add_resources_to_mcp_server(mcp_server.id, resources_data)
 
+        # 알림 생성 (관리자들에게 새 MCP 등록 알림)
+        from backend.service.notification_service import NotificationService
+        notification_service = NotificationService(self.db)
+        notification_service.create_new_mcp_notification_for_admins(mcp_server.id)
+
         return mcp_server
     
     def _extract_tools_from_github(self, github_link: str) -> List[Dict[str, Any]]:
@@ -235,9 +240,19 @@ class MCPServerService:
         """MCP 서버를 승인합니다."""
         mcp_server = self.get_mcp_server_by_id(mcp_server_id)
         if mcp_server:
+            old_status = mcp_server.status
             mcp_server.status = 'approved'
             self.db.commit()
             self.db.refresh(mcp_server)
+
+            # 알림 생성 (pending → approved 변경 시)
+            from backend.service.notification_service import NotificationService
+            notification_service = NotificationService(self.db)
+            notification_service.create_status_change_notification(
+                mcp_server_id=mcp_server_id,
+                old_status=old_status,
+                new_status='approved'
+            )
         return mcp_server
     
     def reject_mcp_server(self, mcp_server_id: int) -> Optional[MCPServer]:
