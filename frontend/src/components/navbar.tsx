@@ -15,12 +15,14 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { apiFetch } from "@/lib/api-client";
+import NotificationDropdown from "./notification-dropdown";
 
 export function Navbar() {
   const [open, setOpen] = React.useState(false);
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
   const [wikiMenuOpen, setWikiMenuOpen] = React.useState(false);
   const [showSignInModal, setShowSignInModal] = React.useState(false);
+  const [notificationMenuOpen, setNotificationMenuOpen] = React.useState(false);
   const [unreadCount, setUnreadCount] = React.useState(0);
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
@@ -29,6 +31,7 @@ export function Navbar() {
   const handleOpen = () => setOpen((cur) => !cur);
   const handleUserMenuToggle = () => setUserMenuOpen((cur) => !cur);
   const handleWikiMenuToggle = () => setWikiMenuOpen((cur) => !cur);
+  const handleNotificationMenuToggle = () => setNotificationMenuOpen((cur) => !cur);
   
   const handleRegisterClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -119,13 +122,16 @@ export function Navbar() {
       if (wikiMenuOpen && !(event.target as Element).closest('.wiki-menu')) {
         setWikiMenuOpen(false);
       }
+      if (notificationMenuOpen && !(event.target as Element).closest('.notification-menu')) {
+        setNotificationMenuOpen(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [userMenuOpen, wikiMenuOpen]);
+  }, [userMenuOpen, wikiMenuOpen, notificationMenuOpen]);
 
   return (
     <>
@@ -189,17 +195,27 @@ export function Navbar() {
             </button>
 
             {isAuthenticated && (
-              <button
-                className="relative p-2 text-gray-700 hover:text-gray-900 transition-colors rounded-lg hover:bg-gray-100"
-                title="알림"
-              >
-                <BellIcon className="h-5 w-5" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full">
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
+              <div className="relative notification-menu">
+                <button
+                  onClick={handleNotificationMenuToggle}
+                  className="relative p-2 text-gray-700 hover:text-gray-900 transition-colors rounded-lg hover:bg-gray-100"
+                  title="알림"
+                >
+                  <BellIcon className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {notificationMenuOpen && (
+                  <NotificationDropdown
+                    onClose={() => setNotificationMenuOpen(false)}
+                    onNotificationRead={fetchUnreadCount}
+                  />
                 )}
-              </button>
+              </div>
             )}
 
             {isAuthenticated ? (
