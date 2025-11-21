@@ -315,56 +315,67 @@ class PlaygroundService:
                 "iterations": 0  # Track number of reasoning rounds
             }
 
-            # First API call - run in executor to make it truly async
-            try:
-                if tools:
-                    completion = await asyncio.to_thread(
-                        self.client.chat.completions.create,
-                        model=self.model,
-                        messages=messages,
-                        tools=tools,
-                        tool_choice="auto"
-                    )
-                else:
-                    completion = await asyncio.to_thread(
-                        self.client.chat.completions.create,
-                        model=self.model,
-                        messages=messages
-                    )
-            except Exception as e:
-                error_type = type(e).__name__
-                error_msg = str(e)
-                logger.error(f"OpenAI API call failed - Type: {error_type}, Message: {error_msg}", exc_info=True)
-                logger.error(f"Model: {self.model}, Base URL: {self.base_url}, Messages count: {len(messages)}")
-                return {
-                    "success": False,
-                    "error": f"Failed to get response from LLM: [{error_type}] {error_msg}"
-                }
+            # Multi-hop reasoning loop: Allow LLM to call tools multiple times
+            iteration = 0
+            while iteration < self.MAX_ITERATIONS:
+                iteration += 1
+                response_data["iterations"] = iteration
 
-            response_message = completion.choices[0].message
-            response_data["tokens_used"] = completion.usage.total_tokens
+                logger.info(f"Multi-hop iteration {iteration}/{self.MAX_ITERATIONS}")
 
-            # Check if tool calls were made
-            if response_message.tool_calls:
-                # Ensure content field exists (some models omit it with tool calls)
-                # Convert response_message to dict format with guaranteed content field
-                response_message_dict = {
-                    "role": "assistant",
-                    "content": response_message.content if response_message.content else "",
-                    "tool_calls": [
-                        {
-                            "id": tc.id,
-                            "type": "function",
-                            "function": {
-                                "name": tc.function.name,
-                                "arguments": tc.function.arguments
-                            }
-                        } for tc in response_message.tool_calls
-                    ]
-                }
-                messages.append(response_message_dict)
+                # LLM API call - run in executor to make it truly async
+                try:
+                    if tools:
+                        completion = await asyncio.to_thread(
+                            self.client.chat.completions.create,
+                            model=self.model,
+                            messages=messages,
+                            tools=tools,
+                            tool_choice="auto"
+                        )
+                    else:
+                        completion = await asyncio.to_thread(
+                            self.client.chat.completions.create,
+                            model=self.model,
+                            messages=messages
+                        )
+                except Exception as e:
+                    error_type = type(e).__name__
+                    error_msg = str(e)
+                    logger.error(f"OpenAI API call failed - Type: {error_type}, Message: {error_msg}", exc_info=True)
+                    logger.error(f"Model: {self.model}, Base URL: {self.base_url}, Messages count: {len(messages)}")
+                    return {
+                        "success": False,
+                        "error": f"Failed to get response from LLM: [{error_type}] {error_msg}"
+                    }
 
-                for tool_call in response_message.tool_calls:
+                response_message = completion.choices[0].message
+                response_data["tokens_used"] += completion.usage.total_tokens
+
+                # Check if tool calls were made
+                if response_message.tool_calls:
+                    # LLM wants to call tools - continue loop
+                    logger.info(f"LLM requested {len(response_message.tool_calls)} tool calls in iteration {iteration}")
+
+                    # Ensure content field exists (some models omit it with tool calls)
+                    # Convert response_message to dict format with guaranteed content field
+                    response_message_dict = {
+                        "role": "assistant",
+                        "content": response_message.content if response_message.content else "",
+                        "tool_calls": [
+                            {
+                                "id": tc.id,
+                                "type": "function",
+                                "function": {
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments
+                                }
+                            } for tc in response_message.tool_calls
+                        ]
+                    }
+                    messages.append(response_message_dict)
+
+                    for tool_call in response_message.tool_calls:
                     function_name = tool_call.function.name
                     try:
                         function_args = json.loads(tool_call.function.arguments)
@@ -496,7 +507,8 @@ class PlaygroundService:
                     response_data["tool_calls"].append({
                         "name": function_name,
                         "arguments": function_args,
-                        "result": safe_tool_result
+                        "result": safe_tool_result,
+                        "iteration": iteration  # Track which iteration this tool call belongs to
                     })
 
                     # Add tool response to messages (send as string for OpenAI)
@@ -506,25 +518,13 @@ class PlaygroundService:
                         "content": tool_content
                     })
 
-                # Get final response after tool execution
-                try:
-                    second_completion = await asyncio.to_thread(
-                        self.client.chat.completions.create,
-                        model=self.model,
-                        messages=messages
-                    )
-
-                    response_data["response"] = second_completion.choices[0].message.content
-                    response_data["tokens_used"] += second_completion.usage.total_tokens
-                except Exception as e:
-                    logger.error(f"Second OpenAI API call failed: {str(e)}", exc_info=True)
-                    return {
-                        "success": False,
-                        "error": f"Failed to get final response from LLM: {str(e)}"
-                    }
-            else:
-                # No tool calls, just return the response
-                response_data["response"] = response_message.content
+                    # After adding all tool results, loop will continue to next iteration
+                    # LLM will see the tool results and decide whether to call more tools or provide final answer
+                else:
+                    # No tool calls - LLM provided final answer, exit loop
+                    logger.info(f"LLM provided final answer in iteration {iteration}, exiting loop")
+                    response_data["response"] = response_message.content
+                    break  # Exit while loop
 
             return response_data
 
