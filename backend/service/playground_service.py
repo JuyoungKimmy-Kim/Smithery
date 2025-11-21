@@ -29,6 +29,9 @@ class PlaygroundService:
     # Rate limiting constants
     DAILY_QUERY_LIMIT = 5
 
+    # Multi-hop reasoning constants
+    MAX_ITERATIONS = 5  # Maximum number of tool calling rounds to prevent infinite loops
+
     # Shared OpenAI client (singleton pattern to reuse connections)
     _shared_client = None
     _client_config = None
@@ -303,12 +306,13 @@ class PlaygroundService:
                 "content": message
             })
 
-            # Call OpenAI with tools
+            # Initialize response data with iteration tracking
             response_data = {
                 "success": True,
                 "response": "",
                 "tool_calls": [],
-                "tokens_used": 0
+                "tokens_used": 0,
+                "iterations": 0  # Track number of reasoning rounds
             }
 
             # First API call - run in executor to make it truly async
