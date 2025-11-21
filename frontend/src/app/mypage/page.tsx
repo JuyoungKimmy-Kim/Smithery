@@ -35,7 +35,8 @@ export default function MyPage() {
   const [pendingServers, setPendingServers] = useState<Post[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set()); // 즐겨찾기한 서버 ID 목록
+
   const isAdmin = user?.is_admin === "admin";
 
   // 승인/거부 후 목록에서 제거
@@ -125,13 +126,16 @@ export default function MyPage() {
         const favoritesResponse = await apiFetch('/api/mcp-servers/user/favorites', {
           requiresAuth: true
         });
-        
+
         console.log('Favorites response status:', favoritesResponse.status);
-        
+
         if (favoritesResponse.ok) {
           const favoritesData = await favoritesResponse.json();
           console.log('Favorites data:', favoritesData);
           setFavorites(favoritesData);
+          // 즐겨찾기 ID 세트 생성
+          const ids = new Set(favoritesData.map((fav: any) => String(fav.id)));
+          setFavoriteIds(ids);
         } else {
           const errorText = await favoritesResponse.text();
           console.error('Favorites error:', errorText);
@@ -294,6 +298,7 @@ export default function MyPage() {
                               author={server.author}
                               id={server.id}
                               favoritesCount={server.favorites_count || 0}
+                              isFavorited={server.id ? favoriteIds.has(String(server.id)) : false}
                             />
                           ))}
                         </div>
@@ -320,6 +325,7 @@ export default function MyPage() {
                               author={server.author}
                               id={server.id}
                               favoritesCount={server.favorites_count || 0}
+                              isFavorited={server.id ? favoriteIds.has(String(server.id)) : false}
                             />
                           ))}
                         </div>
@@ -362,6 +368,7 @@ export default function MyPage() {
                         author={server.author}
                         id={server.id}
                         favoritesCount={server.favorites_count || 0}
+                        isFavorited={true}
                       />
                     ))}
                   </div>

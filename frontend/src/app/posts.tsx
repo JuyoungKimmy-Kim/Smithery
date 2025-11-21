@@ -8,6 +8,7 @@ import { MCPServer } from "@/types/mcp";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { stripMarkdown } from "@/lib/markdown-utils";
+import { apiFetch } from "@/lib/api-client";
 
 interface Post {
   category: string;
@@ -43,6 +44,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
   const [refreshKey, setRefreshKey] = useState(0); // 즐겨찾기 상태 변경 시 리프레시용
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm); // 검색어 상태 추가
   const [rankingTab, setRankingTab] = useState<'top3' | 'latest' | 'topUsers'>('top3'); // 랭킹 탭 상태
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set()); // 즐겨찾기한 서버 ID 목록
 
   // 외부에서 전달된 검색어가 변경될 때 처리
   useEffect(() => {
@@ -95,14 +97,19 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
             console.log(`Comparing: ${a.title} (${aCount}) vs ${b.title} (${bCount})`);
             return bCount - aCount;
           });
-          
-          console.log('Sorted posts:', sortedData.map((p: Post) => ({ 
-            title: p.title, 
-            favorites_count: p.favorites_count 
+
+          console.log('Sorted posts:', sortedData.map((p: Post) => ({
+            title: p.title,
+            favorites_count: p.favorites_count
           })));
-          
+
           setAllPosts(sortedData);
           setPosts(sortedData);
+
+          // 인증된 사용자의 즐겨찾기 목록 가져오기
+          if (isAuthenticated) {
+            fetchUserFavorites();
+          }
           
           // 모든 태그 추출 및 사용 빈도 계산
           const tagCountMap: {[key: string]: number} = {};
@@ -149,7 +156,24 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
     };
 
     fetchPosts();
-  }, [refreshKey]); // refreshKey가 변경될 때마다 다시 가져오기
+  }, [refreshKey, isAuthenticated]); // refreshKey, isAuthenticated가 변경될 때마다 다시 가져오기
+
+  // 사용자 즐겨찾기 목록 가져오기
+  const fetchUserFavorites = async () => {
+    try {
+      const response = await apiFetch('/api/mcp-servers/user/favorites', {
+        requiresAuth: true
+      });
+
+      if (response.ok) {
+        const favorites = await response.json();
+        const ids = new Set(favorites.map((fav: any) => String(fav.id)));
+        setFavoriteIds(ids);
+      }
+    } catch (error) {
+      console.error('Error fetching user favorites:', error);
+    }
+  };
 
   // 검색 기능 추가
   const handleSearch = (searchTerm: string) => {
@@ -659,6 +683,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                       id={id}
                       healthStatus={health_status}
                       favoritesCount={favorites_count || 0}
+                      isFavorited={id ? favoriteIds.has(String(id)) : false}
                       onFavoriteChange={handleFavoriteChange}
                       onTagClick={handleTagClick}
                     />
