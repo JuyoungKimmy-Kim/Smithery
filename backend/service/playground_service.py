@@ -29,6 +29,9 @@ class PlaygroundService:
     # Rate limiting constants
     DAILY_QUERY_LIMIT = 5
 
+    # Multi-hop reasoning constants
+    MAX_ITERATIONS = 5  # Maximum number of tool calling rounds to prevent infinite loops
+
     # Shared OpenAI client (singleton pattern to reuse connections)
     _shared_client = None
     _client_config = None
@@ -284,16 +287,35 @@ class PlaygroundService:
             # Build messages
             messages = conversation_history or []
 
-            # Add system prompt to encourage tool usage when tools are available
+            # Add system prompt to encourage tool usage and multi-hop reasoning when tools are available
             if tools and (not messages or messages[0].get("role") != "system"):
                 system_message = {
                     "role": "system",
                     "content": (
                         "You are a helpful assistant with access to tools. "
                         "When answering questions, ALWAYS check if there are relevant tools available that could provide accurate information. "
-                        "If a tool can help answer the user's question, you MUST use it instead of relying on general knowledge. "
-                        "For example, if the user asks about documentation, usage, or specific information that a tool like 'search_doc' can provide, "
-                        "you should call that tool first and base your answer on the tool's results."
+                        "If a tool can help answer the user's question, you MUST use it instead of relying on general knowledge.\n\n"
+
+                        "MULTI-STEP REASONING:\n"
+                        "- You can call tools MULTIPLE TIMES in sequence to gather comprehensive information\n"
+                        "- After seeing tool results, analyze if you need MORE information\n"
+                        "- You can call different tools based on what you learned from previous tool calls\n"
+                        f"- You have up to {self.MAX_ITERATIONS} rounds of tool calls available\n"
+                        "- When you have sufficient information, provide your final answer\n\n"
+
+                        "REASONING STRATEGY:\n"
+                        "1. Identify what information you need to answer the question\n"
+                        "2. Call relevant tools to gather that information\n"
+                        "3. Analyze the results - do you need additional details or clarification?\n"
+                        "4. If yes, call more tools based on what you learned\n"
+                        "5. If no, synthesize the information and provide a complete answer\n\n"
+
+                        "EXAMPLES:\n"
+                        "- For 'How do I use feature X?': search_doc → read specific sections → get_examples\n"
+                        "- For 'What are the differences between X and Y?': get_details(X) → get_details(Y) → compare\n"
+                        "- For 'Find information about Z': search → analyze results → get_specific_info\n\n"
+
+                        "Always use tools when available rather than guessing or using general knowledge."
                     )
                 }
                 messages.insert(0, system_message)
@@ -303,224 +325,259 @@ class PlaygroundService:
                 "content": message
             })
 
-            # Call OpenAI with tools
+            # Initialize response data with iteration tracking
             response_data = {
                 "success": True,
                 "response": "",
                 "tool_calls": [],
-                "tokens_used": 0
+                "tokens_used": 0,
+                "iterations": 0  # Track number of reasoning rounds
             }
 
-            # First API call - run in executor to make it truly async
-            try:
-                if tools:
-                    completion = await asyncio.to_thread(
-                        self.client.chat.completions.create,
-                        model=self.model,
-                        messages=messages,
-                        tools=tools,
-                        tool_choice="auto"
-                    )
-                else:
-                    completion = await asyncio.to_thread(
-                        self.client.chat.completions.create,
-                        model=self.model,
-                        messages=messages
-                    )
-            except Exception as e:
-                error_type = type(e).__name__
-                error_msg = str(e)
-                logger.error(f"OpenAI API call failed - Type: {error_type}, Message: {error_msg}", exc_info=True)
-                logger.error(f"Model: {self.model}, Base URL: {self.base_url}, Messages count: {len(messages)}")
-                return {
-                    "success": False,
-                    "error": f"Failed to get response from LLM: [{error_type}] {error_msg}"
-                }
+            # Multi-hop reasoning loop: Allow LLM to call tools multiple times
+            iteration = 0
+            while iteration < self.MAX_ITERATIONS:
+                iteration += 1
+                response_data["iterations"] = iteration
 
-            response_message = completion.choices[0].message
-            response_data["tokens_used"] = completion.usage.total_tokens
+                logger.info(f"Multi-hop iteration {iteration}/{self.MAX_ITERATIONS}")
 
-            # Check if tool calls were made
-            if response_message.tool_calls:
-                # Ensure content field exists (some models omit it with tool calls)
-                # Convert response_message to dict format with guaranteed content field
-                response_message_dict = {
-                    "role": "assistant",
-                    "content": response_message.content if response_message.content else "",
-                    "tool_calls": [
-                        {
-                            "id": tc.id,
-                            "type": "function",
-                            "function": {
-                                "name": tc.function.name,
-                                "arguments": tc.function.arguments
-                            }
-                        } for tc in response_message.tool_calls
-                    ]
-                }
-                messages.append(response_message_dict)
-
-                for tool_call in response_message.tool_calls:
-                    function_name = tool_call.function.name
-                    try:
-                        function_args = json.loads(tool_call.function.arguments)
-                    except json.JSONDecodeError as e:
-                        logger.error(f"Failed to parse tool arguments: {str(e)}")
-                        function_args = {}
-
-                    logger.info(f"Calling tool: {function_name} with args: {function_args}")
-
-                    # Call MCP tool with timeout
-                    try:
-                        tool_result = await asyncio.wait_for(
-                            self.call_mcp_tool(
-                                mcp_server_url,
-                                protocol,
-                                function_name,
-                                function_args,
-                                user_token
-                            ),
-                            timeout=60.0  # 60 second timeout per tool call
+                # LLM API call - run in executor to make it truly async
+                try:
+                    if tools:
+                        completion = await asyncio.to_thread(
+                            self.client.chat.completions.create,
+                            model=self.model,
+                            messages=messages,
+                            tools=tools,
+                            tool_choice="auto"
                         )
-                    except asyncio.TimeoutError:
-                        logger.error(f"Tool {function_name} timed out after 60 seconds")
-                        tool_result = {
-                            "success": False,
-                            "error": f"Tool execution timed out after 60 seconds"
-                        }
-                    except Exception as e:
-                        logger.error(f"Tool {function_name} failed: {str(e)}", exc_info=True)
-                        tool_result = {
-                            "success": False,
-                            "error": f"Tool execution failed: {str(e)}"
-                        }
+                    else:
+                        completion = await asyncio.to_thread(
+                            self.client.chat.completions.create,
+                            model=self.model,
+                            messages=messages
+                        )
+                except Exception as e:
+                    error_type = type(e).__name__
+                    error_msg = str(e)
+                    logger.error(f"OpenAI API call failed - Type: {error_type}, Message: {error_msg}", exc_info=True)
+                    logger.error(f"Model: {self.model}, Base URL: {self.base_url}, Messages count: {len(messages)}")
+                    return {
+                        "success": False,
+                        "error": f"Failed to get response from LLM: [{error_type}] {error_msg}"
+                    }
 
-                    logger.info(f"Tool {function_name} result type: {type(tool_result)}")
-                    logger.info(f"Tool {function_name} result: {str(tool_result)[:500]}")
+                response_message = completion.choices[0].message
+                response_data["tokens_used"] += completion.usage.total_tokens
 
-                    # Extract actual content from MCP result
-                    tool_content = ""
-                    try:
-                        if isinstance(tool_result, dict):
-                            if tool_result.get("success"):
-                                result_data = tool_result.get("result", {})
-                                logger.info(f"Result data type: {type(result_data)}")
+                # Check if tool calls were made
+                if response_message.tool_calls:
+                    # LLM wants to call tools - continue loop
+                    logger.info(f"LLM requested {len(response_message.tool_calls)} tool calls in iteration {iteration}")
 
-                                # MCP result.content is usually a list of content items
-                                if isinstance(result_data, list):
-                                    # Extract text from content items
-                                    text_parts = []
-                                    for item in result_data:
-                                        if isinstance(item, dict):
-                                            # Dict format: {"type": "text", "text": "..."}
-                                            if "text" in item:
-                                                text_parts.append(str(item["text"]))
-                                            elif "type" in item and item["type"] == "text":
-                                                text_parts.append(str(item.get("text", "")))
-                                        elif hasattr(item, 'text'):
-                                            # Object format: TextContent(type='text', text='...')
-                                            text_parts.append(str(item.text))
-                                        elif hasattr(item, '__dict__'):
-                                            # Other object with __dict__
-                                            if 'text' in item.__dict__:
-                                                text_parts.append(str(item.__dict__['text']))
+                    # Ensure content field exists (some models omit it with tool calls)
+                    # Convert response_message to dict format with guaranteed content field
+                    response_message_dict = {
+                        "role": "assistant",
+                        "content": response_message.content if response_message.content else "",
+                        "tool_calls": [
+                            {
+                                "id": tc.id,
+                                "type": "function",
+                                "function": {
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments
+                                }
+                            } for tc in response_message.tool_calls
+                        ]
+                    }
+                    messages.append(response_message_dict)
+
+                    for tool_call in response_message.tool_calls:
+                        function_name = tool_call.function.name
+                        try:
+                            function_args = json.loads(tool_call.function.arguments)
+                        except json.JSONDecodeError as e:
+                            logger.error(f"Failed to parse tool arguments: {str(e)}")
+                            function_args = {}
+
+                        logger.info(f"Calling tool: {function_name} with args: {function_args}")
+
+                        # Call MCP tool with timeout
+                        try:
+                            tool_result = await asyncio.wait_for(
+                                self.call_mcp_tool(
+                                    mcp_server_url,
+                                    protocol,
+                                    function_name,
+                                    function_args,
+                                    user_token
+                                ),
+                                timeout=60.0  # 60 second timeout per tool call
+                            )
+                        except asyncio.TimeoutError:
+                            logger.error(f"Tool {function_name} timed out after 60 seconds")
+                            tool_result = {
+                                "success": False,
+                                "error": f"Tool execution timed out after 60 seconds"
+                            }
+                        except Exception as e:
+                            logger.error(f"Tool {function_name} failed: {str(e)}", exc_info=True)
+                            tool_result = {
+                                "success": False,
+                                "error": f"Tool execution failed: {str(e)}"
+                            }
+
+                        logger.info(f"Tool {function_name} result type: {type(tool_result)}")
+                        logger.info(f"Tool {function_name} result: {str(tool_result)[:500]}")
+
+                        # Extract actual content from MCP result
+                        tool_content = ""
+                        try:
+                            if isinstance(tool_result, dict):
+                                if tool_result.get("success"):
+                                    result_data = tool_result.get("result", {})
+                                    logger.info(f"Result data type: {type(result_data)}")
+
+                                    # MCP result.content is usually a list of content items
+                                    if isinstance(result_data, list):
+                                        # Extract text from content items
+                                        text_parts = []
+                                        for item in result_data:
+                                            if isinstance(item, dict):
+                                                # Dict format: {"type": "text", "text": "..."}
+                                                if "text" in item:
+                                                    text_parts.append(str(item["text"]))
+                                                elif "type" in item and item["type"] == "text":
+                                                    text_parts.append(str(item.get("text", "")))
+                                            elif hasattr(item, 'text'):
+                                                # Object format: TextContent(type='text', text='...')
+                                                text_parts.append(str(item.text))
+                                            elif hasattr(item, '__dict__'):
+                                                # Other object with __dict__
+                                                if 'text' in item.__dict__:
+                                                    text_parts.append(str(item.__dict__['text']))
+                                                else:
+                                                    # Try str() on the whole object
+                                                    text_parts.append(str(item))
                                             else:
-                                                # Try str() on the whole object
+                                                # Unknown type, convert to string
                                                 text_parts.append(str(item))
-                                        else:
-                                            # Unknown type, convert to string
-                                            text_parts.append(str(item))
 
-                                    if text_parts:
-                                        tool_content = "\n".join(text_parts)
-                                    else:
-                                        # Fallback: convert to string representation
+                                        if text_parts:
+                                            tool_content = "\n".join(text_parts)
+                                        else:
+                                            # Fallback: convert to string representation
+                                            try:
+                                                tool_content = json.dumps(result_data, ensure_ascii=False, default=str)
+                                            except (TypeError, ValueError) as e:
+                                                logger.error(f"JSON serialization failed: {e}")
+                                                tool_content = str(result_data)
+                                    elif isinstance(result_data, dict):
+                                        # Try to serialize dict
                                         try:
                                             tool_content = json.dumps(result_data, ensure_ascii=False, default=str)
                                         except (TypeError, ValueError) as e:
                                             logger.error(f"JSON serialization failed: {e}")
                                             tool_content = str(result_data)
-                                elif isinstance(result_data, dict):
-                                    # Try to serialize dict
-                                    try:
-                                        tool_content = json.dumps(result_data, ensure_ascii=False, default=str)
-                                    except (TypeError, ValueError) as e:
-                                        logger.error(f"JSON serialization failed: {e}")
+                                    else:
+                                        # Other types: convert to string
                                         tool_content = str(result_data)
                                 else:
-                                    # Other types: convert to string
-                                    tool_content = str(result_data)
+                                    tool_content = f"Error: {tool_result.get('error', 'Unknown error')}"
                             else:
-                                tool_content = f"Error: {tool_result.get('error', 'Unknown error')}"
-                        else:
-                            tool_content = str(tool_result)
-                    except Exception as e:
-                        logger.error(f"Error parsing tool result: {e}", exc_info=True)
-                        tool_content = f"Error parsing result: {str(e)}"
+                                tool_content = str(tool_result)
+                        except Exception as e:
+                            logger.error(f"Error parsing tool result: {e}", exc_info=True)
+                            tool_content = f"Error parsing result: {str(e)}"
 
-                    logger.info(f"Parsed tool content length: {len(tool_content)}")
-                    logger.info(f"Parsed tool content preview: {tool_content[:500]}...")
+                        logger.info(f"Parsed tool content length: {len(tool_content)}")
+                        logger.info(f"Parsed tool content preview: {tool_content[:500]}...")
 
-                    # Safely serialize tool_result for response
-                    # Convert to fully JSON-serializable format
-                    def make_serializable(obj):
-                        """Recursively convert object to JSON-serializable format"""
-                        if obj is None or isinstance(obj, (str, int, float, bool)):
-                            return obj
-                        elif isinstance(obj, dict):
-                            return {str(k): make_serializable(v) for k, v in obj.items()}
-                        elif isinstance(obj, (list, tuple)):
-                            return [make_serializable(item) for item in obj]
-                        else:
-                            # For any other type, convert to string
-                            return str(obj)
+                        # Safely serialize tool_result for response
+                        # Convert to fully JSON-serializable format
+                        def make_serializable(obj):
+                            """Recursively convert object to JSON-serializable format"""
+                            if obj is None or isinstance(obj, (str, int, float, bool)):
+                                return obj
+                            elif isinstance(obj, dict):
+                                return {str(k): make_serializable(v) for k, v in obj.items()}
+                            elif isinstance(obj, (list, tuple)):
+                                return [make_serializable(item) for item in obj]
+                            else:
+                                # For any other type, convert to string
+                                return str(obj)
 
-                    safe_tool_result = make_serializable(tool_result)
+                        safe_tool_result = make_serializable(tool_result)
 
-                    # Verify it's actually serializable
-                    try:
-                        json.dumps(safe_tool_result)
-                        logger.info(f"Tool result successfully serialized")
-                    except (TypeError, ValueError) as e:
-                        logger.error(f"Tool result STILL not serializable: {e}, using fallback")
-                        safe_tool_result = {
-                            "success": False,
-                            "error": "Result serialization failed",
-                            "raw": str(tool_result)
-                        }
+                        # Verify it's actually serializable
+                        try:
+                            json.dumps(safe_tool_result)
+                            logger.info(f"Tool result successfully serialized")
+                        except (TypeError, ValueError) as e:
+                            logger.error(f"Tool result STILL not serializable: {e}, using fallback")
+                            safe_tool_result = {
+                                "success": False,
+                                "error": "Result serialization failed",
+                                "raw": str(tool_result)
+                            }
 
-                    response_data["tool_calls"].append({
-                        "name": function_name,
-                        "arguments": function_args,
-                        "result": safe_tool_result
-                    })
+                        response_data["tool_calls"].append({
+                            "name": function_name,
+                            "arguments": function_args,
+                            "result": safe_tool_result,
+                            "iteration": iteration  # Track which iteration this tool call belongs to
+                        })
 
-                    # Add tool response to messages (send as string for OpenAI)
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": tool_content
-                    })
+                        # Add tool response to messages (send as string for OpenAI)
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": tool_content
+                        })
 
-                # Get final response after tool execution
+                    # After adding all tool results, loop will continue to next iteration
+                    # LLM will see the tool results and decide whether to call more tools or provide final answer
+                else:
+                    # No tool calls - LLM provided final answer, exit loop
+                    logger.info(f"LLM provided final answer in iteration {iteration}, exiting loop")
+                    response_data["response"] = response_message.content
+                    break  # Exit while loop
+
+            # If we reach here, we hit MAX_ITERATIONS without a final answer
+            # Force a final completion to get an answer based on gathered information
+            if not response_data["response"]:
+                logger.warning(f"Reached MAX_ITERATIONS ({self.MAX_ITERATIONS}) without final answer, forcing completion")
+
                 try:
-                    second_completion = await asyncio.to_thread(
+                    # Add a system message to encourage summarization
+                    messages.append({
+                        "role": "system",
+                        "content": (
+                            "You have reached the maximum number of tool calls. "
+                            "Please provide a final answer based on the information you have gathered so far. "
+                            "Summarize what you learned and answer the user's question to the best of your ability."
+                        )
+                    })
+
+                    forced_completion = await asyncio.to_thread(
                         self.client.chat.completions.create,
                         model=self.model,
                         messages=messages
                     )
 
-                    response_data["response"] = second_completion.choices[0].message.content
-                    response_data["tokens_used"] += second_completion.usage.total_tokens
+                    response_data["response"] = forced_completion.choices[0].message.content
+                    response_data["tokens_used"] += forced_completion.usage.total_tokens
+                    response_data["forced_completion"] = True  # Flag to indicate this was forced
+
+                    logger.info("Successfully generated forced final response")
                 except Exception as e:
-                    logger.error(f"Second OpenAI API call failed: {str(e)}", exc_info=True)
+                    logger.error(f"Failed to generate forced completion: {str(e)}", exc_info=True)
                     return {
                         "success": False,
-                        "error": f"Failed to get final response from LLM: {str(e)}"
+                        "error": f"Reached maximum iterations and failed to generate final response: {str(e)}"
                     }
-            else:
-                # No tool calls, just return the response
-                response_data["response"] = response_message.content
 
             return response_data
 
