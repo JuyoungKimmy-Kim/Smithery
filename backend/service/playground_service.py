@@ -526,6 +526,40 @@ class PlaygroundService:
                     response_data["response"] = response_message.content
                     break  # Exit while loop
 
+            # If we reach here, we hit MAX_ITERATIONS without a final answer
+            # Force a final completion to get an answer based on gathered information
+            if not response_data["response"]:
+                logger.warning(f"Reached MAX_ITERATIONS ({self.MAX_ITERATIONS}) without final answer, forcing completion")
+
+                try:
+                    # Add a system message to encourage summarization
+                    messages.append({
+                        "role": "system",
+                        "content": (
+                            "You have reached the maximum number of tool calls. "
+                            "Please provide a final answer based on the information you have gathered so far. "
+                            "Summarize what you learned and answer the user's question to the best of your ability."
+                        )
+                    })
+
+                    forced_completion = await asyncio.to_thread(
+                        self.client.chat.completions.create,
+                        model=self.model,
+                        messages=messages
+                    )
+
+                    response_data["response"] = forced_completion.choices[0].message.content
+                    response_data["tokens_used"] += forced_completion.usage.total_tokens
+                    response_data["forced_completion"] = True  # Flag to indicate this was forced
+
+                    logger.info("Successfully generated forced final response")
+                except Exception as e:
+                    logger.error(f"Failed to generate forced completion: {str(e)}", exc_info=True)
+                    return {
+                        "success": False,
+                        "error": f"Reached maximum iterations and failed to generate final response: {str(e)}"
+                    }
+
             return response_data
 
         except Exception as e:
