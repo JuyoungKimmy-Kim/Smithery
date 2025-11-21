@@ -27,9 +27,10 @@ export default function NotificationDropdown({ onClose, onNotificationRead }: No
       });
       const data = await response.json();
       setNotifications(data);
+      setLoading(false);
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
-    } finally {
+      setNotifications([]);
       setLoading(false);
     }
   };
