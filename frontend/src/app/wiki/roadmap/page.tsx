@@ -174,21 +174,21 @@ const roadmapDataKo: Version[] = [
   },
   {
     version: 'v1.8',
-    expectedDate: '2025년 11월 7일 (예정)',
-    status: 'in-progress',
+    releaseDate: '2025년 11월 14일',
+    status: 'released',
     description: 'mcp hub 자체를 MCP 서버로 제공하고, MCP playground를 통해 서버를 바로 테스트할 수 있는 기능을 추가하는 업데이트입니다.',
     features: [
       {
         title: 'mcp hub MCP 서버',
         description: 'mcp hub 자체를 MCP 서버로 제공하여 외부 AI 클라이언트에서 직접 MCP 서버 정보를 조회하고 검색할 수 있습니다. roocode 등에서 mcp hub의 데이터를 활용할 수 있습니다.',
         implementation: 'MCP 서버 프로토콜 구현, 서버 검색/조회 API 제공, MCP 클라이언트 연동 가이드 제공',
-        status: 'planned'
+        status: 'completed'
       },
       {
         title: 'MCP Playground',
         description: 'MCP 서버 상세 페이지에서 바로 해당 MCP 서버를 테스트해볼 수 있는 playground를 제공합니다. tools 호출, prompts 테스트, resources 조회 등을 웹 인터페이스에서 직접 실행해볼 수 있습니다.',
         implementation: '브라우저 기반 MCP 클라이언트 구현, 서버 연결 및 통신 처리, 실시간 결과 표시',
-        status: 'planned'
+        status: 'completed'
       }
     ],
     improvements: [
@@ -198,8 +198,32 @@ const roadmapDataKo: Version[] = [
     ]
   },
   {
+    version: 'v1.9',
+    expectedDate: '2025년 11월 28일 (예정)',
+    status: 'in-progress',
+    description: 'Tool calling 기능을 강화하여 사용자가 직접 MCP 도구를 탐색하고 테스트할 수 있는 고급 기능을 추가하는 업데이트입니다. 현재는 사용자 쿼리 기반 자동 도구 선택 및 실행만 지원하지만, 이번 업데이트를 통해 사용자가 직접 MCP 도구를 브라우징하고 실행할 수 있게 됩니다.',
+    features: [
+      {
+        title: 'Multi-hop Tool Calling 지원',
+        description: '여러 도구를 순차적으로 호출하여 복잡한 작업을 수행할 수 있는 multi-hop tool calling 기능을 지원합니다. 한 도구의 결과를 다음 도구의 입력으로 사용하는 연쇄적인 도구 호출이 가능합니다.',
+        status: 'completed'
+      },
+      {
+        title: 'MCP Tool Testing Console',
+        description: '각 MCP 서버의 tools 스키마를 기반으로 동적으로 입력 폼을 생성하여 사용자가 직접 도구를 테스트할 수 있는 콘솔을 제공합니다. 사용자는 입력 값을 입력하고 "Invoke" 버튼을 클릭하여 선택한 MCP 도구를 실행할 수 있으며, 도구의 응답을 즉시 확인할 수 있습니다. 또한 선택한 MCP 서버에서 실시간 로그 스트림을 제공하여 사용자가 서버 동작을 관찰하고 도구 실행을 실시간으로 디버깅할 수 있습니다.',
+        implementation: '도구 스키마 기반 동적 폼 생성, MCP 도구 직접 호출 및 실행, 실시간 응답 표시, 서버 로그 스트리밍 기능',
+        status: 'planned'
+      }
+    ],
+    improvements: [
+      '사용자 직접 도구 제어 가능',
+      '도구 테스트 및 디버깅 편의성 향상',
+      '복잡한 워크플로우 지원'
+    ]
+  },
+  {
     version: 'v2.0',
-    expectedDate: '2025년 11월 21일 (예정)',
+    expectedDate: '2025년 11월 28일 (예정)',
     status: 'planned',
     description: '데이터 분석 및 사용자 행동 추적 시스템을 도입하는 업데이트입니다.',
     features: [
@@ -406,21 +430,21 @@ const roadmapDataEn: Version[] = [
   },
   {
     version: 'v1.8',
-    expectedDate: 'November 7, 2025 (Expected)',
-    status: 'in-progress',
+    releaseDate: 'November 14, 2025',
+    status: 'released',
     description: 'An update that provides MCP Hub itself as an MCP server and adds MCP playground functionality to test servers immediately.',
     features: [
       {
         title: 'MCP Hub MCP Server',
         description: 'Provides MCP Hub itself as an MCP server so external AI clients can directly query and search MCP server information. MCP Hub data can be used in roocode, etc.',
         implementation: 'Implement MCP server protocol, provide server search/query API, provide MCP client integration guide',
-        status: 'planned'
+        status: 'completed'
       },
       {
         title: 'MCP Playground',
         description: 'Provides a playground on the MCP server detail page where you can immediately test the MCP server. You can directly execute tools calls, test prompts, query resources, etc. through the web interface.',
         implementation: 'Browser-based MCP client implementation, server connection and communication handling, real-time result display',
-        status: 'planned'
+        status: 'completed'
       }
     ],
     improvements: [
@@ -430,8 +454,32 @@ const roadmapDataEn: Version[] = [
     ]
   },
   {
+    version: 'v1.9',
+    expectedDate: 'November 28, 2025 (Expected)',
+    status: 'in-progress',
+    description: 'An update that enhances tool calling functionality by adding advanced features that allow users to directly explore and test MCP tools. Currently, only automatic tool selection and execution based on user queries are supported, but this update will enable users to directly browse and execute MCP tools themselves.',
+    features: [
+      {
+        title: 'Multi-hop Tool Calling Support',
+        description: 'Supports multi-hop tool calling functionality that allows multiple tools to be called sequentially to perform complex tasks. Enables chained tool calls where the result of one tool is used as input for the next tool.',
+        status: 'completed'
+      },
+      {
+        title: 'MCP Tool Testing Console',
+        description: 'Provides a console that dynamically generates input forms based on each MCP server\'s tools schema, allowing users to directly test tools. Users can enter input values and click "Invoke" to execute the selected MCP tool, and immediately view the tool\'s response. Also provides a real-time log stream from the selected MCP servers to allow users to observe server behavior and debug tool executions in real time.',
+        implementation: 'Dynamic form generation based on tool schemas, direct MCP tool invocation and execution, real-time response display, server log streaming functionality',
+        status: 'planned'
+      }
+    ],
+    improvements: [
+      'Users can directly control tools',
+      'Enhanced tool testing and debugging convenience',
+      'Support for complex workflows'
+    ]
+  },
+  {
     version: 'v2.0',
-    expectedDate: 'November 21, 2025 (Expected)',
+    expectedDate: 'November 28, 2025 (Expected)',
     status: 'planned',
     description: 'An update introducing data analysis and user behavior tracking systems.',
     features: [
@@ -517,7 +565,7 @@ function FeatureStatusIcon({ status }: { status?: 'completed' | 'in-progress' | 
 }
 
 export default function RoadmapPage() {
-  const [expandedVersion, setExpandedVersion] = useState<string | null>('v1.8');
+  const [expandedVersion, setExpandedVersion] = useState<string | null>('v1.9');
   const [language, setLanguage] = useState<'en' | 'ko'>('en');
 
   useEffect(() => {
