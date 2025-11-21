@@ -287,16 +287,35 @@ class PlaygroundService:
             # Build messages
             messages = conversation_history or []
 
-            # Add system prompt to encourage tool usage when tools are available
+            # Add system prompt to encourage tool usage and multi-hop reasoning when tools are available
             if tools and (not messages or messages[0].get("role") != "system"):
                 system_message = {
                     "role": "system",
                     "content": (
                         "You are a helpful assistant with access to tools. "
                         "When answering questions, ALWAYS check if there are relevant tools available that could provide accurate information. "
-                        "If a tool can help answer the user's question, you MUST use it instead of relying on general knowledge. "
-                        "For example, if the user asks about documentation, usage, or specific information that a tool like 'search_doc' can provide, "
-                        "you should call that tool first and base your answer on the tool's results."
+                        "If a tool can help answer the user's question, you MUST use it instead of relying on general knowledge.\n\n"
+
+                        "MULTI-STEP REASONING:\n"
+                        "- You can call tools MULTIPLE TIMES in sequence to gather comprehensive information\n"
+                        "- After seeing tool results, analyze if you need MORE information\n"
+                        "- You can call different tools based on what you learned from previous tool calls\n"
+                        f"- You have up to {self.MAX_ITERATIONS} rounds of tool calls available\n"
+                        "- When you have sufficient information, provide your final answer\n\n"
+
+                        "REASONING STRATEGY:\n"
+                        "1. Identify what information you need to answer the question\n"
+                        "2. Call relevant tools to gather that information\n"
+                        "3. Analyze the results - do you need additional details or clarification?\n"
+                        "4. If yes, call more tools based on what you learned\n"
+                        "5. If no, synthesize the information and provide a complete answer\n\n"
+
+                        "EXAMPLES:\n"
+                        "- For 'How do I use feature X?': search_doc → read specific sections → get_examples\n"
+                        "- For 'What are the differences between X and Y?': get_details(X) → get_details(Y) → compare\n"
+                        "- For 'Find information about Z': search → analyze results → get_specific_info\n\n"
+
+                        "Always use tools when available rather than guessing or using general knowledge."
                     )
                 }
                 messages.insert(0, system_message)
