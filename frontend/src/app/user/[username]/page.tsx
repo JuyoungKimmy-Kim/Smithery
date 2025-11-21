@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import BlogPostCard from "@/components/blog-post-card";
 import { ArrowSmallDownIcon } from "@heroicons/react/24/solid";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api-client";
 
 interface Post {
   category: string;
@@ -23,23 +25,30 @@ export default function UserServersPage() {
   const params = useParams();
   const username = params.username as string;
   const { t } = useLanguage();
-  
+  const { isAuthenticated } = useAuth();
+
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(6);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchUserServers = async () => {
       try {
         setLoading(true);
         setError(null);
-        
+
         const response = await fetch(`/api/mcp-servers/user/${username}`);
-        
+
         if (response.ok) {
           const data = await response.json();
           setPosts(data);
+
+          // 인증된 사용자의 즐겨찾기 목록 가져오기
+          if (isAuthenticated) {
+            fetchUserFavorites();
+          }
         } else if (response.status === 404) {
           setError('userNotFound');
         } else {
@@ -56,7 +65,24 @@ export default function UserServersPage() {
     if (username) {
       fetchUserServers();
     }
-  }, [username]);
+  }, [username, isAuthenticated]);
+
+  // 사용자 즐겨찾기 목록 가져오기
+  const fetchUserFavorites = async () => {
+    try {
+      const response = await apiFetch('/api/mcp-servers/user/favorites', {
+        requiresAuth: true
+      });
+
+      if (response.ok) {
+        const favorites = await response.json();
+        const ids = new Set(favorites.map((fav: any) => String(fav.id)));
+        setFavoriteIds(ids);
+      }
+    } catch (error) {
+      console.error('Error fetching user favorites:', error);
+    }
+  };
 
   const handleViewMore = () => {
     setVisibleCount(prev => prev + 6);
@@ -142,6 +168,7 @@ export default function UserServersPage() {
                     name: author?.name || 'Unknown Author',
                   }}
                   id={id}
+                  isFavorited={id ? favoriteIds.has(String(id)) : false}
                   onFavoriteChange={handleFavoriteChange}
                 />
               ))}

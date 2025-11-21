@@ -19,6 +19,7 @@ interface BlogPostCardProps {
   healthStatus?: string; // Health status (healthy, unhealthy, unknown)
   id?: string; // MCP 서버 ID 추가
   favoritesCount?: number; // 즐겨찾기 수 (초기값)
+  isFavorited?: boolean; // 즐겨찾기 상태 (부모에서 전달)
   onFavoriteChange?: () => void; // 즐겨찾기 상태 변경 콜백
   onTagClick?: (tag: string) => void; // 태그 클릭 콜백
 }
@@ -34,27 +35,29 @@ export function BlogPostCard({
   healthStatus,
   id,
   favoritesCount: initialFavoritesCount = 0,
+  isFavorited = false,
   onFavoriteChange,
   onTagClick,
 }: BlogPostCardProps) {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
   const { t } = useLanguage();
-  const [isFavorite, setIsFavorite] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(isFavorited);
   const [isLoading, setIsLoading] = useState(false);
   const [favoritesCount, setFavoritesCount] = useState(initialFavoritesCount);
 
-  // 즐겨찾기 상태 및 수 확인
+  // 즐겨찾기 상태 동기화
   useEffect(() => {
-    // 초기값 설정
+    setIsFavorite(isFavorited);
+  }, [isFavorited]);
+
+  // 즐겨찾기 수 확인
+  useEffect(() => {
     setFavoritesCount(initialFavoritesCount);
 
     const loadFavoriteData = () => {
       if (id) {
         fetchFavoritesCount();
-        if (isAuthenticated) {
-          checkFavoriteStatus();
-        }
       }
     };
 
@@ -72,7 +75,7 @@ export function BlogPostCard({
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isAuthenticated, id, initialFavoritesCount]);
+  }, [id, initialFavoritesCount]);
 
   const fetchFavoritesCount = async () => {
     try {
@@ -83,26 +86,6 @@ export function BlogPostCard({
       }
     } catch (error) {
       console.error('Error fetching favorites count:', error);
-    }
-  };
-
-  const checkFavoriteStatus = async () => {
-    try {
-      const response = await apiFetch(`/api/mcp-servers/user/favorites`, {
-        requiresAuth: true
-      });
-
-      if (response.ok) {
-        const favorites = await response.json();
-        console.log('Checking favorite status for id:', id, 'type:', typeof id);
-        console.log('User favorites:', favorites.map((f: any) => ({ id: f.id, type: typeof f.id })));
-        // ID를 문자열로 변환하여 비교 (타입 불일치 방지)
-        const isFav = favorites.some((fav: any) => String(fav.id) === String(id));
-        console.log('Is favorite:', isFav);
-        setIsFavorite(isFav);
-      }
-    } catch (error) {
-      console.error('Error checking favorite status:', error);
     }
   };
 
