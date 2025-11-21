@@ -395,147 +395,147 @@ class PlaygroundService:
                     messages.append(response_message_dict)
 
                     for tool_call in response_message.tool_calls:
-                    function_name = tool_call.function.name
-                    try:
-                        function_args = json.loads(tool_call.function.arguments)
-                    except json.JSONDecodeError as e:
-                        logger.error(f"Failed to parse tool arguments: {str(e)}")
-                        function_args = {}
+                        function_name = tool_call.function.name
+                        try:
+                            function_args = json.loads(tool_call.function.arguments)
+                        except json.JSONDecodeError as e:
+                            logger.error(f"Failed to parse tool arguments: {str(e)}")
+                            function_args = {}
 
-                    logger.info(f"Calling tool: {function_name} with args: {function_args}")
+                        logger.info(f"Calling tool: {function_name} with args: {function_args}")
 
-                    # Call MCP tool with timeout
-                    try:
-                        tool_result = await asyncio.wait_for(
-                            self.call_mcp_tool(
-                                mcp_server_url,
-                                protocol,
-                                function_name,
-                                function_args,
-                                user_token
-                            ),
-                            timeout=60.0  # 60 second timeout per tool call
-                        )
-                    except asyncio.TimeoutError:
-                        logger.error(f"Tool {function_name} timed out after 60 seconds")
-                        tool_result = {
-                            "success": False,
-                            "error": f"Tool execution timed out after 60 seconds"
-                        }
-                    except Exception as e:
-                        logger.error(f"Tool {function_name} failed: {str(e)}", exc_info=True)
-                        tool_result = {
-                            "success": False,
-                            "error": f"Tool execution failed: {str(e)}"
-                        }
+                        # Call MCP tool with timeout
+                        try:
+                            tool_result = await asyncio.wait_for(
+                                self.call_mcp_tool(
+                                    mcp_server_url,
+                                    protocol,
+                                    function_name,
+                                    function_args,
+                                    user_token
+                                ),
+                                timeout=60.0  # 60 second timeout per tool call
+                            )
+                        except asyncio.TimeoutError:
+                            logger.error(f"Tool {function_name} timed out after 60 seconds")
+                            tool_result = {
+                                "success": False,
+                                "error": f"Tool execution timed out after 60 seconds"
+                            }
+                        except Exception as e:
+                            logger.error(f"Tool {function_name} failed: {str(e)}", exc_info=True)
+                            tool_result = {
+                                "success": False,
+                                "error": f"Tool execution failed: {str(e)}"
+                            }
 
-                    logger.info(f"Tool {function_name} result type: {type(tool_result)}")
-                    logger.info(f"Tool {function_name} result: {str(tool_result)[:500]}")
+                        logger.info(f"Tool {function_name} result type: {type(tool_result)}")
+                        logger.info(f"Tool {function_name} result: {str(tool_result)[:500]}")
 
-                    # Extract actual content from MCP result
-                    tool_content = ""
-                    try:
-                        if isinstance(tool_result, dict):
-                            if tool_result.get("success"):
-                                result_data = tool_result.get("result", {})
-                                logger.info(f"Result data type: {type(result_data)}")
+                        # Extract actual content from MCP result
+                        tool_content = ""
+                        try:
+                            if isinstance(tool_result, dict):
+                                if tool_result.get("success"):
+                                    result_data = tool_result.get("result", {})
+                                    logger.info(f"Result data type: {type(result_data)}")
 
-                                # MCP result.content is usually a list of content items
-                                if isinstance(result_data, list):
-                                    # Extract text from content items
-                                    text_parts = []
-                                    for item in result_data:
-                                        if isinstance(item, dict):
-                                            # Dict format: {"type": "text", "text": "..."}
-                                            if "text" in item:
-                                                text_parts.append(str(item["text"]))
-                                            elif "type" in item and item["type"] == "text":
-                                                text_parts.append(str(item.get("text", "")))
-                                        elif hasattr(item, 'text'):
-                                            # Object format: TextContent(type='text', text='...')
-                                            text_parts.append(str(item.text))
-                                        elif hasattr(item, '__dict__'):
-                                            # Other object with __dict__
-                                            if 'text' in item.__dict__:
-                                                text_parts.append(str(item.__dict__['text']))
+                                    # MCP result.content is usually a list of content items
+                                    if isinstance(result_data, list):
+                                        # Extract text from content items
+                                        text_parts = []
+                                        for item in result_data:
+                                            if isinstance(item, dict):
+                                                # Dict format: {"type": "text", "text": "..."}
+                                                if "text" in item:
+                                                    text_parts.append(str(item["text"]))
+                                                elif "type" in item and item["type"] == "text":
+                                                    text_parts.append(str(item.get("text", "")))
+                                            elif hasattr(item, 'text'):
+                                                # Object format: TextContent(type='text', text='...')
+                                                text_parts.append(str(item.text))
+                                            elif hasattr(item, '__dict__'):
+                                                # Other object with __dict__
+                                                if 'text' in item.__dict__:
+                                                    text_parts.append(str(item.__dict__['text']))
+                                                else:
+                                                    # Try str() on the whole object
+                                                    text_parts.append(str(item))
                                             else:
-                                                # Try str() on the whole object
+                                                # Unknown type, convert to string
                                                 text_parts.append(str(item))
-                                        else:
-                                            # Unknown type, convert to string
-                                            text_parts.append(str(item))
 
-                                    if text_parts:
-                                        tool_content = "\n".join(text_parts)
-                                    else:
-                                        # Fallback: convert to string representation
+                                        if text_parts:
+                                            tool_content = "\n".join(text_parts)
+                                        else:
+                                            # Fallback: convert to string representation
+                                            try:
+                                                tool_content = json.dumps(result_data, ensure_ascii=False, default=str)
+                                            except (TypeError, ValueError) as e:
+                                                logger.error(f"JSON serialization failed: {e}")
+                                                tool_content = str(result_data)
+                                    elif isinstance(result_data, dict):
+                                        # Try to serialize dict
                                         try:
                                             tool_content = json.dumps(result_data, ensure_ascii=False, default=str)
                                         except (TypeError, ValueError) as e:
                                             logger.error(f"JSON serialization failed: {e}")
                                             tool_content = str(result_data)
-                                elif isinstance(result_data, dict):
-                                    # Try to serialize dict
-                                    try:
-                                        tool_content = json.dumps(result_data, ensure_ascii=False, default=str)
-                                    except (TypeError, ValueError) as e:
-                                        logger.error(f"JSON serialization failed: {e}")
+                                    else:
+                                        # Other types: convert to string
                                         tool_content = str(result_data)
                                 else:
-                                    # Other types: convert to string
-                                    tool_content = str(result_data)
+                                    tool_content = f"Error: {tool_result.get('error', 'Unknown error')}"
                             else:
-                                tool_content = f"Error: {tool_result.get('error', 'Unknown error')}"
-                        else:
-                            tool_content = str(tool_result)
-                    except Exception as e:
-                        logger.error(f"Error parsing tool result: {e}", exc_info=True)
-                        tool_content = f"Error parsing result: {str(e)}"
+                                tool_content = str(tool_result)
+                        except Exception as e:
+                            logger.error(f"Error parsing tool result: {e}", exc_info=True)
+                            tool_content = f"Error parsing result: {str(e)}"
 
-                    logger.info(f"Parsed tool content length: {len(tool_content)}")
-                    logger.info(f"Parsed tool content preview: {tool_content[:500]}...")
+                        logger.info(f"Parsed tool content length: {len(tool_content)}")
+                        logger.info(f"Parsed tool content preview: {tool_content[:500]}...")
 
-                    # Safely serialize tool_result for response
-                    # Convert to fully JSON-serializable format
-                    def make_serializable(obj):
-                        """Recursively convert object to JSON-serializable format"""
-                        if obj is None or isinstance(obj, (str, int, float, bool)):
-                            return obj
-                        elif isinstance(obj, dict):
-                            return {str(k): make_serializable(v) for k, v in obj.items()}
-                        elif isinstance(obj, (list, tuple)):
-                            return [make_serializable(item) for item in obj]
-                        else:
-                            # For any other type, convert to string
-                            return str(obj)
+                        # Safely serialize tool_result for response
+                        # Convert to fully JSON-serializable format
+                        def make_serializable(obj):
+                            """Recursively convert object to JSON-serializable format"""
+                            if obj is None or isinstance(obj, (str, int, float, bool)):
+                                return obj
+                            elif isinstance(obj, dict):
+                                return {str(k): make_serializable(v) for k, v in obj.items()}
+                            elif isinstance(obj, (list, tuple)):
+                                return [make_serializable(item) for item in obj]
+                            else:
+                                # For any other type, convert to string
+                                return str(obj)
 
-                    safe_tool_result = make_serializable(tool_result)
+                        safe_tool_result = make_serializable(tool_result)
 
-                    # Verify it's actually serializable
-                    try:
-                        json.dumps(safe_tool_result)
-                        logger.info(f"Tool result successfully serialized")
-                    except (TypeError, ValueError) as e:
-                        logger.error(f"Tool result STILL not serializable: {e}, using fallback")
-                        safe_tool_result = {
-                            "success": False,
-                            "error": "Result serialization failed",
-                            "raw": str(tool_result)
-                        }
+                        # Verify it's actually serializable
+                        try:
+                            json.dumps(safe_tool_result)
+                            logger.info(f"Tool result successfully serialized")
+                        except (TypeError, ValueError) as e:
+                            logger.error(f"Tool result STILL not serializable: {e}, using fallback")
+                            safe_tool_result = {
+                                "success": False,
+                                "error": "Result serialization failed",
+                                "raw": str(tool_result)
+                            }
 
-                    response_data["tool_calls"].append({
-                        "name": function_name,
-                        "arguments": function_args,
-                        "result": safe_tool_result,
-                        "iteration": iteration  # Track which iteration this tool call belongs to
-                    })
+                        response_data["tool_calls"].append({
+                            "name": function_name,
+                            "arguments": function_args,
+                            "result": safe_tool_result,
+                            "iteration": iteration  # Track which iteration this tool call belongs to
+                        })
 
-                    # Add tool response to messages (send as string for OpenAI)
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": tool_content
-                    })
+                        # Add tool response to messages (send as string for OpenAI)
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": tool_content
+                        })
 
                     # After adding all tool results, loop will continue to next iteration
                     # LLM will see the tool results and decide whether to call more tools or provide final answer
