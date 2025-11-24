@@ -5,11 +5,51 @@ import ToolCard, { Tool } from './ui/tool-card';
 import { apiFetch } from '@/lib/api-client';
 
 interface ToolsPanelProps {
-  tools: Tool[];
+  tools: any[]; // Accept raw tool data from backend
   serverId: number;
 }
 
+// Convert backend tool format to frontend format
+function convertToolFormat(tool: any): Tool {
+  // If inputSchema already exists, use it
+  if (tool.inputSchema) {
+    return {
+      name: tool.name,
+      description: tool.description || '',
+      inputSchema: tool.inputSchema,
+    };
+  }
+
+  // Otherwise, convert from parameters array
+  const properties: Record<string, any> = {};
+  const required: string[] = [];
+
+  if (tool.parameters && Array.isArray(tool.parameters)) {
+    tool.parameters.forEach((param: any) => {
+      properties[param.name] = {
+        type: param.type || 'string',
+        description: param.description,
+      };
+      if (param.required) {
+        required.push(param.name);
+      }
+    });
+  }
+
+  return {
+    name: tool.name,
+    description: tool.description || '',
+    inputSchema: {
+      type: 'object',
+      properties,
+      required: required.length > 0 ? required : undefined,
+    },
+  };
+}
+
 const ToolsPanel = ({ tools, serverId }: ToolsPanelProps) => {
+  // Convert tools to proper format
+  const convertedTools = tools.map(convertToolFormat);
   const handleExecuteTool = async (toolName: string, arguments_: Record<string, any>) => {
     try {
       const response = await apiFetch(`/api/mcp-servers/${serverId}/tools/execute`, {
@@ -42,7 +82,7 @@ const ToolsPanel = ({ tools, serverId }: ToolsPanelProps) => {
     }
   };
 
-  if (!tools || tools.length === 0) {
+  if (!convertedTools || convertedTools.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow-sm p-8 text-center">
         <p className="text-gray-600">No tools available for this server.</p>
@@ -62,7 +102,7 @@ const ToolsPanel = ({ tools, serverId }: ToolsPanelProps) => {
       </div>
 
       <div className="space-y-3">
-        {tools.map((tool) => (
+        {convertedTools.map((tool) => (
           <ToolCard
             key={tool.name}
             tool={tool}
