@@ -72,24 +72,7 @@ export default function MCPServerDetail() {
   // Custom components for Markdown rendering
   const markdownComponents: Components = {
     code({ node, inline, className, children, ...props }) {
-      return !inline ? (
-        <pre
-          className="rounded p-4 overflow-x-auto my-4"
-          style={{
-            backgroundColor: '#1e293b',
-          }}
-        >
-          <code
-            className={className}
-            style={{
-              color: '#e2e8f0'
-            }}
-            {...props}
-          >
-            {children}
-          </code>
-        </pre>
-      ) : (
+      return inline ? (
         <code
           style={{
             backgroundColor: '#f1f5f9',
@@ -103,6 +86,27 @@ export default function MCPServerDetail() {
         >
           {children}
         </code>
+      ) : (
+        <code
+          className={className}
+          style={{
+            color: '#e2e8f0'
+          }}
+          {...props}
+        >
+          {children}
+        </code>
+      );
+    },
+    pre({ node, ...props }) {
+      return (
+        <pre
+          className="rounded p-4 overflow-x-auto my-4"
+          style={{
+            backgroundColor: '#1e293b',
+          }}
+          {...props}
+        />
       );
     },
     img({ node, ...props }) {
