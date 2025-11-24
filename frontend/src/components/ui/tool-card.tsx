@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useCallback } from 'react';
-import { ChevronDown, ChevronRight } from '@heroicons/react/24/outline';
+import { ChevronDownIcon, ChevronRightIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { PlayIcon } from '@heroicons/react/24/solid';
-import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import DynamicForm from './dynamic-form';
 
 export interface ToolInputSchema {
@@ -154,7 +153,7 @@ const ToolCard = ({ tool, serverId, onExecute }: ToolCardProps) => {
             )}
           </button>
           <button className="text-gray-400 hover:text-gray-600">
-            {isExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+            {isExpanded ? <ChevronDownIcon className="h-5 w-5" /> : <ChevronRightIcon className="h-5 w-5" />}
           </button>
         </div>
       </div>
