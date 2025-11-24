@@ -7,7 +7,7 @@ import asyncio
 from backend.database import get_db
 
 logger = logging.getLogger(__name__)
-from backend.service import MCPServerService, UserService, MCPProxyService
+from backend.service import MCPServerService, UserService, MCPProxyService, AnalyticsService
 from backend.service.notification_service import NotificationService
 from backend.database.model import User
 from backend.api.schemas import (
@@ -202,10 +202,12 @@ def get_mcp_server(mcp_server_id: int, db: Session = Depends(get_db)):
 @router.post("/search", response_model=SearchResponse)
 def search_mcp_servers(
     search_request: SearchRequest,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """MCP 서버를 검색합니다."""
     mcp_service = MCPServerService(db)
+    analytics_service = AnalyticsService(db)
 
     # keyword와 tags 모두 처리
     if search_request.keyword and search_request.tags:
@@ -226,6 +228,19 @@ def search_mcp_servers(
     else:
         # 둘 다 없으면 모든 서버 반환
         mcp_servers = mcp_service.get_approved_mcp_servers()
+
+    # Analytics: 검색 이벤트 추적
+    if search_request.keyword:  # 검색어가 있을 때만 추적
+        try:
+            analytics_service.track_search(
+                keyword=search_request.keyword,
+                results_count=len(mcp_servers),
+                tags=search_request.tags,
+                ip_address=request.client.host if request.client else None,
+                user_agent=request.headers.get("user-agent")
+            )
+        except Exception as e:
+            logger.error(f"Failed to track search event: {e}")
 
     return SearchResponse(
         mcp_servers=mcp_servers,
