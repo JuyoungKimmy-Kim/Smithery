@@ -267,11 +267,13 @@ def search_mcp_servers(
 @router.post("/{mcp_server_id}/favorite", response_model=FavoriteResponse)
 def add_favorite(
     mcp_server_id: int,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """MCP 서버를 즐겨찾기에 추가합니다."""
     user_service = UserService(db)
+    analytics_service = AnalyticsService(db)
     success = user_service.add_favorite(current_user.id, mcp_server_id)
 
     if success:
@@ -285,6 +287,17 @@ def add_favorite(
         except Exception as e:
             logger.error(f"Failed to create favorite notification: {e}")
             # 알림 생성 실패해도 즐겨찾기는 성공으로 처리
+
+        # Analytics: 즐겨찾기 추가 이벤트 추적
+        try:
+            analytics_service.track_favorite_add(
+                mcp_server_id=mcp_server_id,
+                user_id=current_user.id,
+                ip_address=request.client.host if request.client else None
+            )
+        except Exception as e:
+            logger.error(f"Failed to track favorite add event: {e}")
+
         return FavoriteResponse(success=True, message="즐겨찾기에 추가되었습니다.")
     else:
         return FavoriteResponse(success=False, message="이미 즐겨찾기에 추가되어 있습니다.")
@@ -292,14 +305,26 @@ def add_favorite(
 @router.delete("/{mcp_server_id}/favorite", response_model=FavoriteResponse)
 def remove_favorite(
     mcp_server_id: int,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """MCP 서버를 즐겨찾기에서 제거합니다."""
     user_service = UserService(db)
+    analytics_service = AnalyticsService(db)
     success = user_service.remove_favorite(current_user.id, mcp_server_id)
-    
+
     if success:
+        # Analytics: 즐겨찾기 제거 이벤트 추적
+        try:
+            analytics_service.track_favorite_remove(
+                mcp_server_id=mcp_server_id,
+                user_id=current_user.id,
+                ip_address=request.client.host if request.client else None
+            )
+        except Exception as e:
+            logger.error(f"Failed to track favorite remove event: {e}")
+
         return FavoriteResponse(success=True, message="즐겨찾기에서 제거되었습니다.")
     else:
         return FavoriteResponse(success=False, message="즐겨찾기에 존재하지 않습니다.")
