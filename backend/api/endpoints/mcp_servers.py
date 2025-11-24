@@ -15,7 +15,8 @@ from backend.api.schemas import (
     SearchRequest, SearchResponse, FavoriteRequest, FavoriteResponse,
     AdminApprovalRequest, TagResponse, PreviewToolsRequest, PreviewToolsResponse,
     AnnouncementRequest, PreviewPromptsRequest, PreviewPromptsResponse,
-    PreviewResourcesRequest, PreviewResourcesResponse, TopUserResponse
+    PreviewResourcesRequest, PreviewResourcesResponse, TopUserResponse,
+    ToolExecutionRequest, ToolExecutionResponse
 )
 from backend.api.auth import get_current_user, get_current_admin_user
 
@@ -585,4 +586,100 @@ async def check_server_health(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Health check failed: {str(e)}"
+        )
+
+@router.post("/{mcp_server_id}/tools/execute", response_model=ToolExecutionResponse)
+async def execute_tool_directly(
+    mcp_server_id: int,
+    execution_request: ToolExecutionRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    MCP 서버의 특정 Tool을 직접 실행합니다.
+    LLM 없이 사용자가 제공한 인자로 Tool을 바로 호출합니다.
+    Rate limiting 없음 - 자유롭게 테스트 가능
+    """
+    try:
+        logger.info(f"Direct tool execution requested - Server ID: {mcp_server_id}, Tool: {execution_request.tool_name}")
+
+        # 서버 존재 확인
+        mcp_service = MCPServerService(db)
+        mcp_server = mcp_service.get_mcp_server_by_id(mcp_server_id)
+
+        if not mcp_server:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="MCP Server not found"
+            )
+
+        # Get server URL from server_url field or config
+        server_url = mcp_server.server_url
+        logger.info(f"[Tool Execution] MCP Server ID: {mcp_server_id}, Name: {mcp_server.name}")
+        logger.info(f"[Tool Execution] server_url: {server_url}, protocol: {mcp_server.protocol}")
+
+        if not server_url and mcp_server.config:
+            # Try to get from config if server_url is empty
+            config = mcp_server.config
+            if isinstance(config, dict):
+                if "command" in config:
+                    server_url = config["command"]
+                    if "args" in config and isinstance(config["args"], list):
+                        server_url += " " + " ".join(config["args"])
+                elif "url" in config:
+                    server_url = config["url"]
+
+        if not server_url:
+            logger.error(f"[Tool Execution] No server_url found for MCP server {mcp_server_id}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="MCP server URL not found in server_url or config"
+            )
+
+        # Call MCP tool directly via MCPProxyService
+        try:
+            result = await asyncio.wait_for(
+                MCPProxyService.call_tool(
+                    server_url,
+                    mcp_server.protocol,
+                    execution_request.tool_name,
+                    execution_request.arguments,
+                    execution_request.mcp_auth_token
+                ),
+                timeout=60.0  # 60 second timeout per tool call
+            )
+
+            logger.info(f"[Tool Execution] Tool {execution_request.tool_name} executed successfully")
+
+            # Return structured response
+            if result.get("success"):
+                return ToolExecutionResponse(
+                    success=True,
+                    result=result.get("result")
+                )
+            else:
+                return ToolExecutionResponse(
+                    success=False,
+                    error=result.get("error", "Tool execution failed")
+                )
+
+        except asyncio.TimeoutError:
+            logger.error(f"[Tool Execution] Tool {execution_request.tool_name} timed out after 60 seconds")
+            return ToolExecutionResponse(
+                success=False,
+                error="Tool execution timed out after 60 seconds"
+            )
+        except Exception as e:
+            logger.error(f"[Tool Execution] Tool {execution_request.tool_name} failed: {str(e)}", exc_info=True)
+            return ToolExecutionResponse(
+                success=False,
+                error=f"Tool execution failed: {str(e)}"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Tool Execution] Unexpected error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
         )

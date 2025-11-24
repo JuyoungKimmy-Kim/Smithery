@@ -270,3 +270,14 @@ class PlaygroundRateLimitResponse(BaseModel):
     allowed: bool
     remaining: int
     used: int
+
+# Tool Execution schemas (Direct tool testing without LLM)
+class ToolExecutionRequest(BaseModel):
+    tool_name: str
+    arguments: Dict[str, Any]
+    mcp_auth_token: Optional[str] = None
+
+class ToolExecutionResponse(BaseModel):
+    success: bool
+    result: Optional[Any] = None
+    error: Optional[str] = None
