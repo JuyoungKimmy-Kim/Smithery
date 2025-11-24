@@ -73,12 +73,6 @@ class AnalyticsEvent(Base):
     # 세션 추적 (사용자 여정 분석용)
     session_id = Column(String(255), nullable=True, index=True)
 
-    # IP 주소 (지리적 분석, 봇 감지용)
-    ip_address = Column(String(45), nullable=True)  # IPv6 지원
-
-    # User-Agent (디바이스/브라우저 분석용)
-    user_agent = Column(Text, nullable=True)
-
     # Referrer (유입 경로 분석용)
     referrer = Column(String(512), nullable=True)
 

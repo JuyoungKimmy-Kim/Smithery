@@ -207,9 +207,7 @@ def get_mcp_server(
         referrer = request.headers.get("referer", "")
         analytics_service.track_server_view(
             mcp_server_id=mcp_server_id,
-            referrer=referrer,
-            ip_address=request.client.host if request.client else None,
-            user_agent=request.headers.get("user-agent")
+            referrer=referrer
         )
     except Exception as e:
         logger.error(f"Failed to track server view event: {e}")
@@ -252,9 +250,7 @@ def search_mcp_servers(
             analytics_service.track_search(
                 keyword=search_request.keyword,
                 results_count=len(mcp_servers),
-                tags=search_request.tags,
-                ip_address=request.client.host if request.client else None,
-                user_agent=request.headers.get("user-agent")
+                tags=search_request.tags
             )
         except Exception as e:
             logger.error(f"Failed to track search event: {e}")
@@ -292,8 +288,7 @@ def add_favorite(
         try:
             analytics_service.track_favorite_add(
                 mcp_server_id=mcp_server_id,
-                user_id=current_user.id,
-                ip_address=request.client.host if request.client else None
+                user_id=current_user.id
             )
         except Exception as e:
             logger.error(f"Failed to track favorite add event: {e}")
@@ -319,8 +314,7 @@ def remove_favorite(
         try:
             analytics_service.track_favorite_remove(
                 mcp_server_id=mcp_server_id,
-                user_id=current_user.id,
-                ip_address=request.client.host if request.client else None
+                user_id=current_user.id
             )
         except Exception as e:
             logger.error(f"Failed to track favorite remove event: {e}")

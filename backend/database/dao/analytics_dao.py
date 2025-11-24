@@ -24,8 +24,6 @@ class AnalyticsDAO:
         event_type: EventType,
         user_id: Optional[int] = None,
         session_id: Optional[str] = None,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None,
         referrer: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None
     ) -> AnalyticsEvent:
@@ -36,8 +34,6 @@ class AnalyticsDAO:
             event_type: 이벤트 타입 (EventType enum)
             user_id: 사용자 ID (선택사항, 비로그인 허용)
             session_id: 세션 ID (사용자 여정 추적용)
-            ip_address: IP 주소
-            user_agent: User-Agent 문자열
             referrer: Referrer URL
             metadata: 추가 메타데이터 (딕셔너리)
 
@@ -48,8 +44,6 @@ class AnalyticsDAO:
             event_type=event_type,
             user_id=user_id,
             session_id=session_id,
-            ip_address=ip_address,
-            user_agent=user_agent,
             referrer=referrer
         )
 

@@ -42,8 +42,6 @@ class AnalyticsService:
         event_type: EventType,
         user_id: Optional[int] = None,
         session_id: Optional[str] = None,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None,
         referrer: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None
     ):
@@ -58,8 +56,6 @@ class AnalyticsService:
                 event_type=event_type,
                 user_id=user_id,
                 session_id=session_id,
-                ip_address=ip_address,
-                user_agent=user_agent,
                 referrer=referrer,
                 metadata=metadata
             )
@@ -74,9 +70,7 @@ class AnalyticsService:
         results_count: int,
         user_id: Optional[int] = None,
         session_id: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None
+        tags: Optional[List[str]] = None
     ):
         """검색 이벤트를 추적합니다."""
         metadata = {
@@ -92,8 +86,6 @@ class AnalyticsService:
             event_type=event_type,
             user_id=user_id,
             session_id=session_id,
-            ip_address=ip_address,
-            user_agent=user_agent,
             metadata=metadata
         )
 
@@ -102,9 +94,7 @@ class AnalyticsService:
         mcp_server_id: int,
         user_id: Optional[int] = None,
         session_id: Optional[str] = None,
-        referrer: Optional[str] = None,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None
+        referrer: Optional[str] = None
     ):
         """서버 조회 이벤트를 추적합니다."""
         # Referrer에 따라 이벤트 타입 결정
@@ -125,8 +115,6 @@ class AnalyticsService:
             event_type=event_type,
             user_id=user_id,
             session_id=session_id,
-            ip_address=ip_address,
-            user_agent=user_agent,
             referrer=referrer,
             metadata=metadata
         )
@@ -135,15 +123,13 @@ class AnalyticsService:
         self,
         mcp_server_id: int,
         user_id: int,
-        session_id: Optional[str] = None,
-        ip_address: Optional[str] = None
+        session_id: Optional[str] = None
     ):
         """즐겨찾기 추가 이벤트를 추적합니다."""
         self.track_event(
             event_type=EventType.FAVORITE_ADD,
             user_id=user_id,
             session_id=session_id,
-            ip_address=ip_address,
             metadata={"mcp_server_id": mcp_server_id}
         )
 
@@ -151,15 +137,13 @@ class AnalyticsService:
         self,
         mcp_server_id: int,
         user_id: int,
-        session_id: Optional[str] = None,
-        ip_address: Optional[str] = None
+        session_id: Optional[str] = None
     ):
         """즐겨찾기 제거 이벤트를 추적합니다."""
         self.track_event(
             event_type=EventType.FAVORITE_REMOVE,
             user_id=user_id,
             session_id=session_id,
-            ip_address=ip_address,
             metadata={"mcp_server_id": mcp_server_id}
         )
 
@@ -199,27 +183,23 @@ class AnalyticsService:
     def track_user_register(
         self,
         user_id: int,
-        registration_method: str = "email",
-        ip_address: Optional[str] = None
+        registration_method: str = "email"
     ):
         """사용자 등록 이벤트를 추적합니다."""
         self.track_event(
             event_type=EventType.USER_REGISTER,
             user_id=user_id,
-            ip_address=ip_address,
             metadata={"registration_method": registration_method}
         )
 
     def track_user_login(
         self,
-        user_id: int,
-        ip_address: Optional[str] = None
+        user_id: int
     ):
         """사용자 로그인 이벤트를 추적합니다."""
         self.track_event(
             event_type=EventType.USER_LOGIN,
-            user_id=user_id,
-            ip_address=ip_address
+            user_id=user_id
         )
 
     # ==================== Analytics & Insights ====================
