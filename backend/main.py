@@ -159,6 +159,7 @@ async def health_check():
             "error": str(e)
         }
 
+
 if __name__ == "__main__":
     import uvicorn
     import signal
