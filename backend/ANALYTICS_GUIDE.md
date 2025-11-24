@@ -18,8 +18,7 @@
    - 전체 통계 대시보드
 
 3. **데이터베이스 구조**
-   - `analytics_events`: 실시간 이벤트 저장
-   - `analytics_aggregations`: 집계 데이터 저장용 (현재 미사용)
+   - `analytics_events`: 실시간 이벤트 저장 및 집계
 
 ---
 
@@ -83,17 +82,10 @@ analytics_events에서 직접 집계 (GROUP BY, COUNT)
 | **Large** (100K+/day) | **7일** | 매일 | 디스크 절약, 집계 데이터 활용 |
 
 #### 삭제 전 체크리스트
-1. ✅ `analytics_aggregations`에 집계 완료 여부 확인
-2. ✅ 백업 필요 시 S3/외부 저장소에 아카이브
-3. ✅ 중요 이벤트 (회원가입, 결제 등) 별도 보관 고려
+1. ✅ 백업 필요 시 S3/외부 저장소에 아카이브
+2. ✅ 중요 이벤트 (회원가입, 결제 등) 별도 보관 고려
+3. ✅ 집계 시스템 도입 시: 집계 완료 후 삭제
 
-### analytics_aggregations 테이블
-
-- **보관 기간**: **영구 보관** (작은 용량)
-- **특징**:
-  - 일별 집계 데이터이므로 용량이 작음
-  - 장기 트렌드 분석에 필수
-  - 삭제 불필요
 
 ---
 
@@ -106,19 +98,34 @@ analytics_events에서 직접 집계 (GROUP BY, COUNT)
 pip install APScheduler
 ```
 
-#### B. 집계 스크립트 작성
+#### B. 집계 테이블 추가
+먼저 `AnalyticsAggregation` 모델을 추가해야 합니다:
+```python
+# backend/database/model/analytics_event.py
+class AnalyticsAggregation(Base):
+    __tablename__ = "analytics_aggregations"
+    id = Column(Integer, primary_key=True)
+    aggregation_type = Column(String(100), nullable=False)
+    aggregation_key = Column(String(255), nullable=False)
+    aggregation_value = Column(Integer, default=0)
+    aggregation_date = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, onupdate=datetime.utcnow)
+```
+
+#### C. 집계 스크립트 작성
 `backend/service/analytics_aggregation_job.py` 생성:
 - 일별 서버 조회수 집계
 - 일별 검색어 집계
 - 일별 즐겨찾기 집계
 - 일별 전체 통계 집계
 
-#### C. 스케줄러 설정
+#### D. 스케줄러 설정
 `backend/scheduler.py` 생성:
 - **매일 자정(UTC)**: 어제 데이터 집계
 - **매주 일요일 새벽**: 오래된 이벤트 삭제
 
-#### D. FastAPI 통합
+#### E. FastAPI 통합
 `backend/main.py`에 스케줄러 시작/중지 추가:
 ```python
 @app.on_event("startup")
@@ -134,7 +141,7 @@ async def shutdown_event():
 
 ### 2단계: 분석 API 수정
 
-#### Before (실시간 집계)
+#### Before (현재 - 실시간 집계)
 ```python
 def get_top_search_keywords(days=7):
     # analytics_events에서 직접 집계
@@ -142,7 +149,7 @@ def get_top_search_keywords(days=7):
     # GROUP BY 처리...
 ```
 
-#### After (집계 테이블 사용)
+#### After (확장 후 - 집계 테이블 사용)
 ```python
 def get_top_search_keywords(days=7):
     # analytics_aggregations에서 조회 (빠름!)
@@ -170,7 +177,7 @@ def get_top_search_keywords(days=7):
               [분석 API 결과]
 ```
 
-### Large Service (확장 후)
+### Large Service (확장 시)
 ```
 [실시간 수집] analytics_events (7일 보관)
                     ↓ 매일 자정 집계
@@ -180,6 +187,7 @@ def get_top_search_keywords(days=7):
 
 * 7일 지난 events는 자동 삭제
 * 집계 데이터로 장기 트렌드 분석 가능
+* AnalyticsAggregation 모델 추가 필요
 ```
 
 ---

@@ -8,7 +8,7 @@ from sqlalchemy import and_, func, desc, distinct
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 
-from backend.database.model import AnalyticsEvent, AnalyticsAggregation, EventType
+from backend.database.model import AnalyticsEvent, EventType
 
 
 class AnalyticsDAO:
@@ -260,71 +260,3 @@ class AnalyticsDAO:
             return 0.0
 
         return min(1.0, to_count / from_count)
-
-    # ==================== Aggregation Table Operations ====================
-
-    def create_or_update_aggregation(
-        self,
-        aggregation_type: str,
-        aggregation_key: str,
-        aggregation_value: int,
-        aggregation_date: datetime,
-        metadata: Optional[Dict[str, Any]] = None
-    ) -> AnalyticsAggregation:
-        """
-        집계 데이터를 생성하거나 업데이트합니다.
-
-        동일한 type, key, date 조합이 있으면 업데이트, 없으면 생성합니다.
-        """
-        existing = self.db.query(AnalyticsAggregation).filter(
-            and_(
-                AnalyticsAggregation.aggregation_type == aggregation_type,
-                AnalyticsAggregation.aggregation_key == aggregation_key,
-                AnalyticsAggregation.aggregation_date == aggregation_date
-            )
-        ).first()
-
-        if existing:
-            # 업데이트
-            existing.aggregation_value = aggregation_value
-            existing.updated_at = datetime.utcnow()
-            if metadata:
-                existing.set_metadata(metadata)
-            self.db.commit()
-            self.db.refresh(existing)
-            return existing
-        else:
-            # 생성
-            agg = AnalyticsAggregation(
-                aggregation_type=aggregation_type,
-                aggregation_key=aggregation_key,
-                aggregation_value=aggregation_value,
-                aggregation_date=aggregation_date
-            )
-            if metadata:
-                agg.set_metadata(metadata)
-            self.db.add(agg)
-            self.db.commit()
-            self.db.refresh(agg)
-            return agg
-
-    def get_aggregations(
-        self,
-        aggregation_type: str,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        limit: int = 100
-    ) -> List[AnalyticsAggregation]:
-        """특정 타입의 집계 데이터를 조회합니다."""
-        query = self.db.query(AnalyticsAggregation).filter(
-            AnalyticsAggregation.aggregation_type == aggregation_type
-        )
-
-        if start_date:
-            query = query.filter(AnalyticsAggregation.aggregation_date >= start_date)
-        if end_date:
-            query = query.filter(AnalyticsAggregation.aggregation_date <= end_date)
-
-        return query.order_by(
-            desc(AnalyticsAggregation.aggregation_value)
-        ).limit(limit).all()
