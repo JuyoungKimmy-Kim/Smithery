@@ -185,10 +185,15 @@ def get_mcp_server_favorites_count(mcp_server_id: int, db: Session = Depends(get
     return {"mcp_server_id": mcp_server_id, "favorites_count": count}
 
 @router.get("/{mcp_server_id}", response_model=MCPServerResponse)
-def get_mcp_server(mcp_server_id: int, db: Session = Depends(get_db)):
+def get_mcp_server(
+    mcp_server_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
     """특정 MCP 서버의 상세 정보를 조회합니다."""
 
     mcp_service = MCPServerService(db)
+    analytics_service = AnalyticsService(db)
     mcp_server = mcp_service.get_mcp_server_with_tools(mcp_server_id)
 
     if not mcp_server:
@@ -196,6 +201,18 @@ def get_mcp_server(mcp_server_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="MCP Server not found"
         )
+
+    # Analytics: 서버 조회 이벤트 추적
+    try:
+        referrer = request.headers.get("referer", "")
+        analytics_service.track_server_view(
+            mcp_server_id=mcp_server_id,
+            referrer=referrer,
+            ip_address=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent")
+        )
+    except Exception as e:
+        logger.error(f"Failed to track server view event: {e}")
 
     return mcp_server
 
