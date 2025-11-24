@@ -71,7 +71,7 @@ export default function MCPServerDetail() {
 
   // Custom components for Markdown rendering
   const markdownComponents: Components = {
-    code({ node, inline, className, children, ...props }: any) {
+    code({ inline, className, children, ...props }) {
       return !inline ? (
         <pre
           className="rounded p-4 overflow-x-auto my-4"
@@ -105,7 +105,7 @@ export default function MCPServerDetail() {
         </code>
       );
     },
-    img({ node, ...props }: any) {
+    img({ ...props }) {
       return (
         <img
           {...props}
@@ -114,7 +114,7 @@ export default function MCPServerDetail() {
         />
       );
     },
-    a({ node, ...props }: any) {
+    a({ ...props }) {
       return (
         <a
           {...props}
@@ -124,23 +124,23 @@ export default function MCPServerDetail() {
         />
       );
     },
-    table({ node, ...props }: any) {
+    table({ ...props }) {
       return (
         <div className="overflow-x-auto my-4">
           <table className="min-w-full divide-y divide-gray-300 border border-gray-300" {...props} />
         </div>
       );
     },
-    thead({ node, ...props }: any) {
+    thead({ ...props }) {
       return <thead className="bg-gray-50" {...props} />;
     },
-    th({ node, ...props }: any) {
+    th({ ...props }) {
       return <th className="px-4 py-2 text-left text-sm font-semibold text-gray-900 border border-gray-300" {...props} />;
     },
-    td({ node, ...props }: any) {
+    td({ ...props }) {
       return <td className="px-4 py-2 text-sm text-gray-700 border border-gray-300" {...props} />;
     },
-    blockquote({ node, ...props }: any) {
+    blockquote({ ...props }) {
       return <blockquote className="border-l-4 border-gray-300 pl-4 italic my-4 text-gray-700" {...props} />;
     },
   };
