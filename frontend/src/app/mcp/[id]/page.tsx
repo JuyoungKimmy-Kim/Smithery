@@ -23,6 +23,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import Comments from "@/components/comments";
 import MCPCapabilitiesTabs from "@/components/mcp-capabilities-tabs";
 import PlaygroundChat from "@/components/playground-chat";
+import ToolsPanel from "@/components/tools-panel";
 import { apiFetch } from "@/lib/api-client";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -800,6 +801,16 @@ export default function MCPServerDetail() {
             </div>
           </div>
         </div>
+
+        {/* Direct Tool Testing Section */}
+        {mcp.tools && mcp.tools.length > 0 && (
+          <div className="mb-8">
+            <ToolsPanel
+              tools={mcp.tools}
+              serverId={parseInt(mcp.id)}
+            />
+          </div>
+        )}
 
         {/* Playground Section */}
         <div className="bg-white rounded-lg shadow-sm p-8 mb-8">
