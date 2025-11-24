@@ -8,6 +8,7 @@ from .tag import Tag, mcp_server_tags
 from .comment import Comment
 from .playground_usage import PlaygroundUsage
 from .notification import Notification
+from .analytics_event import AnalyticsEvent, AnalyticsAggregation, EventType
 
 __all__ = [
     'Base',
@@ -23,5 +24,8 @@ __all__ = [
     'mcp_server_tags',
     'Comment',
     'PlaygroundUsage',
-    'Notification'
+    'Notification',
+    'AnalyticsEvent',
+    'AnalyticsAggregation',
+    'EventType'
 ]
