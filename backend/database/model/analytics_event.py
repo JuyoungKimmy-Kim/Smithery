@@ -84,7 +84,7 @@ class AnalyticsEvent(Base):
 
     # 추가 메타데이터 (JSON 형식으로 유연하게 저장)
     # 예: {"keyword": "weather", "tags": ["api"], "results_count": 5}
-    metadata = Column(Text, nullable=True)  # JSON string
+    event_metadata = Column(Text, nullable=True)  # JSON string
 
     # 타임스탬프
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
@@ -101,13 +101,13 @@ class AnalyticsEvent(Base):
 
     def set_metadata(self, data: dict):
         """메타데이터를 JSON 문자열로 저장"""
-        self.metadata = json.dumps(data) if data else None
+        self.event_metadata = json.dumps(data) if data else None
 
     def get_metadata(self) -> dict:
         """메타데이터를 딕셔너리로 반환"""
-        if self.metadata:
+        if self.event_metadata:
             try:
-                return json.loads(self.metadata)
+                return json.loads(self.event_metadata)
             except json.JSONDecodeError:
                 return {}
         return {}
@@ -146,7 +146,7 @@ class AnalyticsAggregation(Base):
     aggregation_date = Column(DateTime, nullable=False, index=True)
 
     # 추가 메타데이터 (JSON)
-    metadata = Column(Text, nullable=True)
+    agg_metadata = Column(Text, nullable=True)
 
     # 생성/업데이트 시간
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -160,13 +160,13 @@ class AnalyticsAggregation(Base):
 
     def set_metadata(self, data: dict):
         """메타데이터를 JSON 문자열로 저장"""
-        self.metadata = json.dumps(data) if data else None
+        self.agg_metadata = json.dumps(data) if data else None
 
     def get_metadata(self) -> dict:
         """메타데이터를 딕셔너리로 반환"""
-        if self.metadata:
+        if self.agg_metadata:
             try:
-                return json.loads(self.metadata)
+                return json.loads(self.agg_metadata)
             except json.JSONDecodeError:
                 return {}
         return {}
