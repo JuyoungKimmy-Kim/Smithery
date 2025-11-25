@@ -35,10 +35,6 @@ class EventType(str, enum.Enum):
     COMMENT_ADD = "comment_add"
     COMMENT_DELETE = "comment_delete"
 
-    # User registration/auth
-    USER_REGISTER = "user_register"
-    USER_LOGIN = "user_login"
-
     # Playground related
     PLAYGROUND_QUERY = "playground_query"
 

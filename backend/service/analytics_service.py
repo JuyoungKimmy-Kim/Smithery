@@ -178,28 +178,6 @@ class AnalyticsService:
             metadata=metadata
         )
 
-    def track_user_register(
-        self,
-        user_id: int,
-        registration_method: str = "email"
-    ):
-        """사용자 등록 이벤트를 추적합니다."""
-        self.track_event(
-            event_type=EventType.USER_REGISTER,
-            user_id=user_id,
-            metadata={"registration_method": registration_method}
-        )
-
-    def track_user_login(
-        self,
-        user_id: int
-    ):
-        """사용자 로그인 이벤트를 추적합니다."""
-        self.track_event(
-            event_type=EventType.USER_LOGIN,
-            user_id=user_id
-        )
-
     # ==================== Analytics & Insights ====================
 
     def get_top_search_keywords(
