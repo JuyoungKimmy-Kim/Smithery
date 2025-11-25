@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   CodeBracketIcon,
   GlobeAltIcon,
@@ -33,6 +33,7 @@ import type { Components } from 'react-markdown';
 export default function MCPServerDetail() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, isAuthenticated, isAdmin, token } = useAuth();
   const [mcp, setMcp] = useState<MCPServer | null>(null);
   const [loading, setLoading] = useState(true);
@@ -315,7 +316,8 @@ export default function MCPServerDetail() {
       try {
         // 캐시를 무시하고 새로운 데이터를 가져오기 위해 timestamp 추가
         const timestamp = new Date().getTime();
-        const response = await fetch(`/api/mcps/${params.id}?t=${timestamp}`);
+        const source = searchParams.get('source') || 'direct';
+        const response = await fetch(`/api/mcps/${params.id}?t=${timestamp}&source=${source}`);
         if (response.ok) {
           const data = await response.json();
           console.log('MCP Server Data:', data); // 디버깅용 로그

@@ -22,6 +22,7 @@ interface BlogPostCardProps {
   isFavorited?: boolean; // 즐겨찾기 상태 (부모에서 전달)
   onFavoriteChange?: () => void; // 즐겨찾기 상태 변경 콜백
   onTagClick?: (tag: string) => void; // 태그 클릭 콜백
+  source?: string; // 유입 경로 (search, list, direct 등)
 }
 
 export function BlogPostCard({
@@ -38,6 +39,7 @@ export function BlogPostCard({
   isFavorited = false,
   onFavoriteChange,
   onTagClick,
+  source = 'list',
 }: BlogPostCardProps) {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
@@ -134,13 +136,13 @@ export function BlogPostCard({
     console.log("Card clicked! ID:", id); // 디버깅 로그 추가
     console.log("Card title:", title); // 제목도 로깅
     if (id) {
-      console.log("Navigating to:", `/mcp/${id}`); // 디버깅 로그 추가
-      router.push(`/mcp/${id}`);
+      console.log("Navigating to:", `/mcp/${id}?source=${source}`); // 디버깅 로그 추가
+      router.push(`/mcp/${id}?source=${source}`);
     } else {
       console.log("No ID provided, navigating to test page"); // 디버깅 로그 추가
       // ID가 없어도 테스트용으로 첫 번째 MCP로 이동
       // router.push 대신 window.location 사용
-      window.location.href = `/mcp/1`;
+      window.location.href = `/mcp/1?source=${source}`;
     }
   };
 

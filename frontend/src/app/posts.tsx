@@ -175,17 +175,66 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
     }
   };
 
-  // 검색 기능 추가
-  const handleSearch = (searchTerm: string) => {
+  // 검색 기능 추가 - 백엔드 API 호출하여 analytics 이벤트 추적
+  const handleSearch = async (searchTerm: string) => {
     setSearchTerm(searchTerm);
     setSelectedTags([]); // 검색 시 태그 선택 리셋
     setVisibleCount(6); // 검색 시 초기 6개로 리셋
-    
+
     if (!searchTerm.trim()) {
       setPosts(allPosts);
       return;
     }
 
+    try {
+      // 백엔드 검색 API 호출 (analytics 이벤트 자동 추적)
+      const response = await apiFetch('/api/mcp-servers/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          keyword: searchTerm,
+          status: 'approved'
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const searchResults = data.mcp_servers || [];
+
+        // 검색 결과를 Post 형식으로 변환
+        const formattedResults = searchResults.map((server: any) => ({
+          id: String(server.id),
+          title: server.name,
+          desc: server.description,
+          category: 'MCP Server',
+          tags: JSON.stringify(server.tags || []),
+          date: server.created_at,
+          author: {
+            img: server.user?.profile_image_url || '/default-avatar.png',
+            name: server.user?.username || 'Unknown Author'
+          },
+          favorites_count: server.favorites_count || 0,
+          health_status: server.health_status,
+          last_health_check: server.last_health_check
+        }));
+
+        setPosts(formattedResults);
+      } else {
+        console.error('Search API failed:', response.status);
+        // Fallback to client-side search
+        fallbackClientSearch(searchTerm);
+      }
+    } catch (error) {
+      console.error('Error calling search API:', error);
+      // Fallback to client-side search
+      fallbackClientSearch(searchTerm);
+    }
+  };
+
+  // Fallback client-side search (API 실패 시)
+  const fallbackClientSearch = (searchTerm: string) => {
     const filteredPosts = allPosts.filter(post => {
       const searchLower = searchTerm.toLowerCase();
       return (
@@ -195,12 +244,12 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
         post.category.toLowerCase().includes(searchLower)
       );
     });
-    
+
     // favorites_count 기준으로 정렬 (내림차순)
-    const sortedFilteredPosts = [...filteredPosts].sort((a: Post, b: Post) => 
+    const sortedFilteredPosts = [...filteredPosts].sort((a: Post, b: Post) =>
       (b.favorites_count || 0) - (a.favorites_count || 0)
     );
-    
+
     setPosts(sortedFilteredPosts);
   };
 
@@ -686,6 +735,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                       isFavorited={id ? favoriteIds.has(String(id)) : false}
                       onFavoriteChange={handleFavoriteChange}
                       onTagClick={handleTagClick}
+                      source={searchTerm || selectedTags.length > 0 ? 'search' : 'list'}
                     />
                   ))}
                 </div>
