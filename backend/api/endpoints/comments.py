@@ -8,7 +8,11 @@ from backend.database import get_db
 from backend.database.model import User, Comment
 from backend.database.dao.comment_dao import CommentDAO
 from backend.service.notification_service import NotificationService
+from backend.service.analytics_service import AnalyticsService
 from backend.api.auth import get_current_user
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/comments", tags=["comments"])
 
@@ -69,6 +73,16 @@ async def create_comment(
     except Exception as e:
         print(f"Failed to create comment notification: {e}")
         # 알림 생성 실패해도 댓글은 성공으로 처리
+
+    # Analytics: 댓글 추가 이벤트 추적
+    try:
+        analytics_service = AnalyticsService(db)
+        analytics_service.track_comment_add(
+            mcp_server_id=mcp_server_id,
+            user_id=current_user.id
+        )
+    except Exception as e:
+        logger.error(f"Failed to track comment add event: {e}")
 
     return CommentResponse(
         id=comment.id,
@@ -164,19 +178,39 @@ async def delete_comment(
 ):
     """댓글을 삭제합니다. (작성자만 삭제 가능)"""
     comment_dao = CommentDAO(db)
-    
+
+    # 삭제 전에 댓글 정보 조회 (mcp_server_id 필요)
+    comment = comment_dao.get_comment_by_id(comment_id)
+    if not comment or comment.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="댓글을 찾을 수 없거나 삭제 권한이 없습니다."
+        )
+
+    mcp_server_id = comment.mcp_server_id
+
     # 댓글 삭제
     success = comment_dao.delete_comment(
         comment_id=comment_id,
         user_id=current_user.id
     )
-    
+
     if not success:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="댓글을 찾을 수 없거나 삭제 권한이 없습니다."
         )
-    
+
+    # Analytics: 댓글 삭제 이벤트 추적
+    try:
+        analytics_service = AnalyticsService(db)
+        analytics_service.track_comment_delete(
+            mcp_server_id=mcp_server_id,
+            user_id=current_user.id
+        )
+    except Exception as e:
+        logger.error(f"Failed to track comment delete event: {e}")
+
     return {"message": "댓글이 성공적으로 삭제되었습니다."}
 
 @router.get("/mcp-servers/{mcp_server_id}/count")

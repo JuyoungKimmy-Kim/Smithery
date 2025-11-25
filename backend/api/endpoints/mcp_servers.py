@@ -7,7 +7,7 @@ import asyncio
 from backend.database import get_db
 
 logger = logging.getLogger(__name__)
-from backend.service import MCPServerService, UserService, MCPProxyService
+from backend.service import MCPServerService, UserService, MCPProxyService, AnalyticsService
 from backend.service.notification_service import NotificationService
 from backend.database.model import User
 from backend.api.schemas import (
@@ -185,10 +185,15 @@ def get_mcp_server_favorites_count(mcp_server_id: int, db: Session = Depends(get
     return {"mcp_server_id": mcp_server_id, "favorites_count": count}
 
 @router.get("/{mcp_server_id}", response_model=MCPServerResponse)
-def get_mcp_server(mcp_server_id: int, db: Session = Depends(get_db)):
+def get_mcp_server(
+    mcp_server_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
     """특정 MCP 서버의 상세 정보를 조회합니다."""
 
     mcp_service = MCPServerService(db)
+    analytics_service = AnalyticsService(db)
     mcp_server = mcp_service.get_mcp_server_with_tools(mcp_server_id)
 
     if not mcp_server:
@@ -197,15 +202,27 @@ def get_mcp_server(mcp_server_id: int, db: Session = Depends(get_db)):
             detail="MCP Server not found"
         )
 
+    # Analytics: 서버 조회 이벤트 추적
+    try:
+        referrer = request.headers.get("referer", "")
+        analytics_service.track_server_view(
+            mcp_server_id=mcp_server_id,
+            referrer=referrer
+        )
+    except Exception as e:
+        logger.error(f"Failed to track server view event: {e}")
+
     return mcp_server
 
 @router.post("/search", response_model=SearchResponse)
 def search_mcp_servers(
     search_request: SearchRequest,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """MCP 서버를 검색합니다."""
     mcp_service = MCPServerService(db)
+    analytics_service = AnalyticsService(db)
 
     # keyword와 tags 모두 처리
     if search_request.keyword and search_request.tags:
@@ -227,6 +244,17 @@ def search_mcp_servers(
         # 둘 다 없으면 모든 서버 반환
         mcp_servers = mcp_service.get_approved_mcp_servers()
 
+    # Analytics: 검색 이벤트 추적
+    if search_request.keyword:  # 검색어가 있을 때만 추적
+        try:
+            analytics_service.track_search(
+                keyword=search_request.keyword,
+                results_count=len(mcp_servers),
+                tags=search_request.tags
+            )
+        except Exception as e:
+            logger.error(f"Failed to track search event: {e}")
+
     return SearchResponse(
         mcp_servers=mcp_servers,
         total_count=len(mcp_servers)
@@ -235,11 +263,13 @@ def search_mcp_servers(
 @router.post("/{mcp_server_id}/favorite", response_model=FavoriteResponse)
 def add_favorite(
     mcp_server_id: int,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """MCP 서버를 즐겨찾기에 추가합니다."""
     user_service = UserService(db)
+    analytics_service = AnalyticsService(db)
     success = user_service.add_favorite(current_user.id, mcp_server_id)
 
     if success:
@@ -253,6 +283,16 @@ def add_favorite(
         except Exception as e:
             logger.error(f"Failed to create favorite notification: {e}")
             # 알림 생성 실패해도 즐겨찾기는 성공으로 처리
+
+        # Analytics: 즐겨찾기 추가 이벤트 추적
+        try:
+            analytics_service.track_favorite_add(
+                mcp_server_id=mcp_server_id,
+                user_id=current_user.id
+            )
+        except Exception as e:
+            logger.error(f"Failed to track favorite add event: {e}")
+
         return FavoriteResponse(success=True, message="즐겨찾기에 추가되었습니다.")
     else:
         return FavoriteResponse(success=False, message="이미 즐겨찾기에 추가되어 있습니다.")
@@ -260,14 +300,25 @@ def add_favorite(
 @router.delete("/{mcp_server_id}/favorite", response_model=FavoriteResponse)
 def remove_favorite(
     mcp_server_id: int,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """MCP 서버를 즐겨찾기에서 제거합니다."""
     user_service = UserService(db)
+    analytics_service = AnalyticsService(db)
     success = user_service.remove_favorite(current_user.id, mcp_server_id)
-    
+
     if success:
+        # Analytics: 즐겨찾기 제거 이벤트 추적
+        try:
+            analytics_service.track_favorite_remove(
+                mcp_server_id=mcp_server_id,
+                user_id=current_user.id
+            )
+        except Exception as e:
+            logger.error(f"Failed to track favorite remove event: {e}")
+
         return FavoriteResponse(success=True, message="즐겨찾기에서 제거되었습니다.")
     else:
         return FavoriteResponse(success=False, message="즐겨찾기에 존재하지 않습니다.")

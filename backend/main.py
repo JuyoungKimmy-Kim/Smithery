@@ -68,6 +68,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.database import init_database
 from backend.api import auth_router, mcp_servers_router, comments_router, playground_router
 from backend.api.endpoints.notifications import router as notifications_router
+from backend.api.endpoints.analytics import router as analytics_router
 
 # Rate limiter 설정
 limiter = Limiter(key_func=get_remote_address)
@@ -98,6 +99,7 @@ app.include_router(mcp_servers_router, prefix="/api/v1")
 app.include_router(comments_router, prefix="/api/v1")
 app.include_router(playground_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
+app.include_router(analytics_router, prefix="/api/v1")
 
 @app.on_event("startup")
 async def startup_event():
@@ -156,6 +158,7 @@ async def health_check():
             "status": "healthy",
             "error": str(e)
         }
+
 
 if __name__ == "__main__":
     import uvicorn
