@@ -188,9 +188,15 @@ def get_mcp_server_favorites_count(mcp_server_id: int, db: Session = Depends(get
 def get_mcp_server(
     mcp_server_id: int,
     request: Request,
+    source: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    """특정 MCP 서버의 상세 정보를 조회합니다."""
+    """특정 MCP 서버의 상세 정보를 조회합니다.
+
+    Args:
+        mcp_server_id: MCP 서버 ID
+        source: 유입 경로 (search, list, direct 등)
+    """
 
     mcp_service = MCPServerService(db)
     analytics_service = AnalyticsService(db)
@@ -207,7 +213,8 @@ def get_mcp_server(
         referrer = request.headers.get("referer", "")
         analytics_service.track_server_view(
             mcp_server_id=mcp_server_id,
-            referrer=referrer
+            referrer=referrer,
+            source=source
         )
     except Exception as e:
         logger.error(f"Failed to track server view event: {e}")

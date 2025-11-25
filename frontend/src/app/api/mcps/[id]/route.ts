@@ -9,8 +9,18 @@ export async function GET(
   try {
     const { id } = await params;
     console.log(`Frontend API: Fetching MCP server with ID: ${id}`);  // 디버깅 로그
-    
-    const response = await fetch(`${BACKEND_URL}/api/v1/mcp-servers/${id}`, {
+
+    // Extract source query parameter from request URL
+    const { searchParams } = new URL(request.url);
+    const source = searchParams.get('source');
+
+    // Build backend URL with source parameter if provided
+    let backendUrl = `${BACKEND_URL}/api/v1/mcp-servers/${id}`;
+    if (source) {
+      backendUrl += `?source=${encodeURIComponent(source)}`;
+    }
+
+    const response = await fetch(backendUrl, {
       cache: 'no-store',  // 캐시 방지
       headers: {
         'Cache-Control': 'no-cache',
