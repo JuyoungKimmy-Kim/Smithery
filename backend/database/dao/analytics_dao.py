@@ -23,7 +23,6 @@ class AnalyticsDAO:
         self,
         event_type: EventType,
         user_id: Optional[int] = None,
-        session_id: Optional[str] = None,
         referrer: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None
     ) -> AnalyticsEvent:
@@ -33,7 +32,6 @@ class AnalyticsDAO:
         Args:
             event_type: 이벤트 타입 (EventType enum)
             user_id: 사용자 ID (선택사항, 비로그인 허용)
-            session_id: 세션 ID (사용자 여정 추적용)
             referrer: Referrer URL
             metadata: 추가 메타데이터 (딕셔너리)
 
@@ -43,7 +41,6 @@ class AnalyticsDAO:
         event = AnalyticsEvent(
             event_type=event_type,
             user_id=user_id,
-            session_id=session_id,
             referrer=referrer
         )
 
@@ -88,15 +85,6 @@ class AnalyticsDAO:
         return self.db.query(AnalyticsEvent).filter(
             AnalyticsEvent.user_id == user_id
         ).order_by(desc(AnalyticsEvent.created_at)).limit(limit).offset(offset).all()
-
-    def get_events_by_session(
-        self,
-        session_id: str
-    ) -> List[AnalyticsEvent]:
-        """특정 세션의 모든 이벤트를 조회합니다 (사용자 여정 추적용)."""
-        return self.db.query(AnalyticsEvent).filter(
-            AnalyticsEvent.session_id == session_id
-        ).order_by(AnalyticsEvent.created_at).all()
 
     # ==================== Aggregation Queries ====================
 
@@ -205,7 +193,7 @@ class AnalyticsDAO:
         고유 방문자 수를 집계합니다.
 
         Returns:
-            {"logged_in_users": 50, "anonymous_users": 200, "total_sessions": 250}
+            {"logged_in_users": 50}
         """
         start_date = datetime.utcnow() - timedelta(days=days)
 
@@ -219,23 +207,8 @@ class AnalyticsDAO:
             )
         ).scalar() or 0
 
-        # 전체 세션 수
-        total_sessions = self.db.query(
-            func.count(distinct(AnalyticsEvent.session_id))
-        ).filter(
-            and_(
-                AnalyticsEvent.session_id.isnot(None),
-                AnalyticsEvent.created_at >= start_date
-            )
-        ).scalar() or 0
-
-        # 익명 사용자는 전체 세션에서 로그인 사용자 수를 뺀 값 (근사치)
-        anonymous_count = max(0, total_sessions - logged_in_count)
-
         return {
-            "logged_in_users": logged_in_count,
-            "anonymous_users": anonymous_count,
-            "total_sessions": total_sessions
+            "logged_in_users": logged_in_count
         }
 
     def get_conversion_rate(

@@ -199,7 +199,6 @@ def get_top_search_keywords(days=7):
 ✅ **이미 적용됨:**
 1. 복합 인덱스 (event_type + created_at)
 2. 사용자별 인덱스 (user_id + event_type + created_at)
-3. 세션별 인덱스 (session_id + created_at)
 
 ✅ **추가 고려사항:**
 1. **쿼리 캐싱**: Redis/Memcached로 자주 조회되는 통계 캐싱

@@ -70,9 +70,6 @@ class AnalyticsEvent(Base):
     # 사용자 정보 (nullable - 비로그인 사용자 허용)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
 
-    # 세션 추적 (사용자 여정 분석용)
-    session_id = Column(String(255), nullable=True, index=True)
-
     # Referrer (유입 경로 분석용)
     referrer = Column(String(512), nullable=True)
 
@@ -90,7 +87,6 @@ class AnalyticsEvent(Base):
     __table_args__ = (
         Index('ix_event_type_created_at', 'event_type', 'created_at'),
         Index('ix_user_event_created_at', 'user_id', 'event_type', 'created_at'),
-        Index('ix_session_created_at', 'session_id', 'created_at'),
     )
 
     def set_metadata(self, data: dict):

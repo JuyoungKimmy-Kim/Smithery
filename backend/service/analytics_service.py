@@ -41,7 +41,6 @@ class AnalyticsService:
         self,
         event_type: EventType,
         user_id: Optional[int] = None,
-        session_id: Optional[str] = None,
         referrer: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None
     ):
@@ -55,7 +54,6 @@ class AnalyticsService:
             self.dao.create_event(
                 event_type=event_type,
                 user_id=user_id,
-                session_id=session_id,
                 referrer=referrer,
                 metadata=metadata
             )
@@ -69,7 +67,6 @@ class AnalyticsService:
         keyword: str,
         results_count: int,
         user_id: Optional[int] = None,
-        session_id: Optional[str] = None,
         tags: Optional[List[str]] = None
     ):
         """검색 이벤트를 추적합니다."""
@@ -85,7 +82,6 @@ class AnalyticsService:
         self.track_event(
             event_type=event_type,
             user_id=user_id,
-            session_id=session_id,
             metadata=metadata
         )
 
@@ -93,7 +89,6 @@ class AnalyticsService:
         self,
         mcp_server_id: int,
         user_id: Optional[int] = None,
-        session_id: Optional[str] = None,
         referrer: Optional[str] = None
     ):
         """서버 조회 이벤트를 추적합니다."""
@@ -114,7 +109,6 @@ class AnalyticsService:
         self.track_event(
             event_type=event_type,
             user_id=user_id,
-            session_id=session_id,
             referrer=referrer,
             metadata=metadata
         )
@@ -122,42 +116,48 @@ class AnalyticsService:
     def track_favorite_add(
         self,
         mcp_server_id: int,
-        user_id: int,
-        session_id: Optional[str] = None
+        user_id: int
     ):
         """즐겨찾기 추가 이벤트를 추적합니다."""
         self.track_event(
             event_type=EventType.FAVORITE_ADD,
             user_id=user_id,
-            session_id=session_id,
             metadata={"mcp_server_id": mcp_server_id}
         )
 
     def track_favorite_remove(
         self,
         mcp_server_id: int,
-        user_id: int,
-        session_id: Optional[str] = None
+        user_id: int
     ):
         """즐겨찾기 제거 이벤트를 추적합니다."""
         self.track_event(
             event_type=EventType.FAVORITE_REMOVE,
             user_id=user_id,
-            session_id=session_id,
             metadata={"mcp_server_id": mcp_server_id}
         )
 
     def track_comment_add(
         self,
         mcp_server_id: int,
-        user_id: int,
-        session_id: Optional[str] = None
+        user_id: int
     ):
         """댓글 추가 이벤트를 추적합니다."""
         self.track_event(
             event_type=EventType.COMMENT_ADD,
             user_id=user_id,
-            session_id=session_id,
+            metadata={"mcp_server_id": mcp_server_id}
+        )
+
+    def track_comment_delete(
+        self,
+        mcp_server_id: int,
+        user_id: int
+    ):
+        """댓글 삭제 이벤트를 추적합니다."""
+        self.track_event(
+            event_type=EventType.COMMENT_DELETE,
+            user_id=user_id,
             metadata={"mcp_server_id": mcp_server_id}
         )
 
@@ -165,8 +165,7 @@ class AnalyticsService:
         self,
         mcp_server_id: int,
         user_id: int,
-        query_tokens: Optional[int] = None,
-        session_id: Optional[str] = None
+        query_tokens: Optional[int] = None
     ):
         """Playground 쿼리 이벤트를 추적합니다."""
         metadata = {"mcp_server_id": mcp_server_id}
@@ -176,7 +175,6 @@ class AnalyticsService:
         self.track_event(
             event_type=EventType.PLAYGROUND_QUERY,
             user_id=user_id,
-            session_id=session_id,
             metadata=metadata
         )
 
@@ -310,31 +308,6 @@ class AnalyticsService:
             "conversion_rate": round(conversion_rate, 4)
         }
 
-    def get_user_journey(
-        self,
-        session_id: str
-    ) -> List[Dict[str, Any]]:
-        """
-        특정 세션의 사용자 여정을 조회합니다.
-
-        Returns:
-            [
-                {"event_type": "search", "timestamp": "...", "metadata": {...}},
-                {"event_type": "server_view", "timestamp": "...", "metadata": {...}},
-                ...
-            ]
-        """
-        events = self.dao.get_events_by_session(session_id)
-
-        return [
-            {
-                "event_type": event.event_type.value,
-                "timestamp": event.created_at.isoformat(),
-                "metadata": event.get_metadata(),
-                "user_id": event.user_id
-            }
-            for event in events
-        ]
 
     def get_analytics_summary(
         self,

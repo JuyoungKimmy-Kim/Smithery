@@ -89,34 +89,6 @@ def get_search_to_view_conversion(
     return analytics_service.get_search_to_view_conversion_rate(days)
 
 
-@router.get("/user-journey/{session_id}")
-def get_user_journey(
-    session_id: str,
-    db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user)  # Admin only
-):
-    """
-    특정 세션의 사용자 여정을 조회합니다. (관리자 전용)
-
-    Returns:
-        [
-            {"event_type": "search", "timestamp": "...", "metadata": {...}},
-            {"event_type": "server_view", "timestamp": "...", "metadata": {...}},
-            ...
-        ]
-    """
-    analytics_service = AnalyticsService(db)
-    journey = analytics_service.get_user_journey(session_id)
-
-    if not journey:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No user journey found for session_id: {session_id}"
-        )
-
-    return journey
-
-
 @router.get("/summary")
 def get_analytics_summary(
     days: int = Query(7, ge=1, le=365, description="분석 기간 (일)"),
