@@ -89,22 +89,45 @@ class AnalyticsService:
         self,
         mcp_server_id: int,
         user_id: Optional[int] = None,
-        referrer: Optional[str] = None
+        session_id: Optional[str] = None,
+        referrer: Optional[str] = None,
+        source: Optional[str] = None
     ):
-        """서버 조회 이벤트를 추적합니다."""
-        # Referrer에 따라 이벤트 타입 결정
-        if referrer and "search" in referrer.lower():
-            event_type = EventType.SERVER_VIEW_FROM_SEARCH
-        elif referrer and "list" in referrer.lower():
-            event_type = EventType.SERVER_VIEW_FROM_LIST
+        """서버 조회 이벤트를 추적합니다.
+
+        Args:
+            mcp_server_id: MCP 서버 ID
+            user_id: 사용자 ID (선택)
+            session_id: 세션 ID (선택)
+            referrer: HTTP Referer 헤더
+            source: 유입 경로 (search, list, direct 등)
+        """
+        # source 파라미터 우선, 없으면 referrer로 판단
+        if source:
+            if source == "search":
+                event_type = EventType.SERVER_VIEW_FROM_SEARCH
+            elif source == "list":
+                event_type = EventType.SERVER_VIEW_FROM_LIST
+            elif source == "direct":
+                event_type = EventType.SERVER_VIEW_DIRECT
+            else:
+                event_type = EventType.SERVER_VIEW
         elif referrer:
-            event_type = EventType.SERVER_VIEW_DIRECT
+            # Fallback: Referrer에 따라 이벤트 타입 결정
+            if "search" in referrer.lower():
+                event_type = EventType.SERVER_VIEW_FROM_SEARCH
+            elif "list" in referrer.lower():
+                event_type = EventType.SERVER_VIEW_FROM_LIST
+            else:
+                event_type = EventType.SERVER_VIEW_DIRECT
         else:
             event_type = EventType.SERVER_VIEW
 
         metadata = {
             "mcp_server_id": mcp_server_id
         }
+        if source:
+            metadata["source"] = source
 
         self.track_event(
             event_type=event_type,

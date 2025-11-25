@@ -686,6 +686,7 @@ export function Posts({ searchTerm: initialSearchTerm = "" }: PostsProps) {
                       isFavorited={id ? favoriteIds.has(String(id)) : false}
                       onFavoriteChange={handleFavoriteChange}
                       onTagClick={handleTagClick}
+                      source={searchTerm || selectedTags.length > 0 ? 'search' : 'list'}
                     />
                   ))}
                 </div>
