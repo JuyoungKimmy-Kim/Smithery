@@ -2,9 +2,10 @@
 Analytics DAO - Data Access Layer for Analytics
 
 이 DAO는 분석 이벤트의 저장 및 조회를 담당합니다.
+TimescaleDB continuous aggregates를 사용하여 빠른 집계 쿼리 제공.
 """
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func, desc, distinct
+from sqlalchemy import and_, func, desc, distinct, text
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 
@@ -94,17 +95,29 @@ class AnalyticsDAO:
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None
     ) -> int:
-        """특정 타입의 이벤트 수를 집계합니다."""
-        query = self.db.query(func.count(AnalyticsEvent.id)).filter(
-            AnalyticsEvent.event_type == event_type
-        )
+        """
+        특정 타입의 이벤트 수를 집계합니다.
+        TimescaleDB hourly_events를 사용하여 빠른 집계.
+        """
+        if start_date is None:
+            start_date = datetime.utcnow() - timedelta(days=7)
 
-        if start_date:
-            query = query.filter(AnalyticsEvent.created_at >= start_date)
-        if end_date:
-            query = query.filter(AnalyticsEvent.created_at <= end_date)
+        # Continuous aggregate 사용
+        query = text("""
+            SELECT COALESCE(SUM(event_count), 0)::INTEGER
+            FROM hourly_events
+            WHERE event_type = :event_type
+                AND hour >= :start_date
+                AND (:end_date IS NULL OR hour <= :end_date)
+        """)
 
-        return query.scalar() or 0
+        result = self.db.execute(query, {
+            "event_type": event_type.value,
+            "start_date": start_date,
+            "end_date": end_date
+        })
+
+        return result.scalar() or 0
 
     def get_top_search_keywords(
         self,
@@ -113,35 +126,29 @@ class AnalyticsDAO:
     ) -> List[Dict[str, Any]]:
         """
         가장 많이 검색된 키워드를 조회합니다.
+        TimescaleDB continuous aggregate를 사용하여 빠른 조회.
 
         Returns:
             [{"keyword": "weather", "count": 150}, ...]
         """
         start_date = datetime.utcnow() - timedelta(days=days)
 
-        events = self.db.query(AnalyticsEvent).filter(
-            and_(
-                AnalyticsEvent.event_type == EventType.SEARCH,
-                AnalyticsEvent.created_at >= start_date
-            )
-        ).all()
+        # Continuous aggregate 사용
+        query = text("""
+            SELECT
+                keyword,
+                SUM(search_count)::INTEGER as count
+            FROM daily_search_keywords
+            WHERE day >= :start_date
+                AND keyword IS NOT NULL
+            GROUP BY keyword
+            ORDER BY count DESC
+            LIMIT :limit
+        """)
 
-        # 메타데이터에서 키워드 추출 및 집계
-        keyword_counts = {}
-        for event in events:
-            metadata = event.get_metadata()
-            keyword = metadata.get("keyword", "").strip().lower()
-            if keyword:
-                keyword_counts[keyword] = keyword_counts.get(keyword, 0) + 1
+        result = self.db.execute(query, {"start_date": start_date, "limit": limit})
 
-        # 정렬 및 상위 N개 반환
-        sorted_keywords = sorted(
-            keyword_counts.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )[:limit]
-
-        return [{"keyword": k, "count": c} for k, c in sorted_keywords]
+        return [{"keyword": row[0], "count": row[1]} for row in result]
 
     def get_most_viewed_servers(
         self,
@@ -150,40 +157,29 @@ class AnalyticsDAO:
     ) -> List[Dict[str, Any]]:
         """
         가장 많이 조회된 서버를 조회합니다.
+        TimescaleDB continuous aggregate를 사용하여 빠른 조회.
 
         Returns:
             [{"mcp_server_id": 123, "view_count": 500}, ...]
         """
         start_date = datetime.utcnow() - timedelta(days=days)
 
-        events = self.db.query(AnalyticsEvent).filter(
-            and_(
-                AnalyticsEvent.event_type.in_([
-                    EventType.SERVER_VIEW,
-                    EventType.SERVER_VIEW_FROM_SEARCH,
-                    EventType.SERVER_VIEW_FROM_LIST,
-                    EventType.SERVER_VIEW_DIRECT
-                ]),
-                AnalyticsEvent.created_at >= start_date
-            )
-        ).all()
+        # Continuous aggregate 사용
+        query = text("""
+            SELECT
+                mcp_server_id,
+                SUM(view_count)::INTEGER as view_count
+            FROM daily_server_views
+            WHERE day >= :start_date
+                AND mcp_server_id IS NOT NULL
+            GROUP BY mcp_server_id
+            ORDER BY view_count DESC
+            LIMIT :limit
+        """)
 
-        # 메타데이터에서 서버 ID 추출 및 집계
-        server_counts = {}
-        for event in events:
-            metadata = event.get_metadata()
-            server_id = metadata.get("mcp_server_id")
-            if server_id:
-                server_counts[server_id] = server_counts.get(server_id, 0) + 1
+        result = self.db.execute(query, {"start_date": start_date, "limit": limit})
 
-        # 정렬 및 상위 N개 반환
-        sorted_servers = sorted(
-            server_counts.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )[:limit]
-
-        return [{"mcp_server_id": s_id, "view_count": count} for s_id, count in sorted_servers]
+        return [{"mcp_server_id": row[0], "view_count": row[1]} for row in result]
 
     def get_unique_visitors_count(
         self,
@@ -191,21 +187,27 @@ class AnalyticsDAO:
     ) -> Dict[str, int]:
         """
         고유 방문자 수를 집계합니다.
+        TimescaleDB hourly_events를 사용하여 빠른 집계.
 
         Returns:
             {"logged_in_users": 50}
         """
         start_date = datetime.utcnow() - timedelta(days=days)
 
-        # 로그인 사용자 수
-        logged_in_count = self.db.query(
-            func.count(distinct(AnalyticsEvent.user_id))
-        ).filter(
-            and_(
-                AnalyticsEvent.user_id.isnot(None),
-                AnalyticsEvent.created_at >= start_date
-            )
-        ).scalar() or 0
+        # Continuous aggregate 사용
+        query = text("""
+            SELECT COUNT(DISTINCT user_id)::INTEGER
+            FROM (
+                SELECT DISTINCT user_id, hour
+                FROM hourly_events
+                WHERE hour >= :start_date
+                    AND unique_users > 0
+            ) subquery
+            WHERE user_id IS NOT NULL
+        """)
+
+        result = self.db.execute(query, {"start_date": start_date})
+        logged_in_count = result.scalar() or 0
 
         return {
             "logged_in_users": logged_in_count
