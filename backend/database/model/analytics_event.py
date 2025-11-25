@@ -65,7 +65,7 @@ class AnalyticsEvent(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     # 이벤트 기본 정보
-    event_type = Column(SQLEnum(EventType), nullable=False, index=True)
+    event_type = Column(SQLEnum(EventType, values_callable=lambda x: [e.value for e in x]), nullable=False, index=True)
 
     # 사용자 정보 (nullable - 비로그인 사용자 허용)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
