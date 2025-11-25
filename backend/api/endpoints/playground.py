@@ -13,6 +13,7 @@ from backend.api.auth import get_current_user
 from backend.database.database import get_db
 from backend.database.dao.mcp_server_dao import MCPServerDAO
 from backend.service.playground_service import PlaygroundService
+from backend.service.analytics_service import AnalyticsService
 from backend.database.model.user import User
 
 logger = logging.getLogger(__name__)
@@ -157,6 +158,17 @@ async def playground_chat(
         # Increment usage if successful
         if result.get("success"):
             PlaygroundService.increment_usage(db, user_id, server_id)
+
+            # Analytics: Playground 쿼리 추적
+            try:
+                analytics_service = AnalyticsService(db)
+                analytics_service.track_playground_query(
+                    mcp_server_id=server_id,
+                    user_id=user_id,
+                    query_tokens=result.get("tokens_used")
+                )
+            except Exception as e:
+                logger.error(f"Failed to track playground query: {e}")
 
         # Convert result to response schema
         if result.get("success"):
