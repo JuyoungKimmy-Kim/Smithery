@@ -89,7 +89,6 @@ class AnalyticsService:
         self,
         mcp_server_id: int,
         user_id: Optional[int] = None,
-        session_id: Optional[str] = None,
         referrer: Optional[str] = None,
         source: Optional[str] = None
     ):
@@ -98,7 +97,6 @@ class AnalyticsService:
         Args:
             mcp_server_id: MCP 서버 ID
             user_id: 사용자 ID (선택)
-            session_id: 세션 ID (선택)
             referrer: HTTP Referer 헤더
             source: 유입 경로 (search, list, direct 등)
         """
