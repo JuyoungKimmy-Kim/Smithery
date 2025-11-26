@@ -5,11 +5,17 @@ Analytics DAO - Data Access Layer for Analytics
 TimescaleDB continuous aggregates를 사용하여 빠른 집계 쿼리 제공.
 """
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func, desc, distinct, text
+from sqlalchemy import and_, func, desc, distinct
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 
-from backend.database.model import AnalyticsEvent, EventType
+from backend.database.model import (
+    AnalyticsEvent,
+    EventType,
+    HourlyEventsView,
+    DailySearchKeywordsView,
+    DailyServerViewsView
+)
 
 
 class AnalyticsDAO:
@@ -102,22 +108,18 @@ class AnalyticsDAO:
         if start_date is None:
             start_date = datetime.utcnow() - timedelta(days=7)
 
-        # Continuous aggregate 사용
-        query = text("""
-            SELECT COALESCE(SUM(event_count), 0)::INTEGER
-            FROM hourly_events
-            WHERE event_type = :event_type
-                AND hour >= :start_date
-                AND (:end_date IS NULL OR hour <= :end_date)
-        """)
+        # Continuous aggregate 사용 (ORM 스타일)
+        query = self.db.query(
+            func.coalesce(func.sum(HourlyEventsView.event_count), 0)
+        ).filter(
+            HourlyEventsView.event_type == event_type.value,
+            HourlyEventsView.hour >= start_date
+        )
 
-        result = self.db.execute(query, {
-            "event_type": event_type.value,
-            "start_date": start_date,
-            "end_date": end_date
-        })
+        if end_date:
+            query = query.filter(HourlyEventsView.hour <= end_date)
 
-        return result.scalar() or 0
+        return query.scalar() or 0
 
     def get_top_search_keywords(
         self,
@@ -133,22 +135,20 @@ class AnalyticsDAO:
         """
         start_date = datetime.utcnow() - timedelta(days=days)
 
-        # Continuous aggregate 사용
-        query = text("""
-            SELECT
-                keyword,
-                SUM(search_count)::INTEGER as count
-            FROM daily_search_keywords
-            WHERE day >= :start_date
-                AND keyword IS NOT NULL
-            GROUP BY keyword
-            ORDER BY count DESC
-            LIMIT :limit
-        """)
+        # Continuous aggregate 사용 (ORM 스타일)
+        results = self.db.query(
+            DailySearchKeywordsView.keyword,
+            func.sum(DailySearchKeywordsView.search_count).label('count')
+        ).filter(
+            DailySearchKeywordsView.day >= start_date,
+            DailySearchKeywordsView.keyword.isnot(None)
+        ).group_by(
+            DailySearchKeywordsView.keyword
+        ).order_by(
+            desc('count')
+        ).limit(limit).all()
 
-        result = self.db.execute(query, {"start_date": start_date, "limit": limit})
-
-        return [{"keyword": row[0], "count": row[1]} for row in result]
+        return [{"keyword": row.keyword, "count": row.count} for row in results]
 
     def get_most_viewed_servers(
         self,
@@ -164,22 +164,20 @@ class AnalyticsDAO:
         """
         start_date = datetime.utcnow() - timedelta(days=days)
 
-        # Continuous aggregate 사용
-        query = text("""
-            SELECT
-                mcp_server_id,
-                SUM(view_count)::INTEGER as view_count
-            FROM daily_server_views
-            WHERE day >= :start_date
-                AND mcp_server_id IS NOT NULL
-            GROUP BY mcp_server_id
-            ORDER BY view_count DESC
-            LIMIT :limit
-        """)
+        # Continuous aggregate 사용 (ORM 스타일)
+        results = self.db.query(
+            DailyServerViewsView.mcp_server_id,
+            func.sum(DailyServerViewsView.view_count).label('view_count')
+        ).filter(
+            DailyServerViewsView.day >= start_date,
+            DailyServerViewsView.mcp_server_id.isnot(None)
+        ).group_by(
+            DailyServerViewsView.mcp_server_id
+        ).order_by(
+            desc('view_count')
+        ).limit(limit).all()
 
-        result = self.db.execute(query, {"start_date": start_date, "limit": limit})
-
-        return [{"mcp_server_id": row[0], "view_count": row[1]} for row in result]
+        return [{"mcp_server_id": row.mcp_server_id, "view_count": row.view_count} for row in results]
 
     def get_unique_visitors_count(
         self,
@@ -194,20 +192,20 @@ class AnalyticsDAO:
         """
         start_date = datetime.utcnow() - timedelta(days=days)
 
-        # Continuous aggregate 사용
-        query = text("""
-            SELECT COUNT(DISTINCT user_id)::INTEGER
-            FROM (
-                SELECT DISTINCT user_id, hour
-                FROM hourly_events
-                WHERE hour >= :start_date
-                    AND unique_users > 0
-            ) subquery
-            WHERE user_id IS NOT NULL
-        """)
+        # Continuous aggregate 사용 (ORM 스타일)
+        # user_id별 고유 카운트를 위해 서브쿼리 사용
+        subquery = self.db.query(
+            distinct(HourlyEventsView.user_id),
+            HourlyEventsView.hour
+        ).filter(
+            HourlyEventsView.hour >= start_date,
+            HourlyEventsView.unique_users > 0,
+            HourlyEventsView.user_id.isnot(None)
+        ).subquery()
 
-        result = self.db.execute(query, {"start_date": start_date})
-        logged_in_count = result.scalar() or 0
+        logged_in_count = self.db.query(
+            func.count(distinct(subquery.c.user_id))
+        ).scalar() or 0
 
         return {
             "logged_in_users": logged_in_count

@@ -9,6 +9,12 @@ from .comment import Comment
 from .playground_usage import PlaygroundUsage
 from .notification import Notification
 from .analytics_event import AnalyticsEvent, EventType
+from .analytics_views import (
+    HourlyEventsView,
+    DailySearchKeywordsView,
+    DailyServerViewsView,
+    DailyUserActionsView
+)
 
 __all__ = [
     'Base',
@@ -26,5 +32,9 @@ __all__ = [
     'PlaygroundUsage',
     'Notification',
     'AnalyticsEvent',
-    'EventType'
+    'EventType',
+    'HourlyEventsView',
+    'DailySearchKeywordsView',
+    'DailyServerViewsView',
+    'DailyUserActionsView'
 ]
