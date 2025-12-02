@@ -4,7 +4,7 @@ FROM node:18-alpine AS builder
 #Proxy settings for build stage
 ENV https_proxy=""
 ENV no_proxy=""
-COPY ./Certs/ca.crt /usr/local/share/ca-certificates/ca.crt 
+COPY ./Certs/ca.crt /usr/local/share/ca-certificates/ca.crt
 ENV NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/ca.crt
 RUN update-ca-certificates
 
@@ -26,22 +26,19 @@ RUN npm install --include=dev
 
 COPY frontend/ .
 
+# Build for static export
 RUN npm run build -- --no-lint
+RUN npx next export
 
-#Runtime stage
-FROM node:18-alpine
+#Runtime stage - Nginx
+FROM nginx:alpine
 
-WORKDIR /app
-ENV NODE_ENV=production
+# Copy nginx configuration
+COPY nginx/conf.d/default.conf /etc/nginx/conf.d/default.conf
 
-# Copy built application
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/next.config.js ./next.config.js
+# Copy static files from Next.js build
+COPY --from=builder /app/out /usr/share/nginx/html
+COPY --from=builder /app/public /usr/share/nginx/html
 
-# Install only production dependencies
-RUN npm install --only=production
-
-EXPOSE 3000
-CMD ["npm", "start"]
+EXPOSE 80 443
+CMD ["nginx", "-g", "daemon off;"]

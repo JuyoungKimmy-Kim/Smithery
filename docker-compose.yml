@@ -33,7 +33,7 @@ services:
       - db
 
   frontend:
-    container_name: mcp-hub-frontend
+    container_name: mcp-hub-frontend-nginx
     build:
       context: .
       dockerfile: frontend/Dockerfile
@@ -44,9 +44,19 @@ services:
       - HTTPS_PROXY=xxx
       - NO_PROXY=xxx
     ports:
-      - 10002:3000
+      - "${NGINX_PORT:-10002}:9631"
+      - "10080:80"
+    restart: always
+    volumes:
+      - type: bind
+        source: "${CERT_HOST_PATH}/mcp-hub.crt"
+        target: "/etc/nginx/ssl/mcp-hub.crt"
+        read_only: true
+      - type: bind
+        source: "${CERT_HOST_PATH}/mcp-hub.pem"
+        target: "/etc/nginx/ssl/mcp-hub.pem"
+        read_only: true
     depends_on:
       - backend
-
 volumes:
   postgres_data:
