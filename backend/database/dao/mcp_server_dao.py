@@ -143,18 +143,34 @@ class MCPServerDAO:
         ).filter(MCPServer.status == 'pending').order_by(MCPServer.created_at.desc()).all()
     
     def search_mcp_servers(self, keyword: str, status: str = 'approved') -> List[MCPServer]:
-        """키워드로 MCP 서버를 검색합니다."""
+        """키워드로 MCP 서버를 검색합니다. (이름, 설명, 태그에서 검색)"""
+        # 태그에서 키워드를 포함하는 서버 ID 찾기
+        servers_with_matching_tags = self.db.query(MCPServer.id).join(
+            MCPServer.tags
+        ).filter(
+            and_(
+                MCPServer.status == status,
+                Tag.name.ilike(f'%{keyword}%')
+            )
+        ).distinct()
+
+        matching_tag_ids = [s.id for s in servers_with_matching_tags.all()]
+
+        # 이름, 설명 또는 태그에서 키워드가 있는 서버 조회
         query = self.db.query(MCPServer).options(
-            joinedload(MCPServer.owner)
+            joinedload(MCPServer.owner),
+            joinedload(MCPServer.tags)
         ).filter(
             and_(
                 MCPServer.status == status,
                 or_(
                     MCPServer.name.ilike(f'%{keyword}%'),
-                    MCPServer.description.ilike(f'%{keyword}%')
+                    MCPServer.description.ilike(f'%{keyword}%'),
+                    MCPServer.id.in_(matching_tag_ids) if matching_tag_ids else False
                 )
             )
         ).order_by(MCPServer.created_at.desc())
+
         return query.all()
     
     def get_mcp_servers_by_category(self, category: str, status: str = 'approved') -> List[MCPServer]:

@@ -227,40 +227,24 @@ def search_mcp_servers(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    """MCP 서버를 검색합니다."""
+    """MCP 서버를 검색합니다. (키워드로 이름, 설명, 태그 검색)"""
     mcp_service = MCPServerService(db)
     analytics_service = AnalyticsService(db)
 
-    # keyword와 tags 모두 처리
-    if search_request.keyword and search_request.tags:
-        # 둘 다 있으면 AND 조건으로 검색
-        mcp_servers = mcp_service.search_mcp_servers_with_tags(
-            search_request.keyword, search_request.tags, search_request.status
-        )
-    elif search_request.tags:
-        # tags만 있으면 tag 검색
-        mcp_servers = mcp_service.get_mcp_servers_by_tags(
-            search_request.tags, search_request.status
-        )
-    elif search_request.keyword:
-        # keyword만 있으면 keyword 검색
-        mcp_servers = mcp_service.search_mcp_servers(
-            search_request.keyword, search_request.status
-        )
-    else:
-        # 둘 다 없으면 모든 서버 반환
-        mcp_servers = mcp_service.get_approved_mcp_servers()
+    # keyword로 name, description, tags 검색
+    mcp_servers = mcp_service.search_mcp_servers(
+        search_request.keyword, search_request.status
+    )
 
     # Analytics: 검색 이벤트 추적
-    if search_request.keyword:  # 검색어가 있을 때만 추적
-        try:
-            analytics_service.track_search(
-                keyword=search_request.keyword,
-                results_count=len(mcp_servers),
-                tags=search_request.tags
-            )
-        except Exception as e:
-            logger.error(f"Failed to track search event: {e}")
+    try:
+        analytics_service.track_search(
+            keyword=search_request.keyword,
+            results_count=len(mcp_servers),
+            tags=None
+        )
+    except Exception as e:
+        logger.error(f"Failed to track search event: {e}")
 
     return SearchResponse(
         mcp_servers=mcp_servers,
