@@ -62,13 +62,15 @@ class PlaygroundService:
                         api_key=self.api_key,
                         base_url=self.base_url,
                         max_retries=2,  # Limit retries to prevent excessive server load
-                        timeout=180.0   # Overall timeout (3 minutes)
+                        timeout=180.0,   # Overall timeout (3 minutes)
+                        default_headers={"Service-Key": "mcp-playground"}
                     )
                 else:
                     PlaygroundService._shared_client = OpenAI(
                         api_key=self.api_key,
                         max_retries=2,
-                        timeout=180.0
+                        timeout=180.0,
+                        default_headers={"Service-Key": "mcp-playground"}
                     )
                 PlaygroundService._client_config = current_config
 
